@@ -10,3 +10,6 @@ __pycache__/
 postgres-data/
 hf-cache/
 
+node_modules/
+.next/
+tsconfig.tsbuildinfo
