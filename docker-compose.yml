@@ -1,0 +1,50 @@
+services:
+  postgres:
+    image: pgvector/pgvector:pg16
+    container_name: unstandard-postgres
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-unstandard}
+      POSTGRES_USER: ${POSTGRES_USER:-unstandard}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-localdev}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      - ./migrations:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-unstandard} -d ${POSTGRES_DB:-unstandard}"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  tei:
+    image: ghcr.io/huggingface/text-embeddings-inference:latest
+    container_name: unstandard-tei-bge-m3
+    command: ["--model-id", "BAAI/bge-m3", "--port", "8080"]
+    ports:
+      - "8080:8080"
+    volumes:
+      - hf-cache:/data
+    environment:
+      HF_HOME: /data
+
+  depth-service:
+    build:
+      context: ./services/depth-service
+    container_name: unstandard-depth-service
+    environment:
+      DATABASE_URL: ${DATABASE_URL:-postgresql://unstandard:localdev@postgres:5432/unstandard}
+      TEI_BASE_URL: ${TEI_BASE_URL:-http://tei:8080}
+      QWEN_REVIEW_URL: ${QWEN_REVIEW_URL:-http://qwen-review:8001/internal/qwen/review}
+      APP_CONFIG_CACHE_TTL_SECONDS: ${APP_CONFIG_CACHE_TTL_SECONDS:-5}
+    ports:
+      - "8000:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      tei:
+        condition: service_started
+
+volumes:
+  postgres-data:
+  hf-cache:
