@@ -8,6 +8,12 @@ node_modules/
 .pnp
 .pnp.js
 
+# --- Python (depth-service) ---
+.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+
 # --- Build / Output ---
 .next/
 out/
