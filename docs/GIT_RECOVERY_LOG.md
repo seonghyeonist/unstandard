@@ -27,6 +27,30 @@
 
 권장 순서: PR #2를 먼저 머지해 `main` CI를 복구한 뒤, 나머지 브랜치는 `AGENTS.md`/`package-lock.json` 충돌을 수동 조율. (자동 머지/force 금지.)
 
+### 2026-06-22 — PR #2 머지 + 중복/stale 브랜치 정리
+
+- PR #2 (`cursor/setup-dev-environment-baa4`) **머지 완료** → `main` 워크플로 = `ci.yml`만. 깨진 `webpack.yml`/`deno.yml` 제거됨.
+- `dev` → `main`으로 **fast-forward**(작업 손실 0). `dev`도 `ci.yml`만.
+- PR #3 (`feat/initial-nextjs-web`) = 중복 앱(`unstandard-web/`)이라 **닫음**(머지 안 함).
+- 삭제한 원격 브랜치(복구용 SHA):
+  | 브랜치 | 사유 | 삭제 전 SHA |
+  |---|---|---|
+  | `cursor/setup-dev-environment-baa4` | PR #2 머지됨 | `b559c8447ccf230fc9479a2abc058323623125bb` |
+  | `feat/initial-nextjs-web` | PR #3 닫힘(중복 앱) | `d780f667d5861b240888f06e2325ec3cc5d4c5ba` |
+  | `codex/implement-frontend-vertical-slice-for-unstandard` | PR #1 머지됨 | `ba9a9dd286b8ebcffab4919c1509e875ce76e93e` |
+  | `feat/initial-nextjs-web-app` | 옛 main과 동일(고유 작업 0) | `9505e5e2e70f9ab32ea0f6e0199b8ca16d54acda` |
+- 복구: `git push origin <SHA>:refs/heads/<원래이름>`.
+
+### 2026-06-22 — AGENTS 문서 회수 + 잔여 브랜치 정리 (chore/harvest-agent-docs-and-prune-stale-branches)
+
+- `cursor/docs-agents-guide-and-readme-fix-cd9a`의 AGENTS.md에서 **AI 에이전트 운영/작업 규칙 + Git 안전(롤백)만 선별**해 `AGENTS.md`에 반영. README/워크플로/`deno.yml`/`webpack.yml`/app_config 상수/제품 가드레일은 **가져오지 않음**(범위 밖 또는 main이 최신).
+- 회수 후 삭제한 원격 브랜치(복구용 SHA, 본 PR 검증 통과 후 삭제):
+  | 브랜치 | 사유 | 삭제 전 SHA |
+  |---|---|---|
+  | `cursor/initial-nextjs-scaffold-a5d4` | 버려진 평행 스캐폴드(구조 충돌) | `2e492879cf40916369b9d97cb3dc015b3e7ee1b0` |
+  | `cursor/docs-agents-guide-and-readme-fix-cd9a` | AGENTS 내용 회수 완료 | `2f842d80a252761fd25fea3bc275b40573fcb9ae` |
+- 복구: `git push origin <SHA>:refs/heads/<원래이름>`.
+
 ## 복구 치트시트 (비파괴)
 
 ```bash
