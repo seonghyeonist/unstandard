@@ -5,6 +5,12 @@ import type { ApiVerdict, UnlockStatus } from "@/types/api";
 
 type DepthEvaluateResponse = {
   verdict: "PASS" | "REVIEW" | "REJECT";
+  reason_codes?: string[];
+};
+
+export type UnlockAnswerResult = {
+  verdict: ApiVerdict;
+  reasonCodes: string[];
 };
 
 const unlockedProfiles = new Set<string>();
@@ -14,29 +20,36 @@ function questionForProfile(profileId: string): string {
   return candidates.find((candidate) => candidate.id === profileId)?.question ?? "";
 }
 
-export async function submitUnlockAnswer(profileId: string, answer: string): Promise<{ verdict: ApiVerdict }> {
+export async function submitUnlockAnswer(profileId: string, answer: string): Promise<UnlockAnswerResult> {
   try {
-    const verdict: ApiVerdict = hasApiBaseUrl()
-      ? (
-          await apiFetch<DepthEvaluateResponse>("/internal/depth/evaluate", {
-            method: "POST",
-            body: JSON.stringify({
-              user_id: "11111111-1111-1111-1111-111111111111",
-              question_id: onboardingQuestion.id,
-              answer_id: crypto.randomUUID(),
-              question_text: questionForProfile(profileId),
-              answer_text: answer,
-            }),
-          })
-        ).verdict
-      : evaluateDepthAnswer({ questionText: questionForProfile(profileId), answerText: answer }).verdict;
+    let verdict: ApiVerdict;
+    let reasonCodes: string[];
+
+    if (hasApiBaseUrl()) {
+      const response = await apiFetch<DepthEvaluateResponse>("/internal/depth/evaluate", {
+        method: "POST",
+        body: JSON.stringify({
+          user_id: "11111111-1111-1111-1111-111111111111",
+          question_id: onboardingQuestion.id,
+          answer_id: crypto.randomUUID(),
+          question_text: questionForProfile(profileId),
+          answer_text: answer,
+        }),
+      });
+      verdict = response.verdict;
+      reasonCodes = response.reason_codes ?? [];
+    } else {
+      const evaluation = evaluateDepthAnswer({ questionText: questionForProfile(profileId), answerText: answer });
+      verdict = evaluation.verdict;
+      reasonCodes = evaluation.reasonCodes;
+    }
 
     verdicts.set(profileId, verdict);
     if (verdict === "PASS") unlockedProfiles.add(profileId);
-    return { verdict };
+    return { verdict, reasonCodes };
   } catch {
     verdicts.set(profileId, "ERROR");
-    return { verdict: "ERROR" };
+    return { verdict: "ERROR", reasonCodes: [] };
   }
 }
 
