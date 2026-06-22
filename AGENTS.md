@@ -23,3 +23,31 @@ Mini-monorepo with two deliverables:
 
 ### System dependency note
 - Creating the Python venv requires the `python3-venv` system package (installed during environment setup; not part of the update script).
+
+### Quality gate
+- One-shot check: `npm run check` (= `lint` + `typecheck` + `build`). CI (`.github/workflows/ci.yml`) runs the same on Node 20.x/22.x via `npm ci`.
+- Keep `package-lock.json` in sync with `package.json` so `npm ci` stays reproducible.
+
+### Git safety rules (강제)
+- 파괴적 명령을 먼저 쓰지 말 것. `git reset --hard`, `git clean -fd`, `git push --force`, 브랜치 삭제, 히스토리 재작성은 **명시적 승인** 없이는 금지.
+- 되돌릴 때는 비파괴 우선: `git revert <sha>`.
+- 현재 작업 브랜치를 임의로 벗어나지 말 것. `main`에 직접 커밋 금지.
+- 한 번에 하나의 논리적 변경 = 하나의 커밋. 1 브랜치 = 1 에이전트 (동시에 같은 파일 건드리지 말 것 — 충돌/유실 발생).
+
+### PR 리뷰 체크리스트
+- [ ] `npm ci` → `npm run check` 통과(거짓 성공 금지, 실제 실행 결과만 보고)
+- [ ] 의도치 않은 파일 변경 없음 (`git diff --stat` 확인). `next-env.d.ts`는 빌드 산출물이므로 커밋하지 말 것
+- [ ] `.env*`/시크릿 미노출
+- [ ] standalone mock 모드 보존: `.env.example`의 `NEXT_PUBLIC_API_BASE_URL` 기본 빈값 유지
+- [ ] 커밋 메시지 컨벤션(`feat|fix|docs|chore|refactor|test:`) 준수
+
+### 아직 만들지 말 것 (do-not-build-yet)
+현재 우선순위는 repo 안전 → 동작하는 프론트 MVP → CI → 정확한 docs/env 입니다. 명시적 요청 없이는 아래를 구현하지 말 것:
+- Supabase Auth/DB/RLS (현재 인증은 `sessionStorage` mock)
+- real Depth Score 서비스 연동 (현재 `lib/api/answers.ts`의 `mockVerdict` 사용)
+- Playwright 등 새 테스트 프레임워크 / 새 dependency
+- UI 리팩터, 제품 copy 변경
+
+### 알려진 런타임 갭 (백로그, 이번 범위 아님)
+- `lib/api/onboarding.ts`의 `submitOnboardingAnswer`는 답변 텍스트를 저장하지 않음(`void input.answer`).
+- `lib/api/reports.ts`의 `reportTarget`은 no-op.

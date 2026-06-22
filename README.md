@@ -11,9 +11,11 @@
 
 | 항목 | 상태 |
 |------|------|
-| 단계 | MVP 개발 준비 |
+| 단계 | MVP 프론트엔드 vertical slice 구현 (mock 데이터 기반) |
 | 목표 | 50명 클로즈드 알파 테스트 |
 | 배포 | Vercel (예정) |
+
+> 현재 프론트엔드는 **mock 데이터/mock 인증으로 단독 실행**됩니다. Supabase 인증·DB와 실제 Depth Score 서비스 연동은 아직 연결 전(백로그)입니다.
 
 ## 기술 스택
 
@@ -27,29 +29,45 @@
 
 ## 로컬 실행
 
-> ⚠️ 아직 애플리케이션 코드가 없습니다. Phase 2 이후 업데이트됩니다.
+프론트엔드는 백엔드 없이 **mock 모드로 단독 실행**됩니다.
 
 ```bash
 # 1. 의존성 설치
 npm install
 
-# 2. 환경변수 설정
+# 2. 환경변수 설정 (standalone mock 모드: NEXT_PUBLIC_API_BASE_URL 빈값 유지)
 cp .env.example .env.local
-# .env.local 파일을 편집하여 필요한 값을 입력
 
-# 3. 개발 서버 실행
+# 3. 개발 서버 실행 → http://localhost:3000
 npm run dev
+```
+
+### 현재 구현된 화면 (vertical slice)
+
+- `/` 랜딩 → `/login` mock 세션 시작 → `/onboarding` 질문 답변
+- `/app/home` 후보 카드 → `/app/answer/[profileId]` 답변으로 프로필 잠금해제
+- `/app/profile/[id]`, `/app/chat/[matchId]`, `/app/settings`
+
+데이터는 `lib/api/mock-data.ts`, 인증은 `sessionStorage` mock(`lib/api/auth.ts`)입니다.
+
+### 품질 체크
+
+```bash
+npm run lint        # ESLint (--max-warnings=0)
+npm run typecheck   # tsc --noEmit
+npm run build       # next build
+npm run check       # 위 셋을 한 번에
 ```
 
 ## 환경변수
 
-> ⚠️ Phase 4 (Supabase 연결) 이후 업데이트됩니다.
+> Supabase 연결은 추후(백로그)입니다. 현재 사용하는 변수는 아래뿐입니다.
 
 | 변수명 | 설명 | 필수 |
 |--------|------|------|
-| `NEXT_PUBLIC_SUPABASE_URL` | Supabase 프로젝트 URL | ✅ |
-| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Supabase 익명 키 | ✅ |
-| `SUPABASE_SERVICE_ROLE_KEY` | Supabase 서비스 키 (서버 전용) | ✅ |
+| `NEXT_PUBLIC_API_BASE_URL` | depth-service 주소. **비우면 mock 모드**. 값을 채우려면 `docker compose` 백엔드 스택을 먼저 실행해야 함(아니면 답변 잠금해제가 ERROR) | ❌ |
+
+선택적 백엔드 스택(Postgres + TEI 임베딩 + depth-service)은 `docker-compose.yml`로 띄울 수 있으며, 관련 변수는 `.env.example`을 참고하세요.
 
 > **절대로** `.env` 파일이나 API 키를 커밋하지 마세요.
 
