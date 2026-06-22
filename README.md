@@ -136,16 +136,16 @@ npm run lint
 
 ```bash
 # 커밋 전이라면 - 변경 사항 되돌리기
-git checkout -- .
+git restore .
 
 # 커밋 후라면 - 마지막 커밋 취소 (변경 사항은 유지)
 git reset --soft HEAD~1
 
-# 커밋 후 변경 사항도 완전히 되돌리려면 (주의!)
-git reset --hard HEAD~1
+# 이미 push/머지된 변경이라면 - 새 커밋으로 되돌리기
+git revert <sha>
 ```
 
-> ⚠️ `git reset --hard`와 `git push --force`는 최후의 수단입니다. 실행 전 반드시 현재 상태를 확인하세요.
+> ⚠️ `git reset --hard`, `git clean -fd`, `git push --force`는 명시적 승인 없는 자동화 작업에서 금지입니다.
 
 ---
 

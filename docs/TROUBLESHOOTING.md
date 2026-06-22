@@ -43,11 +43,11 @@ Error: Process completed with exit code 1.
 
 ## 4. `next-env.d.ts`가 자꾸 변경됨
 
-원인: `next build`가 재생성하는 산출물입니다. `.gitignore`에 있으나 과거에 커밋되어 추적 중입니다.
+원인: `next build`가 재생성하는 산출물입니다. 이 파일이 추적 중이면 빌드 후 `.next/types/routes.d.ts` 참조가 추가되어 다음 lint에서 `@typescript-eslint/triple-slash-reference` 에러가 날 수 있습니다.
 
-해결: 커밋하지 말 것. 빌드 후 `git checkout -- next-env.d.ts`로 되돌립니다.
+해결: `next-env.d.ts`는 `.gitignore`와 ESLint ignore 대상에 두고 커밋하지 않습니다. 파일이 다시 생성되어도 소스 변경으로 취급하지 않습니다.
 
-주의: `npm run check`(= `lint && typecheck && build`)는 마지막 `build`가 `next-env.d.ts`를 재생성하므로, **연속 2회** 실행하면 두 번째 `lint`가 재생성된 파일의 triple-slash 참조를 잡아 실패할 수 있습니다. CI는 매번 fresh checkout이라 영향 없음. 로컬에서 재실행 전 `git checkout -- next-env.d.ts`로 정리하세요.
+확인: `npm run check`를 반복 실행해도 `next-env.d.ts` 때문에 실패하지 않아야 합니다.
 
 ## 5. depth-service 테스트/실행
 
