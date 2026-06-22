@@ -1,5 +1,6 @@
 import { apiFetch, hasApiBaseUrl } from "@/lib/api/client";
-import { onboardingQuestion } from "@/lib/api/mock-data";
+import { candidates, onboardingQuestion } from "@/lib/api/mock-data";
+import { evaluateDepthAnswer } from "@/lib/depth/evaluate-depth-answer";
 import type { ApiVerdict, UnlockStatus } from "@/types/api";
 
 type DepthEvaluateResponse = {
@@ -9,16 +10,13 @@ type DepthEvaluateResponse = {
 const unlockedProfiles = new Set<string>();
 const verdicts = new Map<string, ApiVerdict>();
 
-function mockVerdict(answer: string): ApiVerdict {
-  const trimmed = answer.trim();
-  if (trimmed.length < 18) return "REJECT";
-  if (trimmed.length < 45 || !/[.?!。！？]|요|다|어요/.test(trimmed)) return "REVIEW";
-  return "PASS";
+function questionForProfile(profileId: string): string {
+  return candidates.find((candidate) => candidate.id === profileId)?.question ?? "";
 }
 
 export async function submitUnlockAnswer(profileId: string, answer: string): Promise<{ verdict: ApiVerdict }> {
   try {
-    const verdict = hasApiBaseUrl()
+    const verdict: ApiVerdict = hasApiBaseUrl()
       ? (
           await apiFetch<DepthEvaluateResponse>("/internal/depth/evaluate", {
             method: "POST",
@@ -26,12 +24,12 @@ export async function submitUnlockAnswer(profileId: string, answer: string): Pro
               user_id: "11111111-1111-1111-1111-111111111111",
               question_id: onboardingQuestion.id,
               answer_id: crypto.randomUUID(),
-              question_text: onboardingQuestion.prompt,
+              question_text: questionForProfile(profileId),
               answer_text: answer,
             }),
           })
         ).verdict
-      : mockVerdict(answer);
+      : evaluateDepthAnswer({ questionText: questionForProfile(profileId), answerText: answer }).verdict;
 
     verdicts.set(profileId, verdict);
     if (verdict === "PASS") unlockedProfiles.add(profileId);
