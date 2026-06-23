@@ -10,12 +10,17 @@ import { BlurredProfileSection } from "@/components/profile/blurred-profile-sect
 import { ReportButton } from "@/components/safety/report-button";
 import { ErrorState, LoadingState } from "@/components/ui/states";
 import { getUnlockStatus } from "@/lib/api/answers";
-import { getProfile } from "@/lib/api/profiles";
+import { getPrivateProfile, getProfile } from "@/lib/api/profiles";
 
 export default function ProfilePage() {
   const params = useParams<{ id: string }>();
   const profile = useQuery({ queryKey: ["profile", params.id], queryFn: () => getProfile(params.id) });
   const unlock = useQuery({ queryKey: ["unlock-status", params.id], queryFn: () => getUnlockStatus(params.id) });
+  const privateContent = useQuery({
+    queryKey: ["profile-private", params.id],
+    queryFn: () => getPrivateProfile(params.id),
+    enabled: Boolean(unlock.data?.unlocked),
+  });
 
   return (
     <AppShell>
@@ -25,7 +30,11 @@ export default function ProfilePage() {
         {profile.data ? (
           <div className="space-y-5">
             <ProfileHeader profile={profile.data} />
-            <BlurredProfileSection profile={profile.data} unlocked={Boolean(unlock.data?.unlocked)} />
+            <BlurredProfileSection
+              profile={profile.data}
+              unlocked={Boolean(unlock.data?.unlocked)}
+              privateContent={privateContent.data}
+            />
             {unlock.data?.unlocked ? (
               <Link className="inline-flex min-h-11 w-full items-center justify-center rounded-full bg-accent px-5 py-3 text-sm font-semibold text-white" href="/app/chat/m1">첫 메시지 쓰기</Link>
             ) : (

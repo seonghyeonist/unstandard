@@ -7,13 +7,18 @@ export type Candidate = {
   question: string;
 };
 
-export type Profile = Candidate & {
+/** Public card + locked preview only — no private letter in client bundles. */
+export type PublicProfile = Candidate & {
   locked: {
     softFacts: string[];
     blurredNote: string;
   };
-  unlocked: {
-    letter: string;
-    smallJoys: string[];
-  };
 };
+
+export type ProfilePrivate = {
+  letter: string;
+  smallJoys: string[];
+};
+
+/** @deprecated Use PublicProfile — full Profile with embedded private fields is removed. */
+export type Profile = PublicProfile;

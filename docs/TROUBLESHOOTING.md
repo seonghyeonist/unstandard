@@ -57,12 +57,25 @@ Error: Process completed with exit code 1.
 
 ## 6. 보안 / mock 모드 주의
 
-현재 앱은 **mock/sessionStorage** 기반입니다. 실사용자 알파 전에 반드시 [`docs/SECURITY_CHECKLIST.md`](./SECURITY_CHECKLIST.md)를 확인하세요.
+실사용자 알파 전에 [`docs/SECURITY_CHECKLIST.md`](./SECURITY_CHECKLIST.md) 확인.
 
-- `sessionStorage` 인증은 DevTools로 위조 가능 — Supabase Auth + middleware 전환 전 실보안 아님.
-- 프로필 `unlocked` 데이터는 JS 번들에 포함 — blur는 UI일 뿐.
-- `NEXT_PUBLIC_API_BASE_URL` 설정 시 브라우저가 depth-service internal API를 직접 호출 — 운영 전 BFF/인증 필요.
-- 신고는 sessionStorage에만 저장 — 서버 미전송.
-- 차단(block) 기능 미구현.
+- **Production fail-closed:** `NODE_ENV=production`에서 Supabase env 없으면 `/app`, `/onboarding` middleware redirect. mock auth 불가.
+- **AUTH_COOKIE_SECRET:** production에서 필수. 없으면 unlock cookie 서명이 throw → unlock 실패 (의도된 fail-closed).
+- Mock auth는 dev-only HttpOnly cookie. `sessionStorage` 인증 제거됨 (PR #11+).
+- 신고는 서버 in-memory buffer — **알파 불가**. Supabase persistence 필요.
+- `NEXT_PUBLIC_API_BASE_URL` 설정 시 depth-service internal API 직접 호출 — BFF 필요.
+- 차단(block) 미구현.
+
+### middleware Edge runtime 경고
+
+`npm run build` 시 다음 경고가 나올 수 있음:
+
+```
+A Node.js API is used (process.version) ... @supabase/supabase-js ... Edge Runtime
+```
+
+- 원인: `middleware.ts`가 `@supabase/ssr`을 import하고, 번들러가 `@supabase/supabase-js` browser 경로까지 포함.
+- **무해하다고 단정하지 말 것.** Vercel Edge preview 배포에서 middleware runtime 오류 여부를 반드시 확인.
+- runtime 오류 시: Supabase 공식 Next.js middleware 패턴 재검토 또는 Node runtime route로 세션 검증 이전 검토.
 
 Supabase/RLS 초안: [`docs/SUPABASE_SETUP.md`](./SUPABASE_SETUP.md), `supabase/migrations/`.
