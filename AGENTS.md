@@ -51,7 +51,7 @@ Mini-monorepo with two deliverables:
 ### Running the frontend (primary product)
 - Standard commands are in `package.json` (`npm run dev` serves on `http://localhost:3000`).
 - The frontend runs **fully standalone on mock data** — most data comes from `lib/api/mock-data.ts` and auth is a `sessionStorage` mock (`lib/api/auth.ts`).
-- **Important caveat for the answer-unlock flow**: `lib/api/answers.ts` calls the real depth-service only when `NEXT_PUBLIC_API_BASE_URL` is set; otherwise it uses the local `mockVerdict`. The shipped `.env.example` sets `NEXT_PUBLIC_API_BASE_URL=http://localhost:8000` and uses Docker-internal hostnames (`postgres`, `tei`). If you copy it to `.env.local` and run `npm run dev` **without** the backend stack actually up, the unlock flow's fetch fails and the UI shows verdict `ERROR`. For standalone frontend development/testing, run with `NEXT_PUBLIC_API_BASE_URL=` empty (i.e. `NEXT_PUBLIC_API_BASE_URL= npm run dev`) so the full UI flow works via the local mock verdict.
+- **Important caveat for the answer-unlock flow**: `lib/api/answers.ts` calls the real depth-service only when `NEXT_PUBLIC_API_BASE_URL` is set; otherwise it uses the local `mockVerdict`. The shipped `.env.example` intentionally keeps `NEXT_PUBLIC_API_BASE_URL=` empty for standalone mock mode. If you set it to `http://localhost:8000`, bring up the backend stack first; otherwise the unlock flow's fetch fails and the UI shows verdict `ERROR`.
 
 ### depth-service
 - Python deps install into a venv at `services/depth-service/.venv` (the update script creates this).
