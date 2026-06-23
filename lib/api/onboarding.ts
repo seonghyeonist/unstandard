@@ -1,3 +1,4 @@
+import { completeMockOnboarding } from "@/app/login/actions";
 import { markOnboarded } from "@/lib/api/auth";
 import { onboardingQuestion } from "@/lib/api/mock-data";
 import { saveOnboardingResponse } from "@/lib/api/onboarding-store";
@@ -12,6 +13,7 @@ export async function getOnboardingQuestion(): Promise<OnboardingQuestion> {
 }
 
 export async function submitOnboardingAnswer(input: { nickname: string; answer: string }) {
+  await completeMockOnboarding(input.nickname);
   const user = await markOnboarded(input.nickname);
 
   const evaluation = evaluateDepthAnswer({

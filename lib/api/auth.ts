@@ -1,3 +1,4 @@
+import { isMockAuthAllowed } from "@/lib/config/auth-mode-client";
 import type { CurrentUser } from "@/types/user";
 
 const USER_KEY = "unstandard.alpha.user";
@@ -18,10 +19,28 @@ function saveFallbackUser(user: CurrentUser | null) {
 }
 
 export async function getCurrentUser(): Promise<CurrentUser | null> {
+  try {
+    const response = await fetch("/api/auth/session", { credentials: "include" });
+    if (response.ok) {
+      const data = (await response.json()) as { user: CurrentUser | null };
+      if (data.user) {
+        saveFallbackUser(data.user);
+        return data.user;
+      }
+    }
+  } catch {
+    // fall through to legacy sessionStorage in dev mock only
+  }
+
+  if (!isMockAuthAllowed()) return null;
   return fallbackUser();
 }
 
 export async function login(nickname = "손님"): Promise<CurrentUser> {
+  if (!isMockAuthAllowed()) {
+    throw new Error("Mock auth is disabled. Configure Supabase Auth.");
+  }
+
   const user: CurrentUser = {
     id: "11111111-1111-1111-1111-111111111111",
     nickname,
@@ -32,6 +51,10 @@ export async function login(nickname = "손님"): Promise<CurrentUser> {
 }
 
 export async function markOnboarded(nickname: string): Promise<CurrentUser> {
+  if (!isMockAuthAllowed()) {
+    throw new Error("Mock auth is disabled. Configure Supabase Auth.");
+  }
+
   const existing = fallbackUser();
   const user: CurrentUser = {
     id: existing?.id ?? "11111111-1111-1111-1111-111111111111",
