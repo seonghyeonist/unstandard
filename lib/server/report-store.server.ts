@@ -4,7 +4,11 @@ import type { ReportRecord } from "@/lib/api/report-store";
 
 /**
  * Ephemeral server-side report buffer for mock/dev until Supabase persistence.
- * Not durable across deploys — intentional for P0 foundation.
+ *
+ * NON-ALPHA-SAFE:
+ * - Lost on server restart / multi-instance deploy
+ * - Not visible to moderators
+ * - Must be replaced with Supabase `reports` table before 50-person alpha
  */
 const serverReports: ReportRecord[] = [];
 

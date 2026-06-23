@@ -1,7 +1,7 @@
 "use server";
 
 import { isMockAuthAllowed } from "@/lib/config/auth-mode";
-import { setMockSessionUser } from "@/lib/auth/mock-session.server";
+import { setMockSessionUser, clearMockSessionUser } from "@/lib/auth/mock-session.server";
 
 const MOCK_USER_ID = "11111111-1111-1111-1111-111111111111";
 
@@ -23,4 +23,8 @@ export async function completeMockOnboarding(nickname: string) {
   const user = { id: MOCK_USER_ID, nickname, onboarded: true };
   await setMockSessionUser(user);
   return user;
+}
+
+export async function endMockSession() {
+  await clearMockSessionUser();
 }

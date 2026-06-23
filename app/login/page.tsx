@@ -5,7 +5,6 @@ import { useRouter } from "next/navigation";
 import { AppShell } from "@/components/layout/app-shell";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { login } from "@/lib/api/auth";
 import { isMockAuthAllowed } from "@/lib/config/auth-mode-client";
 import { startMockSession } from "@/app/login/actions";
 
@@ -17,8 +16,7 @@ export default function LoginPage() {
       if (!isMockAuthAllowed()) {
         throw new Error("Mock auth is disabled. Configure Supabase Auth.");
       }
-      await startMockSession();
-      return login();
+      return startMockSession();
     },
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ["current-user"] });
