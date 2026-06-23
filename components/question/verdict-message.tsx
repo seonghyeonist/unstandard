@@ -1,14 +1,28 @@
 import type { ApiVerdict } from "@/types/api";
+import { verdictCopy } from "@/lib/depth/verdict-copy";
 
-const copy: Record<ApiVerdict, { title: string; className: string }> = {
-  PASS: { title: "이 사람의 세계가 보이기 시작해요.", className: "text-success bg-success/10" },
-  REVIEW: { title: "조금 더 당신답게 적어볼까요?", className: "text-warn bg-warn/10" },
-  REJECT: { title: "너무 짧아서 아직 잘 보이지 않아요.", className: "text-danger bg-danger/10" },
-  ERROR: { title: "잠깐 멈췄어요. 다시 시도해주세요.", className: "text-danger bg-danger/10" },
+const ERROR_COPY = {
+  title: "잠깐 멈췄어요. 다시 시도해주세요.",
+  description: "네트워크가 잠시 흔들렸어요. 같은 답을 한 번만 더 보내볼까요?",
 };
 
-export function VerdictMessage({ verdict }: { verdict?: ApiVerdict }) {
+const className: Record<ApiVerdict, string> = {
+  PASS: "text-success bg-success/10",
+  REVIEW: "text-warn bg-warn/10",
+  REJECT: "text-danger bg-danger/10",
+  ERROR: "text-danger bg-danger/10",
+};
+
+export function VerdictMessage({ verdict, reasonCodes }: { verdict?: ApiVerdict; reasonCodes?: string[] }) {
   if (!verdict) return null;
-  const item = copy[verdict];
-  return <p className={`rounded-2xl px-4 py-3 text-sm font-bold ${item.className}`}>{item.title}</p>;
+
+  const copy =
+    verdict === "ERROR" ? ERROR_COPY : verdictCopy({ verdict, reasonCodes: reasonCodes ?? [] });
+
+  return (
+    <div className={`rounded-2xl px-4 py-3 ${className[verdict]}`}>
+      <p className="text-sm font-bold">{copy.title}</p>
+      <p className="mt-1 text-xs font-medium opacity-80">{copy.description}</p>
+    </div>
+  );
 }

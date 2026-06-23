@@ -23,6 +23,7 @@ export function AnswerForm({ profileId, question }: { profileId: string; questio
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["unlock-status", profileId] }),
   });
   const verdict = mutation.data?.verdict;
+  const reasonCodes = mutation.data?.reasonCodes;
 
   return (
     <Card>
@@ -34,7 +35,7 @@ export function AnswerForm({ profileId, question }: { profileId: string; questio
         </div>
         <TextArea placeholder="예: 어제 편의점 앞에서..." {...form.register("answer")} />
         <FieldError>{form.formState.errors.answer?.message}</FieldError>
-        <VerdictMessage verdict={verdict} />
+        <VerdictMessage verdict={verdict} reasonCodes={reasonCodes} />
         {verdict === "PASS" ? <UnlockAnimation /> : null}
         <Button className="w-full" disabled={mutation.isPending}>{mutation.isPending ? "살펴보는 중" : verdict === "PASS" ? "한 번 더 남기기" : "답 보내기"}</Button>
       </form>

@@ -43,7 +43,38 @@
 3. 사용자 노출 문구 점검:
    - [ ] 화면에 **점수/임계값/"Depth Score"/내부 path 명칭이 보이지 않는다.**
 
-## D. 회귀 (CI 게이트)
+## D. 신고(report) 영속화 (브라우저 수동)
+
+대상: `lib/api/reports.ts` + `lib/api/report-store.ts` (sessionStorage 키 `unstandard.alpha.reports`).
+
+1. 잠금해제한 프로필(`/app/profile/[id]`)에서 "불편한 내용 신고" 클릭.
+   - [ ] 버튼 문구가 "알려줘서 고마워요"로 바뀐다(성공).
+2. DevTools → Application → Session Storage → `unstandard.alpha.reports` 확인.
+   - [ ] 배열에 `{ id, targetType, targetId, reason, createdAt, status:"OPEN" }` 레코드가 생긴다.
+   - [ ] (가능하면) 다른 대상도 신고 → 배열에 **append**되어 항목이 늘어난다(기존 항목 유지).
+3. 페이지 **새로고침** 후:
+   - [ ] 앱이 깨지지 않는다(저장된 reports JSON 파싱 안전).
+4. UI 점검:
+   - [ ] 화면에 관리자/모더레이션/대기열 같은 내부 개념이 노출되지 않는다.
+
+## E. reasonCode 기반 사용자 문구 (브라우저 수동)
+
+대상: `lib/depth/verdict-copy.ts` + `components/question/verdict-message.tsx`.
+
+잠금해제 답변별로 **서로 다른** 문구가 나오는지(항상 "너무 짧아서"가 아님):
+
+| 입력 | 기대 제목 |
+|------|-----------|
+| 빈 답 / 아주 짧은 답 | "조금만 더 적어주세요." |
+| `ㅋㅋㅋ` (반복) | "조금 더 구체적으로 적어볼까요?" |
+| 일반적인 장문(`그냥 보통…`) | "조금 더 구체적으로 적어볼까요?" |
+| `😀😀😀!!!` (기호) | "기호만으로는 아직 열기 어려워요." |
+| 임계 근처(애매) | "거의 다 왔어요." (REVIEW) |
+| 구체적·감정 있는 답 | "이 사람의 세계가 보이기 시작해요." (PASS, 잠금해제) |
+
+- [ ] 점수/임계값/"Depth Score"/내부 path(BASIC·FAST_TRACK·GRAY_BAND·SPAM_REJECT)·modelVersion이 **화면에 안 보인다**.
+
+## F. 회귀 (CI 게이트)
 
 - [ ] `npm run lint`
 - [ ] `npm run typecheck`
