@@ -10,7 +10,7 @@
 | 질문 | 답 |
 |------|-----|
 | PR #11 merged? | **NO** — 인간 머지 대기 |
-| PR #11 foundation-ready? | **YES** — 로컬·CI 검증 통과 (`12ef513`) |
+| PR #11 foundation-ready? | **YES** — 로컬·CI 검증 통과 (`096fc4e`) |
 | Alpha-ready? | **NO — BLOCKED** |
 | Vercel Edge smoke? | **UNVERIFIED** — preview 미실측 |
 
@@ -21,13 +21,14 @@
 | 항목 | 값 |
 |------|-----|
 | **현재 작업 브랜치** | `cursor/p0-supabase-auth-foundation` |
-| **PR #11 HEAD** | `12ef513d4fb89dc24fdb3f12576bfa16b24f2df0` |
+| **PR #11 HEAD** | `096fc4e0728184676592c7cf06b75e3f3a58b13c` |
 | **main (pre-#11)** | `9db9faf` |
 | **PR #11** | https://github.com/seonghyeonist/unstandard/pull/11 |
 
 ### PR #11 커밋
 
 ```
+096fc4e docs: end-of-day handoff and Vercel preview smoke checklist
 12ef513 docs: add session handoff snapshot for P0 auth foundation work
 882b59d fix: harden PR #11 fail-closed auth and unlock boundaries
 1aa22aa feat: add Supabase auth foundation and server-side trust boundaries
@@ -59,7 +60,7 @@
 
 ## 4. 검증 명령 및 결과 (2026-06-23 EOD, 재실행)
 
-브랜치: `cursor/p0-supabase-auth-foundation` @ `12ef513`
+브랜치: `cursor/p0-supabase-auth-foundation` @ `096fc4e`
 
 | Command | Result | Notes |
 |---------|--------|-------|

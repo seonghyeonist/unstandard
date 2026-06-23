@@ -25,7 +25,7 @@ Build success ≠ Edge runtime success. **Preview smoke is mandatory.**
 |-------|-------|
 | Preview URL | _(fill after deploy)_ |
 | Timestamp (UTC) | _(fill)_ |
-| Git SHA | `12ef513` (or post-merge main SHA) |
+| Git SHA | `096fc4e` (or post-merge main SHA) |
 | Env set used | _(see below)_ |
 | Tester | _(name)_ |
 | Result | PASS / FAIL / PARTIAL |
