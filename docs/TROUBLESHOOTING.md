@@ -54,3 +54,15 @@ Error: Process completed with exit code 1.
 - 단위 테스트(DB/임베딩 불필요): `services/depth-service/.venv/bin/python -m pytest` (디렉터리: `services/depth-service`).
 - `GET /health`는 DB 없이 동작하지만, `POST /internal/depth/evaluate`는 TEI 임베딩 서버가 없으면 503.
 - 전체 스택(Postgres pgvector + TEI bge-m3)은 `docker-compose.yml` 필요. 모델 다운로드가 큼 — 프론트 MVP 데모에는 불필요.
+
+## 6. 보안 / mock 모드 주의
+
+현재 앱은 **mock/sessionStorage** 기반입니다. 실사용자 알파 전에 반드시 [`docs/SECURITY_CHECKLIST.md`](./SECURITY_CHECKLIST.md)를 확인하세요.
+
+- `sessionStorage` 인증은 DevTools로 위조 가능 — Supabase Auth + middleware 전환 전 실보안 아님.
+- 프로필 `unlocked` 데이터는 JS 번들에 포함 — blur는 UI일 뿐.
+- `NEXT_PUBLIC_API_BASE_URL` 설정 시 브라우저가 depth-service internal API를 직접 호출 — 운영 전 BFF/인증 필요.
+- 신고는 sessionStorage에만 저장 — 서버 미전송.
+- 차단(block) 기능 미구현.
+
+Supabase/RLS 초안: [`docs/SUPABASE_SETUP.md`](./SUPABASE_SETUP.md), `supabase/migrations/`.

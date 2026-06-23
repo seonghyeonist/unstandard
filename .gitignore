@@ -22,9 +22,13 @@ dist/
 
 # --- Environment Variables (절대 커밋 금지) ---
 .env
+.env.*
 .env.local
+.env.development
 .env.development.local
+.env.test
 .env.test.local
+.env.production
 .env.production.local
 .env*.local
 

@@ -29,7 +29,7 @@
 ```
 
 ### 시크릿 취급
-- 실제 값은 `.env.local`(앱) / `.env`(docker)에만. 예시는 `.env.example`로만 관리(`.gitignore`가 `.env*` 무시).
+- 실제 값은 `.env.local`(앱) / `.env`(docker)에만. 예시는 `.env.example`로만 관리(`.gitignore`가 `.env`, `.env.*`, `.env*.local` 무시).
 - `NEXT_PUBLIC_` 접두어가 붙은 변수만 클라이언트에 노출된다. **서버 전용 키에는 절대 붙이지 않는다.**
 - 커밋 전 `git diff`에 키/토큰/비밀번호가 없는지 점검.
 

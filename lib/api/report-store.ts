@@ -11,8 +11,8 @@ const STORAGE_KEY = "unstandard.alpha.reports";
 
 export type ReportRecord = {
   id: string;
-  reporterUserId?: string;
-  targetType: "profile" | "answer" | "message" | string;
+  reporterUserId: string;
+  targetType: "profile" | "answer" | "message";
   targetId: string;
   reason: string;
   createdAt: string;
