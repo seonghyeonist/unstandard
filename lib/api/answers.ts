@@ -1,3 +1,4 @@
+import { getCurrentUser } from "@/lib/api/auth";
 import { apiFetch, hasApiBaseUrl } from "@/lib/api/client";
 import { candidates, onboardingQuestion } from "@/lib/api/mock-data";
 import { evaluateDepthAnswer } from "@/lib/depth/evaluate-depth-answer";
@@ -22,6 +23,7 @@ function questionForProfile(profileId: string): string {
 
 export async function submitUnlockAnswer(profileId: string, answer: string): Promise<UnlockAnswerResult> {
   try {
+    const user = await getCurrentUser();
     let verdict: ApiVerdict;
     let reasonCodes: string[];
 
@@ -29,7 +31,7 @@ export async function submitUnlockAnswer(profileId: string, answer: string): Pro
       const response = await apiFetch<DepthEvaluateResponse>("/internal/depth/evaluate", {
         method: "POST",
         body: JSON.stringify({
-          user_id: "11111111-1111-1111-1111-111111111111",
+          user_id: user?.id ?? "anonymous-mock-user",
           question_id: onboardingQuestion.id,
           answer_id: crypto.randomUUID(),
           question_text: questionForProfile(profileId),
