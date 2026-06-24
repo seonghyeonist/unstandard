@@ -1,7 +1,10 @@
 import { NextResponse } from "next/server";
 import { getAuthenticatedUser } from "@/lib/auth/server";
-import { validateReportInput } from "@/lib/security/report-validation";
-import { appendServerReport } from "@/lib/server/report-store.server";
+import { validateReportForUser } from "@/lib/security/report-validation";
+import {
+  createOrGetOpenReport,
+  isPersistenceNotConfiguredError,
+} from "@/lib/server/persistence/reports.repository";
 
 export async function POST(request: Request) {
   const user = await getAuthenticatedUser();
@@ -23,28 +26,37 @@ export async function POST(request: Request) {
   const input = body as Record<string, unknown>;
 
   try {
-    const validated = validateReportInput({
-      targetType: String(input.targetType ?? ""),
-      targetId: String(input.targetId ?? ""),
-      reason: String(input.reason ?? ""),
-      reporterUserId: input.reporterUserId as string | undefined,
-    });
+    const validated = validateReportForUser(
+      {
+        targetType: String(input.targetType ?? ""),
+        targetId: String(input.targetId ?? ""),
+        reason: String(input.reason ?? ""),
+        reporterUserId: input.reporterUserId as string | undefined,
+      },
+      user.id,
+    );
 
-    const record = {
-      id: crypto.randomUUID(),
+    const { record, created } = await createOrGetOpenReport({
       reporterUserId: user.id,
       targetType: validated.targetType,
       targetId: validated.targetId,
       reason: validated.reason,
-      createdAt: new Date().toISOString(),
-      status: "OPEN" as const,
-    };
+    });
 
-    appendServerReport(record);
-
-    return NextResponse.json({ ok: true, id: record.id });
+    return NextResponse.json({ ok: true, id: record.id }, { status: created ? 201 : 200 });
   } catch (error) {
-    const message = error instanceof Error ? error.message : "Invalid report";
-    return NextResponse.json({ error: message }, { status: 400 });
+    if (isPersistenceNotConfiguredError(error)) {
+      return NextResponse.json({ error: "Report persistence unavailable" }, { status: 503 });
+    }
+
+    if (error instanceof Error) {
+      const message = error.message;
+      if (message === "Report lookup failed" || message === "Report create failed") {
+        return NextResponse.json({ error: "Report submission failed" }, { status: 500 });
+      }
+      return NextResponse.json({ error: message }, { status: 400 });
+    }
+
+    return NextResponse.json({ error: "Invalid report" }, { status: 400 });
   }
 }

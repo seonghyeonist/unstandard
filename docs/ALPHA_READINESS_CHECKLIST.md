@@ -21,11 +21,11 @@
 
 ### 데이터·RLS
 
-- [ ] Supabase migration 적용 (`supabase/migrations/`)
-- [ ] RLS 정책 활성화 및 테스트 (`0002_rls_policies.sql`)
+- [ ] Supabase migration 적용 (`supabase/migrations/` incl. `0003_reports_dedup_index.sql`)
+- [ ] RLS 정책 활성화 및 테스트 (`0002_rls_policies.sql`) — **human verification required**
 - [ ] DB-backed profiles (mock-public → Supabase adapter)
 - [ ] DB-backed answers (온보딩·unlock 답변 영속)
-- [ ] DB-backed reports (in-memory `report-store.server.ts` 교체)
+- [x] DB-backed reports **code path** (`lib/server/persistence/reports.repository.ts` + `POST /api/reports`) — **migration apply + RLS smoke still human**
 - [ ] Block 기능 (`GET/POST/DELETE /api/blocks` + DB + RLS)
 - [ ] Unlock state: DB가 source of truth, HttpOnly cookie는 cache만
 
@@ -79,7 +79,7 @@
 | 항목 | 현재 상태 |
 |------|-----------|
 | Login UI | Mock session only; Supabase UI 미연결 |
-| Reports | In-memory server buffer (`report-store.server.ts`) |
+| Reports | DB repository coded; **migration + RLS apply human** | In-memory deprecated |
 | Blocks | 미구현 |
 | Unlock | HMAC HttpOnly cookie only (DB 없음) |
 | Onboarding answers | `sessionStorage` (`onboarding-store.ts`) — 알파-safe 아님 |

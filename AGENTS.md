@@ -95,7 +95,7 @@ Mini-monorepo with two deliverables:
 
 ### 알려진 런타임 갭 (백로그, 이번 범위 아님)
 - Supabase login UI 미연결 — login 페이지는 dev mock만 (`app/login/page.tsx`)
-- Reports: API는 있으나 `lib/server/report-store.server.ts` in-memory (NON-ALPHA-SAFE)
+- Reports: `POST /api/reports` → Supabase when persistence env set; 503 if not. In-memory store deprecated.
 - Unlock: DB source of truth 없음 (signed cookie only)
 - Block 기능 미구현
 - `lib/api/onboarding-store.ts`: onboarding은 `sessionStorage` (알파-safe 아님)
