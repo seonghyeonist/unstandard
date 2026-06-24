@@ -54,6 +54,9 @@ export async function POST(request: Request) {
       if (message === "Report lookup failed" || message === "Report create failed") {
         return NextResponse.json({ error: "Report submission failed" }, { status: 500 });
       }
+      if (message === "Reporter profile required") {
+        return NextResponse.json({ error: "Profile setup required before reporting" }, { status: 409 });
+      }
       return NextResponse.json({ error: message }, { status: 400 });
     }
 

@@ -57,4 +57,9 @@ export function resolveCreateOrGetOpenReport(
   return { record: created, created: true };
 }
 
+/** Maps DB insert outcome to HTTP created flag (false for pre-check dup or 23505 race). */
+export function resolveReportCreatedStatus(inserted: boolean): boolean {
+  return inserted;
+}
+
 export type { ReportsRow };

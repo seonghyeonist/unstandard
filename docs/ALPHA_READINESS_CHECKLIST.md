@@ -26,6 +26,7 @@
 - [ ] DB-backed profiles (mock-public → Supabase adapter)
 - [ ] DB-backed answers (온보딩·unlock 답변 영속)
 - [x] DB-backed reports **code path** (`lib/server/persistence/reports.repository.ts` + `POST /api/reports`) — **migration apply + RLS smoke still human**
+- [ ] Reporter has `profiles` row before report insert (`reports.reporter_user_id` FK) — **409 if missing**
 - [ ] Block 기능 (`GET/POST/DELETE /api/blocks` + DB + RLS)
 - [ ] Unlock state: DB가 source of truth, HttpOnly cookie는 cache만
 

@@ -5,6 +5,7 @@ import {
   PersistenceNotConfiguredError,
   mapReportsRowToRecord,
   resolveCreateOrGetOpenReport,
+  resolveReportCreatedStatus,
 } from "../lib/server/persistence/reports.mapper.ts";
 
 describe("mapReportsRowToRecord", () => {
@@ -64,6 +65,16 @@ describe("resolveCreateOrGetOpenReport", () => {
     const result = resolveCreateOrGetOpenReport(null, created);
     assert.equal(result.created, true);
     assert.equal(result.record.id, "new-id");
+  });
+});
+
+describe("resolveReportCreatedStatus", () => {
+  it("returns false when insert was skipped due to 23505 race recovery", () => {
+    assert.equal(resolveReportCreatedStatus(false), false);
+  });
+
+  it("returns true only on successful insert", () => {
+    assert.equal(resolveReportCreatedStatus(true), true);
   });
 });
 

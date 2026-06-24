@@ -5,6 +5,7 @@ import { createClient } from "@/lib/supabase/server";
 import {
   PersistenceNotConfiguredError,
   mapReportsRowToRecord,
+  resolveReportCreatedStatus,
   type CreateReportInput,
   type ReportsRow,
 } from "@/lib/server/persistence/reports.mapper";
@@ -14,6 +15,7 @@ export {
   isPersistenceNotConfiguredError,
   mapReportsRowToRecord,
   resolveCreateOrGetOpenReport,
+  resolveReportCreatedStatus,
   type CreateReportInput,
 } from "@/lib/server/persistence/reports.mapper";
 
@@ -51,7 +53,7 @@ export async function findOpenDuplicateReport(
 
 export async function createReport(
   input: CreateReportInput,
-): Promise<import("@/lib/api/report-store").ReportRecord> {
+): Promise<{ record: import("@/lib/api/report-store").ReportRecord; inserted: boolean }> {
   assertPersistenceEnabled();
   const supabase = await createClient();
 
@@ -71,13 +73,16 @@ export async function createReport(
     if (error.code === "23505") {
       const duplicate = await findOpenDuplicateReport(input);
       if (duplicate) {
-        return duplicate;
+        return { record: duplicate, inserted: false };
       }
+    }
+    if (error.code === "23503") {
+      throw new Error("Reporter profile required");
     }
     throw new Error("Report create failed");
   }
 
-  return mapReportsRowToRecord(data as ReportsRow);
+  return { record: mapReportsRowToRecord(data as ReportsRow), inserted: true };
 }
 
 export async function createOrGetOpenReport(
@@ -88,6 +93,6 @@ export async function createOrGetOpenReport(
     return { record: existing, created: false };
   }
 
-  const created = await createReport(input);
-  return { record: created, created: true };
+  const { record, inserted } = await createReport(input);
+  return { record, created: resolveReportCreatedStatus(inserted) };
 }

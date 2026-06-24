@@ -7,6 +7,14 @@
 --
 -- This migration touches reports ONLY. Unlocks and blocks are intentionally
 -- unchanged — identity model (mock slug vs profile UUID) is still unresolved.
+--
+-- Preflight before apply (human): duplicate OPEN rows will make this index fail.
+--   SELECT reporter_user_id, target_type, target_id, COUNT(*) AS n
+--   FROM public.reports
+--   WHERE status = 'OPEN'
+--   GROUP BY 1, 2, 3
+--   HAVING COUNT(*) > 1;
+-- Resolve duplicates manually before running this migration.
 
 CREATE UNIQUE INDEX IF NOT EXISTS idx_reports_open_dedup
   ON public.reports (reporter_user_id, target_type, target_id)
