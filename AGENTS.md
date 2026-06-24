@@ -8,6 +8,9 @@
 
 ### 핵심 규칙
 - **한 기능 = 한 브랜치 = 한 에이전트.** 무관한 변경을 같은 브랜치에 섞지 않는다. 브랜치당 PR 하나, 작게 유지.
+- **제품 전략 드리프트 금지.** 대학생 쐐기를 제품 정체성으로 하드코딩하지 말 것. 알파/베타·staged reveal 방침은 [`docs/PRODUCT_DIRECTION.md`](./docs/PRODUCT_DIRECTION.md)를 따른다.
+- **`sessionStorage` / `localStorage`를 알파-safe source of truth로 쓰지 말 것.** 인증·신고·차단·unlock 진실은 서버 + DB + RLS가 담당한다.
+- **P0 안전 게이트 전 고급 기능 금지.** 실제 매칭, 프로덕션 AI Depth Score, 사진 reveal, 결제/수익화는 [`docs/ALPHA_READINESS_CHECKLIST.md`](./docs/ALPHA_READINESS_CHECKLIST.md) P0 통과 후.
 - **큰 재작성 금지.** 이미 동작하는 코드/파일은 **재생성하지 말고 그대로 둔다.** 광범위 리팩터링은 별도 브랜치 + 명시적 승인.
 - **변경 후 항상 `git diff --stat` / `git diff` 확인** — 의도치 않은 파일이 바뀌지 않았는지 검증.
 - **TypeScript strict 유지**, 영리한 추상화보다 단순·유지보수 가능한 코드.
@@ -50,7 +53,7 @@ Mini-monorepo with two deliverables:
 
 ### Running the frontend (primary product)
 - Standard commands are in `package.json` (`npm run dev` serves on `http://localhost:3000`).
-- The frontend runs **fully standalone on mock data** — most data comes from `lib/api/mock-data.ts` and auth is a `sessionStorage` mock (`lib/api/auth.ts`).
+- The frontend runs **fully standalone on mock data** — most data comes from `lib/api/mock-data.ts`. Auth: dev mock uses HttpOnly cookie (`lib/auth/mock-session.server.ts`); production requires Supabase (`middleware.ts` fail-closed). Client reads session via `GET /api/auth/session` (`lib/api/auth.ts`).
 - **Important caveat for the answer-unlock flow**: `lib/api/answers.ts` calls the real depth-service only when `NEXT_PUBLIC_API_BASE_URL` is set; otherwise it uses the local `mockVerdict`. The shipped `.env.example` intentionally keeps `NEXT_PUBLIC_API_BASE_URL=` empty for standalone mock mode. If you set it to `http://localhost:8000`, bring up the backend stack first; otherwise the unlock flow's fetch fails and the UI shows verdict `ERROR`.
 
 ### depth-service
@@ -83,12 +86,16 @@ Mini-monorepo with two deliverables:
 - [ ] 커밋 메시지 컨벤션(`feat|fix|docs|chore|refactor|test:`) 준수
 
 ### 아직 만들지 말 것 (do-not-build-yet)
-현재 우선순위는 repo 안전 → 동작하는 프론트 MVP → CI → 정확한 docs/env 입니다. 명시적 요청 없이는 아래를 구현하지 말 것:
-- Supabase Auth/DB/RLS (현재 인증은 `sessionStorage` mock)
-- real Depth Score 서비스 연동 (현재 `lib/api/answers.ts`의 `mockVerdict` 사용)
+현재 우선순위는 **P0 알파 게이트** → DB 영속·RLS·신고/차단 → 그 다음 제품 확장입니다. 명시적 요청 없이는 아래를 구현하지 말 것:
+- 실제 매칭 알고리즘, 추천/개인화
+- 프로덕션 AI Depth Score (현재 `lib/depth/evaluate-depth-answer.ts` 결정론적 mock만)
+- 사진 reveal, 외모 랭킹, 결제/수익화
 - Playwright 등 새 테스트 프레임워크 / 새 dependency
-- UI 리팩터, 제품 copy 변경
+- UI 리팩터, 제품 copy 변경 (전략 문서 승인 없이)
 
 ### 알려진 런타임 갭 (백로그, 이번 범위 아님)
-- `lib/api/onboarding.ts`의 `submitOnboardingAnswer`는 답변 텍스트를 저장하지 않음(`void input.answer`).
-- `lib/api/reports.ts`의 `reportTarget`은 no-op.
+- Supabase login UI 미연결 — login 페이지는 dev mock만 (`app/login/page.tsx`)
+- Reports: API는 있으나 `lib/server/report-store.server.ts` in-memory (NON-ALPHA-SAFE)
+- Unlock: DB source of truth 없음 (signed cookie only)
+- Block 기능 미구현
+- `lib/api/onboarding-store.ts`: onboarding은 `sessionStorage` (알파-safe 아님)
