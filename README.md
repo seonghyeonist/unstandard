@@ -15,7 +15,7 @@
 | 목표 | 50명 클로즈드 알파 테스트 |
 | 배포 | Vercel (예정) |
 
-> 현재 프론트엔드는 **mock 데이터/mock 인증으로 단독 실행**됩니다. Supabase 인증·DB와 실제 Depth Score 서비스 연동은 아직 연결 전(백로그)입니다.
+> 현재 프론트엔드는 **mock 데이터로 단독 실행** 가능합니다. Supabase auth **foundation**(middleware, fail-closed)은 머지되었으나 **login UI·DB 영속·RLS는 미완** — 50인 알파는 **BLOCKED**. 제품 전략: [`docs/PRODUCT_DIRECTION.md`](./docs/PRODUCT_DIRECTION.md) · 게이트: [`docs/ALPHA_READINESS_CHECKLIST.md`](./docs/ALPHA_READINESS_CHECKLIST.md).
 
 ## 기술 스택
 
@@ -44,11 +44,11 @@ npm run dev
 
 ### 현재 구현된 화면 (vertical slice)
 
-- `/` 랜딩 → `/login` mock 세션 시작 → `/onboarding` 질문 답변
+- `/` 랜딩 → `/login` (dev: mock HttpOnly 세션) → `/onboarding` 질문 답변
 - `/app/home` 후보 카드 → `/app/answer/[profileId]` 답변으로 프로필 잠금해제
 - `/app/profile/[id]`, `/app/chat/[matchId]`, `/app/settings`
 
-데이터는 `lib/api/mock-data.ts`, 인증은 `sessionStorage` mock(`lib/api/auth.ts`)입니다.
+데이터는 `lib/api/mock-data.ts`. 인증: dev mock cookie + `GET /api/auth/session`; production은 Supabase env 필수 (`lib/api/auth.ts`, `middleware.ts`).
 
 ### 품질 체크
 
@@ -61,11 +61,13 @@ npm run check       # 위 셋을 한 번에
 
 ## 환경변수
 
-> Supabase 연결은 추후(백로그)입니다. 현재 사용하는 변수는 아래뿐입니다.
+> 로컬 mock 개발에 필수인 변수는 적습니다. Production/preview 알파에는 Supabase·`AUTH_COOKIE_SECRET` 등 추가 env가 필요합니다 (`docs/SUPABASE_SETUP.md`).
 
 | 변수명 | 설명 | 필수 |
 |--------|------|------|
-| `NEXT_PUBLIC_API_BASE_URL` | depth-service 주소. **비우면 mock 모드**. 값을 채우려면 `docker compose` 백엔드 스택을 먼저 실행해야 함(아니면 답변 잠금해제가 ERROR) | ❌ |
+| `NEXT_PUBLIC_API_BASE_URL` | depth-service 주소. **비우면 mock 모드**. 값을 채우려면 `docker compose` 백엔드 스택을 먼저 실행해야 함(아니면 답변 잠금해제가 ERROR) | ❌ (mock) |
+| `NEXT_PUBLIC_SUPABASE_URL` / `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Production·preview protected routes | ✅ (prod) |
+| `AUTH_COOKIE_SECRET` | Unlock signed cookie (production) | ✅ (prod) |
 
 선택적 백엔드 스택(Postgres + TEI 임베딩 + depth-service)은 `docker-compose.yml`로 띄울 수 있으며, 관련 변수는 `.env.example`을 참고하세요.
 
