@@ -80,7 +80,7 @@
 | 항목 | 현재 상태 |
 |------|-----------|
 | Login UI | Mock session only; Supabase UI 미연결 |
-| Reports | DB repository coded; **migration + RLS apply human** | In-memory deprecated |
+| Reports | DB repository coded; migration + RLS apply human. In-memory deprecated. |
 | Blocks | 미구현 |
 | Unlock | HMAC HttpOnly cookie only (DB 없음) |
 | Onboarding answers | `sessionStorage` (`onboarding-store.ts`) — 알파-safe 아님 |
