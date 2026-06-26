@@ -29,9 +29,16 @@
 
 ```bash
 # 실행한 테스트 명령과 결과를 붙여넣어 주세요
+npm ci
 npm run lint
+npm run typecheck
+npm run test
 npm run build
+npm run check
+npm audit --audit-level=moderate
 ```
+
+> 알려진 moderate advisory: Next.js 번들 postcss (`GHSA-qx2v-qp2m-jg93`). `npm audit fix --force`는 Next major 다운그레이드를 유발하므로 사용하지 않습니다.
 
 ## 롤백 방법
 
@@ -48,6 +55,13 @@ npm run build
 - [ ] 커밋 메시지가 컨벤션을 따르는가 (`feat:`, `fix:` 등)
 - [ ] 의도하지 않은 파일이 변경되지 않았는가
 - [ ] `.env` 또는 시크릿이 코드에 노출되지 않았는가
+- [ ] 불필요한 리팩터링/제품 동작 변경이 섞이지 않았는가
+- [ ] `npm ci` 통과
 - [ ] `npm run lint` 통과
+- [ ] `npm run typecheck` 통과
+- [ ] `npm run test` 통과
 - [ ] `npm run build` 통과
+- [ ] `npm run check` 통과
+- [ ] `npm audit --audit-level=moderate` 확인 (알려진 Next/postcss moderate만 허용)
+- [ ] UI 변경 시 스크린샷/녹화 등 확인 자료를 첨부했는가 (해당 시)
 - [ ] (보안 관련) 악마의 대변인 리뷰 통과
