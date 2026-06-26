@@ -23,7 +23,7 @@
 
 - [ ] Supabase migration 적용 (`supabase/migrations/`)
 - [ ] RLS 정책 활성화 및 테스트 (`0002_rls_policies.sql`)
-- [ ] DB-backed profiles (mock-public → Supabase adapter)
+- [ ] Reporter profile bootstrap staging smoke (`ensureReporterProfile` + reports insert; nickname not email-derived)
 - [ ] DB-backed answers (온보딩·unlock 답변 영속)
 - [ ] DB-backed reports via `ReportsRepository` (alpha adapter wired; migration + RLS smoke pending)
 - [ ] Block 기능 (`GET/POST/DELETE /api/blocks` + DB + RLS)
@@ -79,7 +79,7 @@
 | 항목 | 현재 상태 |
 |------|-----------|
 | Login UI | Mock session only; Supabase UI 미연결 |
-| Reports | `ReportsRepository` + Supabase alpha adapter (migration/RLS smoke pending) |
+| Reports | `ReportsRepository` + explicit adapter gate; `ensureReporterProfile` before insert when enabled |
 | Blocks | 미구현 |
 | Unlock | HMAC HttpOnly cookie only (DB 없음) |
 | Onboarding answers | `sessionStorage` (`onboarding-store.ts`) — 알파-safe 아님 |

@@ -1,6 +1,9 @@
 import { NextResponse } from "next/server";
 import { getAuthenticatedUser } from "@/lib/auth/server";
+import { isReportsPersistenceEnabled } from "@/lib/config/persistence-mode";
 import { validateReportForUser } from "@/lib/security/report-validation";
+import { ensureReporterProfile } from "@/lib/server/profile/profile-bootstrap";
+import { mapReporterProfileFailure } from "@/lib/server/profile/profile-bootstrap.http-mapper";
 import { createReportHttpResponse } from "@/lib/server/persistence/reports.http";
 import { createReportsRepository } from "@/lib/server/persistence/reports.repository.factory";
 
@@ -34,9 +37,19 @@ export async function POST(request: Request) {
       user.id,
     );
 
+    let reporterUserId = user.id;
+    if (isReportsPersistenceEnabled()) {
+      const reporterProfile = await ensureReporterProfile(user);
+      if (!reporterProfile.ok) {
+        const failure = mapReporterProfileFailure(reporterProfile);
+        return NextResponse.json(failure.body, { status: failure.status });
+      }
+      reporterUserId = reporterProfile.profileId;
+    }
+
     const repository = createReportsRepository();
     const result = await repository.createOrGetOpenReport({
-      reporterUserId: user.id,
+      reporterUserId,
       targetType: validated.targetType,
       targetId: validated.targetId,
       reason: validated.reason,
