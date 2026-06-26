@@ -55,6 +55,7 @@ npm audit --audit-level=moderate
 - [ ] 커밋 메시지가 컨벤션을 따르는가 (`feat:`, `fix:` 등)
 - [ ] 의도하지 않은 파일이 변경되지 않았는가
 - [ ] `.env` 또는 시크릿이 코드에 노출되지 않았는가
+- [ ] 불필요한 리팩터링/제품 동작 변경이 섞이지 않았는가
 - [ ] `npm ci` 통과
 - [ ] `npm run lint` 통과
 - [ ] `npm run typecheck` 통과
@@ -62,4 +63,5 @@ npm audit --audit-level=moderate
 - [ ] `npm run build` 통과
 - [ ] `npm run check` 통과
 - [ ] `npm audit --audit-level=moderate` 확인 (알려진 Next/postcss moderate만 허용)
+- [ ] UI 변경 시 스크린샷/녹화 등 확인 자료를 첨부했는가 (해당 시)
 - [ ] (보안 관련) 악마의 대변인 리뷰 통과

@@ -11,6 +11,7 @@
 - **제품 전략 드리프트 금지.** 대학생 쐐기를 제품 정체성으로 하드코딩하지 말 것. 알파/베타·staged reveal 방침은 [`docs/PRODUCT_DIRECTION.md`](./docs/PRODUCT_DIRECTION.md)를 따른다.
 - **`sessionStorage` / `localStorage`를 알파-safe source of truth로 쓰지 말 것.** 인증·신고·차단·unlock 진실은 서버 + DB + RLS가 담당한다.
 - **P0 안전 게이트 전 고급 기능 금지.** 실제 매칭, 프로덕션 AI Depth Score, 사진 reveal, 결제/수익화는 [`docs/ALPHA_READINESS_CHECKLIST.md`](./docs/ALPHA_READINESS_CHECKLIST.md) P0 통과 후.
+- **Supabase를 프로덕션 아키텍처로 취급하지 말 것.** 영속성은 교체 가능한 repository interface 뒤에 둔다 — [`docs/PERSISTENCE_BOUNDARY.md`](./docs/PERSISTENCE_BOUNDARY.md).
 - **큰 재작성 금지.** 이미 동작하는 코드/파일은 **재생성하지 말고 그대로 둔다.** 광범위 리팩터링은 별도 브랜치 + 명시적 승인.
 - **변경 후 항상 `git diff --stat` / `git diff` 확인** — 의도치 않은 파일이 바뀌지 않았는지 검증.
 - **TypeScript strict 유지**, 영리한 추상화보다 단순·유지보수 가능한 코드.

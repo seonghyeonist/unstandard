@@ -44,3 +44,18 @@ Before merging persistence work, confirm:
 - `main`: reports use in-memory buffer (`lib/server/report-store.server.ts`) — **not alpha-safe**.
 - Open PR #13: Supabase-coupled repository — **needs reframe** before merge (interface boundary first).
 - Auth middleware uses Supabase SSR as an alpha auth adapter — existing; do not deepen without boundary review.
+
+## Immediate implication for PR #13
+
+**Do not merge PR #13 as-is.**
+
+Before that PR can proceed:
+
+1. Introduce a generic `ReportsRepository` interface (backend-agnostic input/output types).
+2. Move Supabase-specific code under an adapter path only, e.g. `lib/server/persistence/adapters/supabase/reports.repository.ts`.
+3. Keep `POST /api/reports` route logic backend-agnostic — route imports a factory/interface, not `@supabase/*`.
+4. Preserve HTTP behavior: 401 / 400 / 503 / 409 / 500 / 201 / 200 as currently specified.
+5. Tests assert route/repository **behavior**, not Supabase SDK internals.
+6. Document in PR body that Supabase is temporary alpha infrastructure, not production architecture.
+
+See also: [`docs/NEXT_TASK_REPORTS_REPOSITORY_REFRAME.md`](./NEXT_TASK_REPORTS_REPOSITORY_REFRAME.md).

@@ -159,6 +159,8 @@ git revert <commit-sha>
 
 > ⚠️ `git reset --hard`, `git clean -fd`, `git push --force`, 브랜치 삭제, 히스토리 재작성은 **명시적 승인 없이 사용하지 않습니다.** 최후의 수단이며, 공유 브랜치에서는 `git revert`를 우선합니다.
 
+영속성(persistence) 설계 원칙: Supabase는 알파/프로토타입 어댑터일 뿐이며 프로덕션 백엔드가 아닙니다. 자세한 내용은 [`docs/PERSISTENCE_BOUNDARY.md`](./docs/PERSISTENCE_BOUNDARY.md)를 참고하세요.
+
 ---
 
 ## 개발 우선순위
