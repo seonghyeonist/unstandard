@@ -41,21 +41,39 @@ Before merging persistence work, confirm:
 
 ## Current state (honest)
 
-- `main`: reports use in-memory buffer (`lib/server/report-store.server.ts`) — **not alpha-safe**.
-- Open PR #13: Supabase-coupled repository — **needs reframe** before merge (interface boundary first).
+- `POST /api/reports` uses `ReportsRepository` via factory — route is backend-agnostic.
+- Supabase implementation lives under `lib/server/persistence/adapters/supabase/` (alpha adapter only).
+- In-memory `report-store.server.ts` is deprecated and unused by the route.
+- **50-person alpha still BLOCKED** until human applies migration + RLS smoke + reporter profile bootstrap.
+- PR #13 remains draft/historical — superseded by adapter reframe PR; do not merge as-is.
 - Auth middleware uses Supabase SSR as an alpha auth adapter — existing; do not deepen without boundary review.
 
-## Immediate implication for PR #13
+## PR #13 status
 
-**Do not merge PR #13 as-is.**
+Superseded by adapter-boundary reframe. Salvaged behavior preserved; Supabase code quarantined under `adapters/supabase/`.
 
-Before that PR can proceed:
+## Reports persistence activation
 
-1. Introduce a generic `ReportsRepository` interface (backend-agnostic input/output types).
-2. Move Supabase-specific code under an adapter path only, e.g. `lib/server/persistence/adapters/supabase/reports.repository.ts`.
-3. Keep `POST /api/reports` route logic backend-agnostic — route imports a factory/interface, not `@supabase/*`.
-4. Preserve HTTP behavior: 401 / 400 / 503 / 409 / 500 / 201 / 200 as currently specified.
-5. Tests assert route/repository **behavior**, not Supabase SDK internals.
-6. Document in PR body that Supabase is temporary alpha infrastructure, not production architecture.
+Reports persistence must **not** be enabled by Supabase public env vars alone.
 
-See also: [`docs/NEXT_TASK_REPORTS_REPOSITORY_REFRAME.md`](./NEXT_TASK_REPORTS_REPOSITORY_REFRAME.md).
+| `REPORTS_PERSISTENCE_ADAPTER` | Supabase URL + anon key | Enabled? |
+|-------------------------------|-------------------------|----------|
+| unset / `disabled` | any | **No** → 503 |
+| `supabase-alpha` | missing | **No** → 503 |
+| `supabase-alpha` | present | **Yes** (alpha adapter) |
+| unknown value | any | **No** → 503 |
+
+Set `REPORTS_PERSISTENCE_ADAPTER=supabase-alpha` only after migration apply, RLS smoke, and identity contract review.
+
+### Reports identity contract
+
+Current reports persistence sends authenticated `user.id` as `reporterUserId`.
+
+Until Reporter Profile Bootstrap is implemented, this assumes either:
+
+1. `profiles.id` equals `auth.users.id`, or
+2. the reports adapter can resolve auth user id to profile id before insert.
+
+If this contract is not satisfied, reports may return 409 `Profile setup required before reporting`.
+
+Self-report protection is only complete when target profile IDs and reporter IDs use the same identity namespace or a resolver maps them safely.
