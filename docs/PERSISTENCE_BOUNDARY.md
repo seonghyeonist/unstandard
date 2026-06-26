@@ -51,3 +51,29 @@ Before merging persistence work, confirm:
 ## PR #13 status
 
 Superseded by adapter-boundary reframe. Salvaged behavior preserved; Supabase code quarantined under `adapters/supabase/`.
+
+## Reports persistence activation
+
+Reports persistence must **not** be enabled by Supabase public env vars alone.
+
+| `REPORTS_PERSISTENCE_ADAPTER` | Supabase URL + anon key | Enabled? |
+|-------------------------------|-------------------------|----------|
+| unset / `disabled` | any | **No** → 503 |
+| `supabase-alpha` | missing | **No** → 503 |
+| `supabase-alpha` | present | **Yes** (alpha adapter) |
+| unknown value | any | **No** → 503 |
+
+Set `REPORTS_PERSISTENCE_ADAPTER=supabase-alpha` only after migration apply, RLS smoke, and identity contract review.
+
+### Reports identity contract
+
+Current reports persistence sends authenticated `user.id` as `reporterUserId`.
+
+Until Reporter Profile Bootstrap is implemented, this assumes either:
+
+1. `profiles.id` equals `auth.users.id`, or
+2. the reports adapter can resolve auth user id to profile id before insert.
+
+If this contract is not satisfied, reports may return 409 `Profile setup required before reporting`.
+
+Self-report protection is only complete when target profile IDs and reporter IDs use the same identity namespace or a resolver maps them safely.

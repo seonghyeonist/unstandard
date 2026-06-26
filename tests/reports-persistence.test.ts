@@ -1,12 +1,62 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { isPersistenceEnabled } from "../lib/config/persistence-mode.ts";
+import {
+  getReportsPersistenceAdapter,
+  isReportsPersistenceEnabled,
+} from "../lib/config/persistence-mode.ts";
 import { mapCreateReportResultToHttp } from "../lib/server/persistence/reports.http-mapper.ts";
 import { mapSupabaseReportsRowToRecord } from "../lib/server/persistence/adapters/supabase/reports-row.mapper.ts";
 import {
   reportFailure,
   reportSuccess,
 } from "../lib/server/persistence/reports.types.ts";
+
+const ENV_KEYS = [
+  "REPORTS_PERSISTENCE_ADAPTER",
+  "NEXT_PUBLIC_SUPABASE_URL",
+  "NEXT_PUBLIC_SUPABASE_ANON_KEY",
+] as const;
+
+function snapshotEnv(): Record<(typeof ENV_KEYS)[number], string | undefined> {
+  return {
+    REPORTS_PERSISTENCE_ADAPTER: process.env.REPORTS_PERSISTENCE_ADAPTER,
+    NEXT_PUBLIC_SUPABASE_URL: process.env.NEXT_PUBLIC_SUPABASE_URL,
+    NEXT_PUBLIC_SUPABASE_ANON_KEY: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
+  };
+}
+
+function restoreEnv(snapshot: Record<(typeof ENV_KEYS)[number], string | undefined>): void {
+  for (const key of ENV_KEYS) {
+    const value = snapshot[key];
+    if (value === undefined) {
+      delete process.env[key];
+    } else {
+      process.env[key] = value;
+    }
+  }
+}
+
+function withEnv(
+  overrides: Partial<Record<(typeof ENV_KEYS)[number], string | undefined>>,
+  run: () => void,
+): void {
+  const snapshot = snapshotEnv();
+  for (const key of ENV_KEYS) {
+    if (key in overrides) {
+      const value = overrides[key];
+      if (value === undefined) {
+        delete process.env[key];
+      } else {
+        process.env[key] = value;
+      }
+    }
+  }
+  try {
+    run();
+  } finally {
+    restoreEnv(snapshot);
+  }
+}
 
 describe("mapCreateReportResultToHttp", () => {
   it("maps new report to 201", () => {
@@ -87,19 +137,88 @@ describe("reportSuccess", () => {
   });
 });
 
-describe("isPersistenceEnabled", () => {
-  it("is false when alpha adapter env is missing", () => {
-    const originalUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-    const originalKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-    delete process.env.NEXT_PUBLIC_SUPABASE_URL;
-    delete process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-    try {
-      assert.equal(isPersistenceEnabled(), false);
-    } finally {
-      if (originalUrl === undefined) delete process.env.NEXT_PUBLIC_SUPABASE_URL;
-      else process.env.NEXT_PUBLIC_SUPABASE_URL = originalUrl;
-      if (originalKey === undefined) delete process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-      else process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY = originalKey;
-    }
+describe("reports persistence activation gate", () => {
+  it("is disabled when REPORTS_PERSISTENCE_ADAPTER is missing", () => {
+    withEnv(
+      {
+        REPORTS_PERSISTENCE_ADAPTER: undefined,
+        NEXT_PUBLIC_SUPABASE_URL: undefined,
+        NEXT_PUBLIC_SUPABASE_ANON_KEY: undefined,
+      },
+      () => {
+        assert.equal(getReportsPersistenceAdapter(), "disabled");
+        assert.equal(isReportsPersistenceEnabled(), false);
+      },
+    );
+  });
+
+  it("is disabled when REPORTS_PERSISTENCE_ADAPTER=disabled", () => {
+    withEnv(
+      {
+        REPORTS_PERSISTENCE_ADAPTER: "disabled",
+        NEXT_PUBLIC_SUPABASE_URL: "https://example.supabase.co",
+        NEXT_PUBLIC_SUPABASE_ANON_KEY: "anon-key",
+      },
+      () => {
+        assert.equal(getReportsPersistenceAdapter(), "disabled");
+        assert.equal(isReportsPersistenceEnabled(), false);
+      },
+    );
+  });
+
+  it("is disabled when supabase-alpha but Supabase URL/key missing", () => {
+    withEnv(
+      {
+        REPORTS_PERSISTENCE_ADAPTER: "supabase-alpha",
+        NEXT_PUBLIC_SUPABASE_URL: undefined,
+        NEXT_PUBLIC_SUPABASE_ANON_KEY: undefined,
+      },
+      () => {
+        assert.equal(getReportsPersistenceAdapter(), "supabase-alpha");
+        assert.equal(isReportsPersistenceEnabled(), false);
+      },
+    );
+  });
+
+  it("is disabled when Supabase URL/key present but adapter missing", () => {
+    withEnv(
+      {
+        REPORTS_PERSISTENCE_ADAPTER: undefined,
+        NEXT_PUBLIC_SUPABASE_URL: "https://example.supabase.co",
+        NEXT_PUBLIC_SUPABASE_ANON_KEY: "anon-key",
+      },
+      () => {
+        assert.equal(getReportsPersistenceAdapter(), "disabled");
+        assert.equal(isReportsPersistenceEnabled(), false);
+      },
+    );
+  });
+
+  it("is enabled when supabase-alpha and Supabase URL/key present", () => {
+    withEnv(
+      {
+        REPORTS_PERSISTENCE_ADAPTER: "supabase-alpha",
+        NEXT_PUBLIC_SUPABASE_URL: "https://example.supabase.co",
+        NEXT_PUBLIC_SUPABASE_ANON_KEY: "anon-key",
+      },
+      () => {
+        assert.equal(getReportsPersistenceAdapter(), "supabase-alpha");
+        assert.equal(isReportsPersistenceEnabled(), true);
+      },
+    );
+  });
+
+  it("is disabled for unknown adapter values", () => {
+    withEnv(
+      {
+        REPORTS_PERSISTENCE_ADAPTER: "postgres-prod",
+        NEXT_PUBLIC_SUPABASE_URL: "https://example.supabase.co",
+        NEXT_PUBLIC_SUPABASE_ANON_KEY: "anon-key",
+      },
+      () => {
+        assert.equal(getReportsPersistenceAdapter(), "disabled");
+        assert.equal(isReportsPersistenceEnabled(), false);
+      },
+    );
   });
 });

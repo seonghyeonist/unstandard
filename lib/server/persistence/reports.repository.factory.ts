@@ -1,6 +1,6 @@
 import "server-only";
 
-import { isPersistenceEnabled } from "@/lib/config/persistence-mode";
+import { isReportsPersistenceEnabled } from "@/lib/config/persistence-mode";
 import type { ReportsRepository } from "@/lib/server/persistence/reports.repository.interface";
 import type { CreateReportInput, CreateReportResult } from "@/lib/server/persistence/reports.types";
 import { reportFailure } from "@/lib/server/persistence/reports.types";
@@ -12,9 +12,12 @@ const persistenceDisabledRepository: ReportsRepository = {
   },
 };
 
-/** Wires the active alpha persistence adapter. Route imports this only. */
+/**
+ * Wires the active alpha persistence adapter. Route imports this only.
+ * Current wiring: Supabase alpha adapter when explicitly enabled — not production architecture.
+ */
 export function createReportsRepository(): ReportsRepository {
-  if (!isPersistenceEnabled()) {
+  if (!isReportsPersistenceEnabled()) {
     return persistenceDisabledRepository;
   }
   return createSupabaseReportsRepository();
