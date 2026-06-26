@@ -3,12 +3,10 @@ import "server-only";
 import type { ReportRecord } from "@/lib/api/report-store";
 
 /**
- * Ephemeral server-side report buffer for mock/dev until Supabase persistence.
+ * @deprecated Unused by POST /api/reports — replaced by ReportsRepository (alpha adapter).
+ * Kept for rollback reference only. Do not wire back without explicit approval.
  *
- * NON-ALPHA-SAFE:
- * - Lost on server restart / multi-instance deploy
- * - Not visible to moderators
- * - Must be replaced with Supabase `reports` table before 50-person alpha
+ * Ephemeral server-side report buffer (NON-ALPHA-SAFE).
  */
 const serverReports: ReportRecord[] = [];
 

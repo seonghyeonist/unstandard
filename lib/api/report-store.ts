@@ -1,10 +1,9 @@
 /**
- * Local persistence for safety reports.
+ * Legacy client-side report helpers (sessionStorage).
  *
- * Today this appends to `sessionStorage` (matching the mock auth/onboarding
- * layers). The record shape mirrors a future Supabase `reports` row so the
- * migration is a storage-adapter swap, not a rewrite. Keep all storage logic
- * here, isolated from UI and from moderation concepts.
+ * `ReportRecord` is the shared row shape — server persistence uses
+ * `ReportsRepository` (alpha adapter), not this module.
+ * sessionStorage helpers are dead code for the current UI path.
  */
 
 const STORAGE_KEY = "unstandard.alpha.reports";

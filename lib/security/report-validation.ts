@@ -41,3 +41,21 @@ export function validateReportInput(input: ReportInput): {
     reason,
   };
 }
+
+/** Server-only validation with authenticated reporter context. */
+export function validateReportForUser(
+  input: ReportInput,
+  reporterUserId: string,
+): {
+  targetType: ReportTargetType;
+  targetId: string;
+  reason: string;
+} {
+  const validated = validateReportInput(input);
+
+  if (validated.targetType === "profile" && validated.targetId === reporterUserId) {
+    throw new Error("Cannot report your own profile");
+  }
+
+  return validated;
+}

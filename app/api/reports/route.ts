@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
 import { getAuthenticatedUser } from "@/lib/auth/server";
-import { validateReportInput } from "@/lib/security/report-validation";
-import { appendServerReport } from "@/lib/server/report-store.server";
+import { validateReportForUser } from "@/lib/security/report-validation";
+import { createReportHttpResponse } from "@/lib/server/persistence/reports.http";
+import { createReportsRepository } from "@/lib/server/persistence/reports.repository.factory";
 
 export async function POST(request: Request) {
   const user = await getAuthenticatedUser();
@@ -23,26 +24,25 @@ export async function POST(request: Request) {
   const input = body as Record<string, unknown>;
 
   try {
-    const validated = validateReportInput({
-      targetType: String(input.targetType ?? ""),
-      targetId: String(input.targetId ?? ""),
-      reason: String(input.reason ?? ""),
-      reporterUserId: input.reporterUserId as string | undefined,
-    });
+    const validated = validateReportForUser(
+      {
+        targetType: String(input.targetType ?? ""),
+        targetId: String(input.targetId ?? ""),
+        reason: String(input.reason ?? ""),
+        reporterUserId: input.reporterUserId as string | undefined,
+      },
+      user.id,
+    );
 
-    const record = {
-      id: crypto.randomUUID(),
+    const repository = createReportsRepository();
+    const result = await repository.createOrGetOpenReport({
       reporterUserId: user.id,
       targetType: validated.targetType,
       targetId: validated.targetId,
       reason: validated.reason,
-      createdAt: new Date().toISOString(),
-      status: "OPEN" as const,
-    };
+    });
 
-    appendServerReport(record);
-
-    return NextResponse.json({ ok: true, id: record.id });
+    return createReportHttpResponse(result);
   } catch (error) {
     const message = error instanceof Error ? error.message : "Invalid report";
     return NextResponse.json({ error: message }, { status: 400 });
