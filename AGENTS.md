@@ -49,7 +49,7 @@ git revert <sha>         # 3) push/머지된 변경: 새 커밋으로 되돌림 
 
 ### What this repo is
 Mini-monorepo with two deliverables:
-- **Frontend** (repo root): Next.js 15 App Router + React 19 + Tailwind v4, package manager **npm**. This is the user-facing product and is the primary thing to run. Scripts in `package.json`: `dev`, `build`, `start`, `lint`, `typecheck`.
+- **Frontend** (repo root): Next.js 15 App Router + React 19 + Tailwind v4, package manager **npm**. This is the user-facing product and is the primary thing to run. Scripts in `package.json`: `dev`, `build`, `start`, `lint`, `typecheck`, `test`, `check`.
 - **depth-service** (`services/depth-service`): Python 3.12 FastAPI "Depth Score" microservice. Deps in `requirements.txt`, tests via `pytest` (config in `pyproject.toml`).
 
 ### Running the frontend (primary product)
@@ -70,7 +70,7 @@ Mini-monorepo with two deliverables:
 - Creating the Python venv requires the `python3-venv` system package (installed during environment setup; not part of the update script).
 
 ### Quality gate
-- One-shot check: `npm run check` (= `lint` + `typecheck` + `build`). CI (`.github/workflows/ci.yml`) runs the same on Node 20.x/22.x via `npm ci`.
+- One-shot check: `npm run check` (= `lint` + `typecheck` + `test` + `build`). CI (`.github/workflows/ci.yml`) runs the same checks on Node 20.x/22.x via `npm ci`.
 - Keep `package-lock.json` in sync with `package.json` so `npm ci` stays reproducible.
 
 ### Git safety rules (강제)
