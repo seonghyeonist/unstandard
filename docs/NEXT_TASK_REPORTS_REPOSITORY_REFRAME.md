@@ -14,14 +14,14 @@ This task reframed PR #13 salvage work behind `ReportsRepository`.
 
 ## Still alpha-blocked (human gates)
 
-- Set `REPORTS_PERSISTENCE_ADAPTER=supabase-alpha` only after migration + RLS smoke (never by Supabase public env alone)
+- Set `REPORTS_PERSISTENCE_ADAPTER=supabase-alpha` only after migration + RLS smoke
 - Apply `0003_reports_dedup_index.sql` to staging
-- RLS smoke on `reports`
-- Reporter profile bootstrap before 409 path is live
+- RLS smoke on `reports` and `profiles` insert policy
+- Staging smoke: authenticated report without 409 solely for missing profile row
 
-### Reports identity contract (documented, not solved)
+### Reporter Profile Bootstrap (implemented)
 
-`reporterUserId` is currently `auth.users.id`. Requires `profiles.id === auth.users.id` or an adapter resolver before insert. See `PERSISTENCE_BOUNDARY.md`.
+`ensureReporterProfile` creates minimal `profiles` row (`id = auth.users.id`, nickname only) via Supabase alpha adapter when reports persistence is enabled.
 
 ## Next recommended task
 

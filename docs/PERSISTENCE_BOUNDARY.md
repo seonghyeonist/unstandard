@@ -67,13 +67,12 @@ Set `REPORTS_PERSISTENCE_ADAPTER=supabase-alpha` only after migration apply, RLS
 
 ### Reports identity contract
 
-Current reports persistence sends authenticated `user.id` as `reporterUserId`.
+Reporter Profile Bootstrap (alpha adapter) ensures `profiles.id = auth.users.id` exists before reports insert when `REPORTS_PERSISTENCE_ADAPTER=supabase-alpha`.
 
-Until Reporter Profile Bootstrap is implemented, this assumes either:
+- Minimal row: `id` + `nickname` only (no full profile system).
+- Supabase adapter under `lib/server/profile/adapters/supabase/`.
+- Route calls `ensureReporterProfile` — never `.from("profiles")` directly.
 
-1. `profiles.id` equals `auth.users.id`, or
-2. the reports adapter can resolve auth user id to profile id before insert.
+Self-report protection compares `targetId` to authenticated `user.id` (same as `profileId` under Option A).
 
-If this contract is not satisfied, reports may return 409 `Profile setup required before reporting`.
-
-Self-report protection is only complete when target profile IDs and reporter IDs use the same identity namespace or a resolver maps them safely.
+**Alpha still BLOCKED** until migration apply, RLS smoke, and staging verification.
