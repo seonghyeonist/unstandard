@@ -136,18 +136,28 @@ npm run lint
 
 ### 나쁜 변경을 되돌리는 방법
 
+먼저 현재 상태를 확인합니다.
+
 ```bash
-# 커밋 전이라면 - 변경 사항 되돌리기
-git checkout -- .
-
-# 커밋 후라면 - 마지막 커밋 취소 (변경 사항은 유지)
-git reset --soft HEAD~1
-
-# 커밋 후 변경 사항도 완전히 되돌리려면 (주의!)
-git reset --hard HEAD~1
+git status
+git diff
 ```
 
-> ⚠️ `git reset --hard`와 `git push --force`는 최후의 수단입니다. 실행 전 반드시 현재 상태를 확인하세요.
+```bash
+# 커밋 전 — 특정 파일만 되돌리기
+git restore <file>
+
+# 커밋 전 — 모든 미커밋 변경 되돌리기
+git restore .
+
+# 커밋 후 — 마지막 커밋만 취소 (변경 사항은 작업 트리에 유지)
+git reset --soft HEAD~1
+
+# 이미 push/머지된 변경 — 새 커밋으로 되돌리기 (공유 브랜치 권장)
+git revert <commit-sha>
+```
+
+> ⚠️ `git reset --hard`, `git clean -fd`, `git push --force`, 브랜치 삭제, 히스토리 재작성은 **명시적 승인 없이 사용하지 않습니다.** 최후의 수단이며, 공유 브랜치에서는 `git revert`를 우선합니다.
 
 ---
 
