@@ -1,7 +1,5 @@
 import "server-only";
 
-import "server-only";
-
 import type { AuthenticatedUser } from "@/lib/auth/server";
 import { isReportsPersistenceEnabled } from "@/lib/config/persistence-mode";
 import { ensureReporterProfileSupabase } from "@/lib/server/profile/adapters/supabase/reporter-profile.bootstrap";

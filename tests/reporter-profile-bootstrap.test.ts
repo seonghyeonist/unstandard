@@ -19,17 +19,16 @@ describe("resolveReporterNickname", () => {
     );
   });
 
-  it("falls back to email local part", () => {
-    assert.equal(
-      resolveReporterNickname({
-        id: "11111111-1111-1111-1111-111111111111",
-        email: "reporter@example.com",
-      }),
-      "reporter",
-    );
+  it("does not use email local-part when nickname is missing", () => {
+    const nickname = resolveReporterNickname({
+      id: "11111111-1111-1111-1111-111111111111",
+      email: "reporter@example.com",
+    });
+    assert.equal(nickname, "user-11111111");
+    assert.equal(nickname.includes("reporter"), false);
   });
 
-  it("falls back to stable user prefix when nickname and email missing", () => {
+  it("falls back to stable user prefix when nickname is missing", () => {
     const nickname = resolveReporterNickname({
       id: "11111111-1111-1111-1111-111111111111",
     });

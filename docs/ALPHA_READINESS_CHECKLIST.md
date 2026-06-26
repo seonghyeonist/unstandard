@@ -23,7 +23,7 @@
 
 - [ ] Supabase migration 적용 (`supabase/migrations/`)
 - [ ] RLS 정책 활성화 및 테스트 (`0002_rls_policies.sql`)
-- [ ] Reporter profile bootstrap staging smoke (`ensureReporterProfile` + reports insert)
+- [ ] Reporter profile bootstrap staging smoke (`ensureReporterProfile` + reports insert; nickname not email-derived)
 - [ ] DB-backed answers (온보딩·unlock 답변 영속)
 - [ ] DB-backed reports via `ReportsRepository` (alpha adapter wired; migration + RLS smoke pending)
 - [ ] Block 기능 (`GET/POST/DELETE /api/blocks` + DB + RLS)

@@ -70,6 +70,7 @@ Set `REPORTS_PERSISTENCE_ADAPTER=supabase-alpha` only after migration apply, RLS
 Reporter Profile Bootstrap (alpha adapter) ensures `profiles.id = auth.users.id` exists before reports insert when `REPORTS_PERSISTENCE_ADAPTER=supabase-alpha`.
 
 - Minimal row: `id` + `nickname` only (no full profile system).
+- Reporter Profile Bootstrap must not derive public/profile nicknames from email local-parts. If no nickname exists, use a non-identifying stable fallback such as `user-<uuid-prefix>`.
 - Supabase adapter under `lib/server/profile/adapters/supabase/`.
 - Route calls `ensureReporterProfile` — never `.from("profiles")` directly.
 
