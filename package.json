@@ -9,7 +9,7 @@
     "lint": "eslint . --max-warnings=0",
     "typecheck": "tsc --noEmit",
     "check": "npm run lint && npm run typecheck && npm run test && npm run build",
-    "test": "node --experimental-strip-types --test lib/**/*.test.ts tests/**/*.test.ts"
+    "test": "tsx --test lib/**/*.test.ts tests/**/*.test.ts"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.0.1",
