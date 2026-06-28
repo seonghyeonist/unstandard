@@ -12,10 +12,10 @@
 
 ### 인증·세션
 
-- [ ] Supabase login UI 연결 및 실제 로그인 플로우 테스트 (OAuth 또는 magic link)
+- [ ] Supabase login UI 연결 및 실제 로그인 플로우 테스트 (OAuth 또는 magic link) — 코드: `/login` + `/api/auth/supabase/oauth` + magic link; **staging 실측 증거 없음**
 - [ ] 서버 측 세션 검증 (`middleware.ts` + API route `requireAuthenticatedUser`)
 - [ ] Production에서 mock auth 비활성 (`isMockAuthAllowed() === false`)
-- [ ] Vercel preview/prod env 검증 (Supabase URL/anon key, `AUTH_COOKIE_SECRET`)
+- [ ] Vercel preview/prod env 검증 (`UNSTANDARD_SUPABASE_URL`, `UNSTANDARD_SUPABASE_PUBLISHABLE_KEY`, `AUTH_COOKIE_SECRET`)
 - [ ] Vercel Edge middleware runtime smoke (`docs/VERCEL_PREVIEW_SMOKE.md`)
 - [ ] Service role key가 클라이언트 번들에 없음 (`SUPABASE_SERVICE_ROLE_KEY` server-only)
 
@@ -78,7 +78,7 @@
 
 | 항목 | 현재 상태 |
 |------|-----------|
-| Login UI | Mock session only; Supabase UI 미연결 |
+| Login UI | Minimal staging entry (`/login` magic link + optional OAuth); **live staging smoke pending** |
 | Reports | `ReportsRepository` + explicit adapter gate; `ensureReporterProfile` before insert when enabled |
 | Blocks | 미구현 |
 | Unlock | HMAC HttpOnly cookie only (DB 없음) |

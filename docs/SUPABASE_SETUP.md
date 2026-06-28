@@ -8,12 +8,23 @@
 ### Local (`.env.local` — Next.js, gitignore됨)
 
 ```bash
-# Public — browser bundle에 포함됨
-NEXT_PUBLIC_SUPABASE_URL=https://<project-ref>.supabase.co
-NEXT_PUBLIC_SUPABASE_ANON_KEY=<anon-key>
+# Server-only Supabase alpha adapter (preferred)
+UNSTANDARD_SUPABASE_URL=https://<project-ref>.supabase.co
+UNSTANDARD_SUPABASE_PUBLISHABLE_KEY=<publishable-anon-key>
+# Optional: github | google | apple | discord (must be enabled in Supabase dashboard)
+UNSTANDARD_SUPABASE_OAUTH_PROVIDER=
+# Optional redirect origin for staging (defaults to request host)
+UNSTANDARD_APP_URL=
 
-# Standalone mock mode (현재 기본)
+# Standalone mock mode (current default when UNSTANDARD_* unset)
 NEXT_PUBLIC_API_BASE_URL=
+```
+
+Legacy fallback (temporary — do not use for new code):
+
+```bash
+NEXT_PUBLIC_SUPABASE_URL=
+NEXT_PUBLIC_SUPABASE_ANON_KEY=
 ```
 
 ### Server-only (Vercel **Encrypted**, 로컬 `.env.local` — `NEXT_PUBLIC_` 금지)
@@ -30,8 +41,8 @@ DATABASE_URL=postgresql://postgres.<ref>:<password>@aws-0-<region>.pooler.supaba
 
 | Variable | Local | Vercel Preview | Vercel Production |
 |----------|-------|----------------|-------------------|
-| `NEXT_PUBLIC_SUPABASE_URL` | dev project or empty | preview project | prod project |
-| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | dev anon | preview anon | prod anon |
+| `UNSTANDARD_SUPABASE_URL` | staging project | preview project | prod project |
+| `UNSTANDARD_SUPABASE_PUBLISHABLE_KEY` | staging publishable key | preview | prod |
 | `SUPABASE_SERVICE_ROLE_KEY` | `.env.local` only | Preview encrypted | Production encrypted |
 | `NEXT_PUBLIC_API_BASE_URL` | empty (mock) | empty unless BFF ready | BFF URL only |
 
@@ -54,7 +65,19 @@ psql "$DATABASE_URL" -f supabase/migrations/0002_rls_policies.sql
 - `supabase/migrations/0001_initial_schema.sql` — 테이블 초안
 - `supabase/migrations/0002_rls_policies.sql` — RLS 정책 초안
 
-## 4. Client utilities (not wired yet)
+## 4. Staging login smoke (minimal)
+
+After setting `UNSTANDARD_SUPABASE_*` on Vercel Preview:
+
+1. Enable Email auth and/or OAuth provider in Supabase dashboard (staging project).
+2. Add redirect URL: `https://<preview-host>/auth/callback`
+3. Visit `/login` → send magic link or use OAuth button (when `UNSTANDARD_SUPABASE_OAUTH_PROVIDER` set).
+4. After callback, `/app/settings` shows authenticated id prefix.
+5. With session cookie, run reports staging smoke (`POST /api/reports`) — persistence still requires `REPORTS_PERSISTENCE_ADAPTER=supabase-alpha` **after** migration + RLS.
+
+**Do not** enable `REPORTS_PERSISTENCE_ADAPTER=supabase-alpha` until migrations and RLS smoke pass.
+
+## 5. Client utilities (not wired yet)
 
 Supabase JS SDK는 **아직 dependency에 없음**. 연동 시:
 
@@ -63,7 +86,7 @@ Supabase JS SDK는 **아직 dependency에 없음**. 연동 시:
 
 도입 전 `npm install @supabase/supabase-js` 승인 필요.
 
-## 5. Security warnings
+## 6. Security warnings
 
 1. mock auth (`lib/api/auth.ts`)를 Supabase 전환 시 **제거** — 병행 금지.
 2. RLS 없이 테이블 생성 금지.

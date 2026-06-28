@@ -3,8 +3,18 @@
  * Mock auth is development-only theater — never a production alpha path.
  */
 
+function isServerSupabaseConfigured(): boolean {
+  const url =
+    process.env.UNSTANDARD_SUPABASE_URL?.trim() ||
+    process.env.NEXT_PUBLIC_SUPABASE_URL?.trim();
+  const publishableKey =
+    process.env.UNSTANDARD_SUPABASE_PUBLISHABLE_KEY?.trim() ||
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY?.trim();
+  return Boolean(url && publishableKey);
+}
+
 export function isSupabaseAuthEnabled(): boolean {
-  return Boolean(process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY);
+  return isServerSupabaseConfigured();
 }
 
 export function isMockAuthAllowed(): boolean {

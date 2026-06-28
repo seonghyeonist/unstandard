@@ -1,5 +1,6 @@
 import "server-only";
 import { createClient } from "@supabase/supabase-js";
+import { getServerSupabaseConfig } from "@/lib/config/supabase-config";
 
 /**
  * Service-role client — SERVER ONLY.
@@ -7,7 +8,7 @@ import { createClient } from "@supabase/supabase-js";
  * Reserved for future admin/migration tasks; not wired in MVP routes yet.
  */
 export function createAdminClient() {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const { url } = getServerSupabaseConfig();
   const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
   if (!url || !serviceRoleKey) {
     throw new Error("Supabase admin env is not configured");

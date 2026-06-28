@@ -1,20 +1,17 @@
 import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
+import { requireServerSupabaseConfig } from "@/lib/config/supabase-config";
 
 /**
  * Server Supabase client — session from HttpOnly cookies.
  * Use in Route Handlers, Server Actions, and Server Components only.
  */
 export async function createClient() {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-  if (!url || !anonKey) {
-    throw new Error("Supabase env is not configured");
-  }
+  const { url, publishableKey } = requireServerSupabaseConfig();
 
   const cookieStore = await cookies();
 
-  return createServerClient(url, anonKey, {
+  return createServerClient(url, publishableKey, {
     cookies: {
       getAll() {
         return cookieStore.getAll();
