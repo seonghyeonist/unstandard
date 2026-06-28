@@ -13,6 +13,8 @@ import {
 
 const ENV_KEYS = [
   "REPORTS_PERSISTENCE_ADAPTER",
+  "UNSTANDARD_SUPABASE_URL",
+  "UNSTANDARD_SUPABASE_PUBLISHABLE_KEY",
   "NEXT_PUBLIC_SUPABASE_URL",
   "NEXT_PUBLIC_SUPABASE_ANON_KEY",
 ] as const;
@@ -20,6 +22,8 @@ const ENV_KEYS = [
 function snapshotEnv(): Record<(typeof ENV_KEYS)[number], string | undefined> {
   return {
     REPORTS_PERSISTENCE_ADAPTER: process.env.REPORTS_PERSISTENCE_ADAPTER,
+    UNSTANDARD_SUPABASE_URL: process.env.UNSTANDARD_SUPABASE_URL,
+    UNSTANDARD_SUPABASE_PUBLISHABLE_KEY: process.env.UNSTANDARD_SUPABASE_PUBLISHABLE_KEY,
     NEXT_PUBLIC_SUPABASE_URL: process.env.NEXT_PUBLIC_SUPABASE_URL,
     NEXT_PUBLIC_SUPABASE_ANON_KEY: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
   };
@@ -194,12 +198,14 @@ describe("reports persistence activation gate", () => {
     );
   });
 
-  it("is enabled when supabase-alpha and Supabase URL/key present", () => {
+  it("is enabled when supabase-alpha and UNSTANDARD Supabase env present", () => {
     withEnv(
       {
         REPORTS_PERSISTENCE_ADAPTER: "supabase-alpha",
-        NEXT_PUBLIC_SUPABASE_URL: "https://example.supabase.co",
-        NEXT_PUBLIC_SUPABASE_ANON_KEY: "anon-key",
+        UNSTANDARD_SUPABASE_URL: "https://example.supabase.co",
+        UNSTANDARD_SUPABASE_PUBLISHABLE_KEY: "publishable-key",
+        NEXT_PUBLIC_SUPABASE_URL: undefined,
+        NEXT_PUBLIC_SUPABASE_ANON_KEY: undefined,
       },
       () => {
         assert.equal(getReportsPersistenceAdapter(), "supabase-alpha");

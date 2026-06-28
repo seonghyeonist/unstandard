@@ -6,6 +6,16 @@
  * When disabled, report routes fail closed (503) — no silent in-memory fallback.
  */
 
+function isServerSupabaseConfigured(): boolean {
+  const url =
+    process.env.UNSTANDARD_SUPABASE_URL?.trim() ||
+    process.env.NEXT_PUBLIC_SUPABASE_URL?.trim();
+  const publishableKey =
+    process.env.UNSTANDARD_SUPABASE_PUBLISHABLE_KEY?.trim() ||
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY?.trim();
+  return Boolean(url && publishableKey);
+}
+
 export type ReportsPersistenceAdapter = "disabled" | "supabase-alpha";
 
 export function getReportsPersistenceAdapter(): ReportsPersistenceAdapter {
@@ -17,9 +27,5 @@ export function getReportsPersistenceAdapter(): ReportsPersistenceAdapter {
 }
 
 export function isReportsPersistenceEnabled(): boolean {
-  return (
-    getReportsPersistenceAdapter() === "supabase-alpha" &&
-    Boolean(process.env.NEXT_PUBLIC_SUPABASE_URL) &&
-    Boolean(process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY)
-  );
+  return getReportsPersistenceAdapter() === "supabase-alpha" && isServerSupabaseConfigured();
 }

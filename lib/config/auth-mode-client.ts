@@ -1,5 +1,6 @@
 /**
- * Client-safe auth mode flags (NEXT_PUBLIC_* only).
+ * @deprecated Prefer server-provided auth mode props on /login.
+ * Client bundles cannot read UNSTANDARD_* server env; do not expand NEXT_PUBLIC Supabase usage.
  */
 
 export function isSupabaseAuthEnabled(): boolean {

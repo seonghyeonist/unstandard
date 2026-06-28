@@ -55,19 +55,46 @@ npm run dev
 ```bash
 npm run lint        # ESLint (--max-warnings=0)
 npm run typecheck   # tsc --noEmit
+npm run test        # node --test (pure unit tests)
 npm run build       # next build
-npm run check       # 위 셋을 한 번에
+npm run check       # 위 네 단계를 한 번에
 ```
 
 ## 환경변수
 
-> 로컬 mock 개발에 필수인 변수는 적습니다. Production/preview 알파에는 Supabase·`AUTH_COOKIE_SECRET` 등 추가 env가 필요합니다 (`docs/SUPABASE_SETUP.md`).
+> 로컬 mock 개발에 필수인 변수는 적습니다. Staging/preview 알파에는 server-only Supabase env + `AUTH_COOKIE_SECRET` 등이 필요합니다 (`docs/SUPABASE_SETUP.md`).
+
+### Supabase alpha adapter (server-only, preferred)
+
+| 변수명 | 설명 | 필수 |
+|--------|------|------|
+| `UNSTANDARD_SUPABASE_URL` | Staging/preview Supabase project URL (server-only) | ✅ (Supabase auth path) |
+| `UNSTANDARD_SUPABASE_PUBLISHABLE_KEY` | Publishable/anon key (server-only route handlers) | ✅ (Supabase auth path) |
+| `UNSTANDARD_SUPABASE_OAUTH_PROVIDER` | Optional OAuth button (`github`, `google`, `apple`, `discord`) | ❌ |
+| `UNSTANDARD_APP_URL` | Optional explicit redirect origin for magic link/OAuth | ❌ |
+| `AUTH_COOKIE_SECRET` | Unlock signed cookie (production) | ✅ (prod) |
+
+### Reports persistence gate
+
+| 변수명 | 설명 | 필수 |
+|--------|------|------|
+| `REPORTS_PERSISTENCE_ADAPTER` | Default `disabled` — **503 fail-closed**. `supabase-alpha` only after migration + RLS smoke | ❌ (default off) |
+
+> Supabase URL/key **alone** do **not** enable reports DB persistence. Explicit adapter + env required.
+
+### Legacy fallback (temporary — do not use for new code)
+
+| 변수명 | 설명 |
+|--------|------|
+| `NEXT_PUBLIC_SUPABASE_URL` / `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Legacy fallback read by server config only. **Not** the preferred path. |
+
+> `SUPABASE_SERVICE_ROLE_KEY` is server-only and **must not** be used in user-scoped auth/login/report/profile paths.
+
+### Other
 
 | 변수명 | 설명 | 필수 |
 |--------|------|------|
 | `NEXT_PUBLIC_API_BASE_URL` | depth-service 주소. **비우면 mock 모드**. 값을 채우려면 `docker compose` 백엔드 스택을 먼저 실행해야 함(아니면 답변 잠금해제가 ERROR) | ❌ (mock) |
-| `NEXT_PUBLIC_SUPABASE_URL` / `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Production·preview protected routes | ✅ (prod) |
-| `AUTH_COOKIE_SECRET` | Unlock signed cookie (production) | ✅ (prod) |
 
 선택적 백엔드 스택(Postgres + TEI 임베딩 + depth-service)은 `docker-compose.yml`로 띄울 수 있으며, 관련 변수는 `.env.example`을 참고하세요.
 

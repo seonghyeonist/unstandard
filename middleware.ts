@@ -1,6 +1,7 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 import { isProductionAuthConfigured } from "@/lib/config/auth-production";
+import { getServerSupabaseConfig } from "@/lib/config/supabase-config";
 
 const PROTECTED_PREFIXES = ["/app", "/onboarding"];
 
@@ -12,8 +13,7 @@ export async function middleware(request: NextRequest) {
   const pathname = request.nextUrl.pathname;
   const protectedPath = isProtectedPath(pathname);
 
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  const { url: supabaseUrl, publishableKey: supabaseAnonKey } = getServerSupabaseConfig();
 
   // Fail closed: production without Supabase must not expose protected routes.
   if (protectedPath && !isProductionAuthConfigured()) {

@@ -11,7 +11,9 @@ export function isProductionAuthConfigured(): boolean {
 
 export function assertProductionAuthConfigured(): void {
   if (!isProductionAuthConfigured()) {
-    throw new Error("Production requires NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY");
+    throw new Error(
+      "Production requires UNSTANDARD_SUPABASE_URL and UNSTANDARD_SUPABASE_PUBLISHABLE_KEY",
+    );
   }
 }
 
