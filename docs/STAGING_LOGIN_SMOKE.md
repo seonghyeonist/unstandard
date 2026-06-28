@@ -10,6 +10,7 @@ Prove the merged login entry works on a real **Vercel Preview + Supabase staging
 
 Related (do not conflate):
 
+- [`P0-5_SMOKE_DAY_RUNBOOK.md`](./P0-5_SMOKE_DAY_RUNBOOK.md) — **당일 실측용** 링크·순서·복붙 템플릿
 - [`VERCEL_PREVIEW_SMOKE.md`](./VERCEL_PREVIEW_SMOKE.md) — Edge middleware runtime + broader preview gates
 - [`ALPHA_READINESS_CHECKLIST.md`](./ALPHA_READINESS_CHECKLIST.md) — P0 alpha blockers
 - [`SUPABASE_SETUP.md`](./SUPABASE_SETUP.md) — env names and migration workflow
