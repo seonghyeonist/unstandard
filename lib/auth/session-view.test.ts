@@ -11,6 +11,7 @@ describe("toPublicSessionUser", () => {
     assert.equal(view.nickname, "user-11111111");
     assert.equal(view.idPrefix, "11111111");
     assert.equal(view.onboarded, true);
+    assert.equal("id" in view, false);
     assert.equal("email" in view, false);
   });
 
@@ -21,5 +22,6 @@ describe("toPublicSessionUser", () => {
     );
     assert.equal(view.onboarded, false);
     assert.equal(view.nickname, "손님");
+    assert.equal("id" in view, false);
   });
 });

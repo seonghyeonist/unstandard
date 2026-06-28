@@ -12,7 +12,6 @@ export async function GET() {
   const publicUser = toPublicSessionUser(user, { supabaseAuth: isSupabaseAuthEnabled() });
   return NextResponse.json({
     user: {
-      id: publicUser.id,
       nickname: publicUser.nickname,
       onboarded: publicUser.onboarded,
       idPrefix: publicUser.idPrefix,

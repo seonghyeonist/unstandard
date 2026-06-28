@@ -28,7 +28,7 @@ export default function SettingsPage() {
     },
   });
 
-  const idPrefix = user?.idPrefix ?? user?.id.replace(/-/g, "").slice(0, 8) ?? "unknown";
+  const idPrefix = user?.idPrefix ?? "unknown";
 
   return (
     <AppShell title="설정" eyebrow="alpha">

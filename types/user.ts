@@ -1,9 +1,8 @@
 export type CurrentUser = {
-  id: string;
   nickname: string;
   onboarded: boolean;
-  /** Safe display prefix — not the full auth user id when omitted server-side */
-  idPrefix?: string;
+  /** Safe display prefix only — full auth user id is never exposed to the client session API */
+  idPrefix: string;
 };
 
 export type OnboardingQuestion = {
