@@ -12,7 +12,7 @@
 
 ### 인증·세션
 
-- [ ] Supabase login UI 연결 및 실제 로그인 플로우 테스트 (OAuth 또는 magic link) — 코드: `/login` + `/api/auth/supabase/oauth` + magic link; **staging 실측 증거 없음**
+- [ ] Supabase login UI 연결 및 실제 로그인 플로우 테스트 (OAuth 또는 magic link) — 코드: `/login` + `/api/auth/supabase/oauth` + magic link; **staging 실측 증거 없음** → [`docs/STAGING_LOGIN_SMOKE.md`](./STAGING_LOGIN_SMOKE.md) (P0-5)
 - [ ] 서버 측 세션 검증 (`middleware.ts` + API route `requireAuthenticatedUser`)
 - [ ] Production에서 mock auth 비활성 (`isMockAuthAllowed() === false`)
 - [ ] Vercel preview/prod env 검증 (`UNSTANDARD_SUPABASE_URL`, `UNSTANDARD_SUPABASE_PUBLISHABLE_KEY`, `AUTH_COOKIE_SECRET`)
@@ -43,7 +43,7 @@
 - [ ] `npm run typecheck` 통과
 - [ ] `npm run build` 통과
 - [ ] `npm run check` 통과
-- [ ] `npm run test` 통과 (현재 13 tests)
+- [ ] `npm run test` 통과 (현재 45 tests, `tsx --test`)
 - [ ] 모바일 뷰포트 수동 smoke (`docs/MANUAL_TEST_CHECKLIST.md` + 핵심 플로우)
 
 ### npm audit (알파 전 결정 기록)
@@ -74,11 +74,11 @@
 
 ---
 
-## 현재 알려진 갭 (2026-06-24, main @ 4189a9d)
+## 현재 알려진 갭 (2026-06-28, main @ 4a5153e)
 
 | 항목 | 현재 상태 |
 |------|-----------|
-| Login UI | Minimal staging entry (`/login` magic link + optional OAuth); **live staging smoke pending** |
+| Login UI | Minimal staging entry merged (PR #18); **live staging smoke pending** — [`STAGING_LOGIN_SMOKE.md`](./STAGING_LOGIN_SMOKE.md) |
 | Reports | `ReportsRepository` + explicit adapter gate; `ensureReporterProfile` before insert when enabled |
 | Blocks | 미구현 |
 | Unlock | HMAC HttpOnly cookie only (DB 없음) |
