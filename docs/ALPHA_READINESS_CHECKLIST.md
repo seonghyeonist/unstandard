@@ -21,11 +21,11 @@
 
 ### 데이터·RLS
 
-- [ ] Supabase migration 적용 (`supabase/migrations/`)
-- [ ] RLS 정책 활성화 및 테스트 (`0002_rls_policies.sql`)
-- [ ] Reporter profile bootstrap staging smoke (`ensureReporterProfile` + reports insert; nickname not email-derived)
+- [ ] Supabase migration 적용 (`supabase/migrations/`) — 증거: [`RLS_REPORTS_STAGING_SMOKE.md`](./RLS_REPORTS_STAGING_SMOKE.md) §2
+- [ ] RLS 정책 활성화 및 테스트 (`0002_rls_policies.sql`) — 증거: [`RLS_REPORTS_STAGING_SMOKE.md`](./RLS_REPORTS_STAGING_SMOKE.md) §3
+- [ ] Reporter profile bootstrap staging smoke (`ensureReporterProfile` + reports insert; nickname not email-derived) — 증거: [`RLS_REPORTS_STAGING_SMOKE.md`](./RLS_REPORTS_STAGING_SMOKE.md) §4–§6
 - [ ] DB-backed answers (온보딩·unlock 답변 영속)
-- [ ] DB-backed reports via `ReportsRepository` (alpha adapter wired; migration + RLS smoke pending)
+- [ ] DB-backed reports via `ReportsRepository` (alpha adapter wired; migration + RLS smoke pending) — 증거: [`RLS_REPORTS_STAGING_SMOKE.md`](./RLS_REPORTS_STAGING_SMOKE.md) §4–§10
 - [ ] Block 기능 (`GET/POST/DELETE /api/blocks` + DB + RLS)
 - [ ] Unlock state: DB가 source of truth, HttpOnly cookie는 cache만
 
