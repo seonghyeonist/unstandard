@@ -1,8 +1,11 @@
 # Vercel Preview Smoke Checklist
 
-> **Status (2026-06-23):** Vercel Edge middleware runtime remains **UNVERIFIED**.  
+> **Status (2026-06-28):** Vercel Edge middleware runtime remains **UNVERIFIED**.  
 > Local `npm run build` passes but emits a Supabase Edge Runtime warning.  
 > Do not deploy to production alpha until this checklist is completed on a real Vercel preview.
+>
+> **Login smoke (P0-5)** is a separate checklist: [`STAGING_LOGIN_SMOKE.md`](./STAGING_LOGIN_SMOKE.md).  
+> Complete login smoke first; then run Edge/middleware cases below on the same Preview deployment.
 
 ---
 
@@ -25,7 +28,7 @@ Build success ≠ Edge runtime success. **Preview smoke is mandatory.**
 |-------|-------|
 | Preview URL | _(fill after deploy)_ |
 | Timestamp (UTC) | _(fill)_ |
-| Git SHA | `096fc4e` (or post-merge main SHA) |
+| Git SHA | `4a5153e` (or post-merge main SHA) |
 | Env set used | _(see below)_ |
 | Tester | _(name)_ |
 | Result | PASS / FAIL / PARTIAL |
@@ -43,15 +46,18 @@ NODE_ENV=production
 AUTH_COOKIE_SECRET=<test-secret>
 ```
 
-### B — Production with Supabase (no login UI yet)
+### B — Production-like Preview with Supabase (preferred server-only env)
 
 ```bash
 NODE_ENV=production
-NEXT_PUBLIC_SUPABASE_URL=<project-url>
-NEXT_PUBLIC_SUPABASE_ANON_KEY=<anon-key>
+UNSTANDARD_SUPABASE_URL=<project-url>
+UNSTANDARD_SUPABASE_PUBLISHABLE_KEY=<publishable-key>
 AUTH_COOKIE_SECRET=<test-secret>
-SUPABASE_SERVICE_ROLE_KEY=<server-only, Vercel env not exposed to client>
+REPORTS_PERSISTENCE_ADAPTER=disabled
+# Do NOT set SUPABASE_SERVICE_ROLE_KEY for login smoke
 ```
+
+Legacy fallback (not preferred): `NEXT_PUBLIC_SUPABASE_URL` + `NEXT_PUBLIC_SUPABASE_ANON_KEY`.
 
 ---
 
@@ -120,6 +126,8 @@ git restore next-env.d.ts   # if build dirtied it
 
 ## Links
 
+- PR #18 (merged): minimal Supabase login entry — `4a5153e`
+- [`docs/STAGING_LOGIN_SMOKE.md`](./STAGING_LOGIN_SMOKE.md) — P0-5 login evidence checklist
 - PR #11: https://github.com/seonghyeonist/unstandard/pull/11
 - `docs/TROUBLESHOOTING.md` §6 — middleware Edge warning
 - `docs/SECURITY_CHECKLIST.md` — alpha gate
