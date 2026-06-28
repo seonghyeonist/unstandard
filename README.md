@@ -56,7 +56,8 @@ npm run dev
 npm run lint        # ESLint (--max-warnings=0)
 npm run typecheck   # tsc --noEmit
 npm run build       # next build
-npm run check       # 위 셋을 한 번에
+npm run test        # node:test 기반 단위 테스트
+npm run check       # lint + typecheck + test + build
 ```
 
 ## 환경변수
