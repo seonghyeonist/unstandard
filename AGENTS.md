@@ -50,7 +50,7 @@ git revert <sha>         # 3) push/머지된 변경: 새 커밋으로 되돌림 
 ### What this repo is
 Mini-monorepo with two deliverables:
 - **Frontend** (repo root): Next.js 15 App Router + React 19 + Tailwind v4, package manager **npm**. This is the user-facing product and is the primary thing to run. Scripts in `package.json`: `dev`, `build`, `start`, `lint`, `typecheck`.
-- **depth-service** (`services/depth-service`): Python 3.12 FastAPI "Depth Score" microservice. Deps in `requirements.txt`, tests via `pytest` (config in `pyproject.toml`).
+- **depth-service** (`services/depth-service`): Python 3.12 FastAPI "Depth Score" microservice. Deps in `requirements.txt`, tests via `pytest` (config in `pytest.ini`).
 
 ### Running the frontend (primary product)
 - Standard commands are in `package.json` (`npm run dev` serves on `http://localhost:3000`).
