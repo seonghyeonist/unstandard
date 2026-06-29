@@ -1,0 +1,7 @@
+# depth-service is optional local/docker Python — not part of Vercel frontend deploy.
+# Without this, Vercel may detect FastAPI (requirements.txt + app/main.py) and serve
+# {"detail":"Not Found"} instead of the Next.js app for routes like /login.
+services/depth-service/
+
+# Docker compose stack — not deployed to Vercel
+docker-compose.yml
