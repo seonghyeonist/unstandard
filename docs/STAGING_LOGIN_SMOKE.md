@@ -10,6 +10,7 @@ Prove the merged login entry works on a real **Vercel Preview + Supabase staging
 
 Related (do not conflate):
 
+- [`PRODUCTION_AUTH_RESET_RUNBOOK.md`](./PRODUCTION_AUTH_RESET_RUNBOOK.md) — 고정 도메인 + env 재설정 + magic link 1회 스모크 순서
 - [`VERCEL_PREVIEW_SMOKE.md`](./VERCEL_PREVIEW_SMOKE.md) — Edge middleware runtime + broader preview gates
 - [`ALPHA_READINESS_CHECKLIST.md`](./ALPHA_READINESS_CHECKLIST.md) — P0 alpha blockers
 - [`SUPABASE_SETUP.md`](./SUPABASE_SETUP.md) — env names and migration workflow
