@@ -47,7 +47,7 @@ Error: Process completed with exit code 1.
 
 해결: 커밋하지 말 것. Git 추적 대상에서 제거된 경우 로컬에만 존재합니다. 빌드 후 의도치 않게 변경된 경우 `git restore next-env.d.ts`로 되돌립니다. ESLint는 이 생성 파일을 검사하지 않도록 `eslint.config.mjs`에서 `next-env.d.ts`를 ignore합니다.
 
-주의: `npm run check`(= `lint && typecheck && build`)가 빌드 직후 재실행에서 `next-env.d.ts` triple-slash reference로 실패하면, `eslint.config.mjs`의 ignore 목록에 `next-env.d.ts`가 있는지 먼저 확인하세요.
+주의: `npm run check`(= `lint && typecheck && test && build`)가 빌드 직후 재실행에서 `next-env.d.ts` triple-slash reference로 실패하면, `eslint.config.mjs`의 ignore 목록에 `next-env.d.ts`가 있는지 먼저 확인하세요.
 
 ## 5. depth-service 테스트/실행
 
