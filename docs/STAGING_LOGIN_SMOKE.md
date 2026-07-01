@@ -138,6 +138,24 @@ curl -sS "https://<preview>/api/debug/auth-env?token=<UNSTANDARD_DEBUG_CHECK_TOK
 
 **Do not proceed to magic link until `ok: true`.** After P0-5 smoke passes, remove `UNSTANDARD_DEBUG_CHECK_TOKEN` from Vercel and delete `app/api/debug/auth-env/route.ts`.
 
+### D0b. Callback diagnostics (temporary — remove after P0-5 smoke)
+
+`app/auth/callback/route.ts` emits **safe server logs** for callback lifecycle events:
+
+| `action` | When |
+|----------|------|
+| `authCallback:start` | Every callback request |
+| `authCallback:missingConfig` | Supabase env missing |
+| `authCallback:missingCode` | No `code` query param |
+| `authCallback:exchangeFailed` | `exchangeCodeForSession` error |
+| `authCallback:exchangeSucceeded` | Session exchange OK |
+
+Logs include booleans, host labels, redirect targets, and safe error `name`/`message`/`status`/`code` only. They **never** log auth codes, tokens, cookies, emails, user IDs, Supabase URLs/keys, or full callback URLs.
+
+**Expired magic link (`otp_expired`):** Supabase often returns errors in the URL **hash fragment** (`#error_code=otp_expired`), which the server never receives. In that case Vercel logs show `authCallback:missingCode` even though the browser URL later shows `otp_expired` on `/login`. **Discard old magic-link emails** and request **one fresh link** only after Supabase rate limit clears. `/login` now surfaces a clearer client-side message when the hash contains `otp_expired`.
+
+Remove callback diagnostics after P0-5 smoke passes.
+
 | # | Case | Steps | Expected | Pass |
 |---|------|-------|----------|------|
 | 0 | Auth env diagnostics | `GET /api/debug/auth-env?token=...` | `ok: true`; all required auth/reports booleans true | ☐ |
@@ -282,7 +300,8 @@ If smoke fails due to **env misconfiguration only**, fix env — no code revert.
 | `app/login/page.tsx` | Server page; passes `mockAllowed`, `supabaseEnabled`, `oauthProvider` |
 | `app/login/actions.ts` | `requestSupabaseMagicLink` → `signInWithOtp` |
 | `app/api/auth/supabase/oauth/route.ts` | OAuth redirect |
-| `app/auth/callback/route.ts` | PKCE `exchangeCodeForSession` → `/app/settings` |
+| `app/auth/callback/route.ts` | PKCE `exchangeCodeForSession` → `/app/settings`; **temporary** safe callback diagnostics |
+| `lib/auth/callback-diagnostics.ts` | **Temporary** safe callback log helpers |
 | `app/api/auth/session/route.ts` | Public session: `nickname`, `onboarded`, `idPrefix` only |
 | `app/api/auth/logout/route.ts` | Supabase `signOut` + mock cookie clear |
 | `lib/auth/session-view.ts` | `toPublicSessionUser` — strips id/email/tokens |

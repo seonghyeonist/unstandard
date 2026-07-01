@@ -3,11 +3,15 @@
 import Link from "next/link";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { AppShell } from "@/components/layout/app-shell";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { requestSupabaseMagicLink, startMockSession } from "@/app/login/actions";
+import {
+  parseAuthHashErrorCode,
+  resolveCallbackHashLoginMessage,
+} from "@/lib/auth/callback-hash-errors";
 
 type LoginClientProps = {
   mockAllowed: boolean;
@@ -35,7 +39,22 @@ export default function LoginClient({
   const router = useRouter();
   const queryClient = useQueryClient();
   const [email, setEmail] = useState("");
-  const loginError = resolveLoginError(errorCode);
+  const [hashLoginError, setHashLoginError] = useState<string | null>(null);
+  const loginError = hashLoginError ?? resolveLoginError(errorCode);
+
+  useEffect(() => {
+    const hashErrorCode = parseAuthHashErrorCode(window.location.hash);
+    const hashMessage = resolveCallbackHashLoginMessage(hashErrorCode);
+    if (hashMessage) {
+      setHashLoginError(hashMessage);
+    }
+
+    if (window.location.hash) {
+      const url = new URL(window.location.href);
+      url.hash = "";
+      window.history.replaceState({}, "", `${url.pathname}${url.search}`);
+    }
+  }, []);
 
   const mockMutation = useMutation({
     mutationFn: async () => startMockSession(),
