@@ -41,6 +41,7 @@ UNSTANDARD_SUPABASE_OAUTH_PROVIDER=
 UNSTANDARD_APP_URL=
 AUTH_COOKIE_SECRET=
 REPORTS_PERSISTENCE_ADAPTER=disabled
+UNSTANDARD_DEBUG_CHECK_TOKEN=
 ```
 
 | Variable | Required for login smoke | Notes |
@@ -48,14 +49,19 @@ REPORTS_PERSISTENCE_ADAPTER=disabled
 | `UNSTANDARD_SUPABASE_URL` | ✅ | Server-only. Staging Supabase project URL. |
 | `UNSTANDARD_SUPABASE_PUBLISHABLE_KEY` | ✅ | Publishable/anon key. Server route handlers only. |
 | `UNSTANDARD_SUPABASE_OAUTH_PROVIDER` | ❌ | Optional. One of `github`, `google`, `apple`, `discord`. |
-| `UNSTANDARD_APP_URL` | ❌ | Optional. Set to exact Preview URL if magic-link/OAuth redirect mismatches request host. |
+| `UNSTANDARD_APP_URL` | ✅ | Exact Preview/Production origin for magic-link/OAuth redirect alignment. |
 | `AUTH_COOKIE_SECRET` | ✅ | Random server secret (unlock + cookie signing in production-like env). |
-| `REPORTS_PERSISTENCE_ADAPTER` | ✅ | Must be `disabled` for this smoke. |
+| `REPORTS_PERSISTENCE_ADAPTER` | ✅ | Must be `disabled` for this smoke (or unset — default is disabled). |
+| `UNSTANDARD_DEBUG_CHECK_TOKEN` | ✅ **temporary** | Random token for `GET /api/debug/auth-env?token=...` pre-flight. **Remove from Vercel after P0-5 smoke passes.** |
 
 **Do not set for this smoke:**
 
 - `REPORTS_PERSISTENCE_ADAPTER=supabase-alpha`
 - `SUPABASE_SERVICE_ROLE_KEY` (not used by login paths; do not add “just in case”)
+
+**Temporary diagnostic (remove after P0-5 smoke):**
+
+- `UNSTANDARD_DEBUG_CHECK_TOKEN` — gates `GET /api/debug/auth-env?token=...`. Returns booleans only (no secret values). Delete this env var and remove the route after smoke passes.
 
 **Legacy fallback (document only — not preferred):**
 
@@ -110,8 +116,31 @@ Authentication → URL Configuration:
 
 Run against a **fresh Vercel Preview deployment** after env is set.
 
+### D0. Pre-flight — auth env diagnostics (before `/login`)
+
+Call the temporary bool API to confirm this deployment reads required env vars:
+
+```bash
+curl -sS "https://<preview>/api/debug/auth-env?token=<UNSTANDARD_DEBUG_CHECK_TOKEN>" | jq .
+```
+
+| Check | Expected |
+|-------|----------|
+| HTTP status | `200` (wrong/missing token → `404`) |
+| `ok` | `true` |
+| `auth.hasUnstandardSupabaseUrl` | `true` |
+| `auth.hasUnstandardSupabasePublishableKey` | `true` |
+| `auth.hasAuthCookieSecret` | `true` |
+| `auth.hasUnstandardAppUrl` | `true` |
+| `auth.isServerSupabaseConfigured` | `true` |
+| `reports.reportsPersistenceAdapterIsDisabled` | `true` |
+| Response body | **No** URLs, keys, tokens, emails, or user IDs — booleans and safe labels only |
+
+**Do not proceed to magic link until `ok: true`.** After P0-5 smoke passes, remove `UNSTANDARD_DEBUG_CHECK_TOKEN` from Vercel and delete `app/api/debug/auth-env/route.ts`.
+
 | # | Case | Steps | Expected | Pass |
 |---|------|-------|----------|------|
+| 0 | Auth env diagnostics | `GET /api/debug/auth-env?token=...` | `ok: true`; all required auth/reports booleans true | ☐ |
 | 1 | `/login` loads | Open `https://<preview>/login` | 200, magic link form visible, staging copy | ☐ |
 | 2 | Magic link request | Enter test email → submit | Success message; no stack trace in UI | ☐ |
 | 3 | Magic link opens callback | Click link in email | Browser navigates to `/auth/callback?code=...` | ☐ |
@@ -179,7 +208,7 @@ Store in PR comment, issue, or internal run log. **Never commit secrets.**
 
 | Verdict | When |
 |---------|------|
-| **PASS** | Cases 1–11 pass; session API exposes only safe fields; reports 503; no service role in client bundle |
+| **PASS** | Cases 0–11 pass; session API exposes only safe fields; reports 503; no service role in client bundle |
 | **NEEDS FIX** | Partial pass — e.g. redirect mismatch, callback error, session leaks field name |
 | **BLOCKED** | Auth boundary broken — full id/email/token exposed, mock auth on Preview, or protected routes public |
 
@@ -193,10 +222,11 @@ Store in PR comment, issue, or internal run log. **Never commit secrets.**
 
 1. Open **seonghyeonist/unstandard** → Vercel project.
 2. **Settings → Environment Variables → Preview**.
-3. Add variables from [Section A](#a-required-vercel-preview-env). Generate `AUTH_COOKIE_SECRET` (32+ random bytes).
+3. Add variables from [Section A](#a-required-vercel-preview-env). Generate `AUTH_COOKIE_SECRET` and `UNSTANDARD_DEBUG_CHECK_TOKEN` (32+ random bytes each).
 4. Leave `REPORTS_PERSISTENCE_ADAPTER=disabled` (or unset — default is disabled).
 5. **Do not** add `SUPABASE_SERVICE_ROLE_KEY` for this smoke.
 6. Trigger redeploy: **Deployments → latest Preview → Redeploy** (or push empty commit to a PR branch).
+7. Run [D0 pre-flight](#d0-pre-flight--auth-env-diagnostics-before-login) before opening `/login`.
 
 ### Supabase (staging project)
 
@@ -259,4 +289,5 @@ If smoke fails due to **env misconfiguration only**, fix env — no code revert.
 | `lib/config/supabase-config.ts` | `UNSTANDARD_*` preferred; legacy fallback |
 | `lib/config/auth-mode.ts` | Mock disabled in production |
 | `lib/config/persistence-mode.ts` | Reports explicit-gated; default disabled |
+| `app/api/debug/auth-env/route.ts` | **Temporary** bool env diagnostics for P0-5 pre-flight |
 | `middleware.ts` | Protected `/app`, `/onboarding`; Supabase session check |
