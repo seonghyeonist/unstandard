@@ -6,7 +6,7 @@ describe("toPublicSessionUser", () => {
   it("masks supabase users with safe nickname and onboarded staging default", () => {
     const view = toPublicSessionUser(
       { id: "11111111-1111-1111-1111-111111111111", email: "hidden@example.com" },
-      { supabaseAuth: true },
+      { supabaseAuth: true, answersPersistenceEnabled: false },
     );
     assert.equal(view.nickname, "user-11111111");
     assert.equal(view.idPrefix, "11111111");
