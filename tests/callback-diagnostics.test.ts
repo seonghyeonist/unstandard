@@ -83,6 +83,13 @@ describe("sanitizeAuthErrorMessage", () => {
   it("redacts unknown provider messages", () => {
     assert.equal(sanitizeAuthErrorMessage("secret internal failure detail"), "redacted_auth_error");
   });
+
+  it("caps allowlisted provider messages to 80 characters", () => {
+    const longAllowed =
+      "Signups not allowed for this instance. Contact the project administrator for access to this application.";
+    assert.ok(longAllowed.length > 80);
+    assert.equal(sanitizeAuthErrorMessage(longAllowed), longAllowed.slice(0, 80));
+  });
 });
 
 describe("extractSafeAuthErrorFields", () => {

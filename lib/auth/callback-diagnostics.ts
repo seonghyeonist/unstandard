@@ -56,7 +56,10 @@ const ALLOWED_AUTH_ERROR_MESSAGES = new Set([
   "Invalid login credentials",
   "Signups not allowed for this instance",
   "Email not confirmed",
+  "Signups not allowed for this instance. Contact the project administrator for access to this application.",
 ]);
+
+export const MAX_SAFE_AUTH_ERROR_MESSAGE_LENGTH = 80;
 
 const EMAIL_LIKE_PATTERN = /@/;
 const TOKEN_LIKE_PATTERN = /\b(bearer\s+|eyJ[a-zA-Z0-9_-]{10,}|access_token|refresh_token|apikey)\b/i;
@@ -70,7 +73,7 @@ export function sanitizeAuthErrorMessage(message: string): string {
     return "redacted_auth_error";
   }
   if (ALLOWED_AUTH_ERROR_MESSAGES.has(trimmed)) {
-    return trimmed;
+    return trimmed.slice(0, MAX_SAFE_AUTH_ERROR_MESSAGE_LENGTH);
   }
   return "redacted_auth_error";
 }
