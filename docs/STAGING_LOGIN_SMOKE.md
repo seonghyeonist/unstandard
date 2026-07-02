@@ -17,6 +17,24 @@ Related (do not conflate):
 
 ---
 
+## Canonical P0-5 target (do not substitute)
+
+| Field | Value |
+|-------|-------|
+| Vercel project | `unstandard-m9qj` |
+| Vercel dashboard | https://vercel.com/unstandard/unstandard-m9qj |
+| Production host | `https://unstandard-m9qj.vercel.app` |
+| Required `UNSTANDARD_APP_URL` | `https://unstandard-m9qj.vercel.app` |
+| Required Supabase Redirect URL | `https://unstandard-m9qj.vercel.app/auth/callback` |
+
+**Evidence validity rule:** Evidence from `unstandard`, `unstandard-f3nf`, `unstandard-fabi`, or any other Vercel project is **invalid** for the reported `unstandard-m9qj` production callback failure unless the user explicitly changes the target.
+
+**Magic-link smoke:** **PAUSED** until Supabase email rate-limit cooldown is confirmed. Do not request another magic link before cooldown.
+
+**Branch preview evidence:** Valid only if the preview deployment belongs to the **`unstandard-m9qj`** Vercel project and host/env/Supabase Redirect URL all match that preview host.
+
+---
+
 ## Record template (fill after human-run smoke)
 
 | Field | Value |

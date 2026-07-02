@@ -8,6 +8,19 @@
 
 ---
 
+## Canonical P0-5 Vercel target
+
+| Field | Value |
+|-------|-------|
+| Vercel project | `unstandard-m9qj` |
+| Production host | `https://unstandard-m9qj.vercel.app` |
+| Required `UNSTANDARD_APP_URL` | `https://unstandard-m9qj.vercel.app` |
+| Required Supabase Redirect URL | `https://unstandard-m9qj.vercel.app/auth/callback` |
+
+`unstandard`, `unstandard-f3nf`, `unstandard-fabi` 등 **다른 Vercel 프로젝트 증거**는 보고된 `unstandard-m9qj` production 실패에 **적용 불가**. Magic-link smoke는 rate-limit cooldown 확인 전까지 **중단**.
+
+---
+
 ## P0 — 50인 알파 전 필수
 
 ### 인증·세션

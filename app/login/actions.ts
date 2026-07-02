@@ -1,6 +1,7 @@
 "use server";
 
 import { isMockAuthAllowed, isSupabaseAuthEnabled } from "@/lib/config/auth-mode";
+import { extractSafeAuthErrorFields } from "@/lib/auth/callback-diagnostics";
 import { getSupabaseAuthRedirectOrigin } from "@/lib/auth/supabase-request-origin";
 import { setMockSessionUser, clearMockSessionUser } from "@/lib/auth/mock-session.server";
 import { createClient } from "@/lib/supabase/server";
@@ -67,12 +68,13 @@ export async function requestSupabaseMagicLink(email: string) {
   });
 
   if (error) {
+    const safeError = extractSafeAuthErrorFields(error);
     console.error({
       action: "requestSupabaseMagicLink",
-      errorName: error.name,
-      errorMessage: error.message,
-      ...(error.status !== undefined ? { errorStatus: error.status } : {}),
-      ...(error.code !== undefined ? { errorCode: error.code } : {}),
+      errorName: safeError.errorName,
+      errorMessage: safeError.errorMessage,
+      ...(safeError.errorStatus !== null ? { errorStatus: safeError.errorStatus } : {}),
+      ...(safeError.errorCode !== null ? { errorCode: safeError.errorCode } : {}),
       ...diagnostics,
     });
     throw new Error("Magic link request failed. Check Supabase email auth settings.");
