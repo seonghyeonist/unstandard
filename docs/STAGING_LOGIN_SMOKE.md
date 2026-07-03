@@ -1,8 +1,8 @@
 # Staging Login Smoke — P0-5
 
 > **Task:** `P0-5: Vercel/Supabase Live Login Smoke`  
-> **Status:** **UNVERIFIED** — checklist only. No live evidence recorded yet.  
-> **Alpha verdict:** **BLOCKED** — this smoke does not change that.  
+> **Status:** **PASS (canonical staging, human-confirmed)** — login/logout smoke on `unstandard-m9qj` production host.  
+> **Alpha verdict:** **BLOCKED** — this smoke does not change that. DB/RLS/answers/reports/blocks/unlock/rate limiting remain incomplete.  
 > **Merge baseline:** `4a5153e` (PR #18 — minimal Supabase login entry)
 
 This document is **evidence gathering**, not product expansion.  
@@ -27,7 +27,7 @@ Related (do not conflate):
 | Required `UNSTANDARD_APP_URL` | `https://unstandard-m9qj.vercel.app` |
 | Required Supabase Redirect URL | `https://unstandard-m9qj.vercel.app/auth/callback` |
 
-**Evidence validity rule:** Evidence from `unstandard`, `unstandard-f3nf`, `unstandard-fabi`, or any other Vercel project is **invalid** for the reported `unstandard-m9qj` production callback failure unless the user explicitly changes the target.
+**Evidence validity rule:** Evidence from `unstandard`, `unstandard-f3nf`, `unstandard-fabi`, or any other Vercel project is **invalid** for P0-5 auth/deployment claims unless the founder explicitly changes the canonical target in writing.
 
 **Magic-link smoke:** **PAUSED** until Supabase email rate-limit cooldown is confirmed. Do not request another magic link before cooldown.
 
@@ -60,12 +60,30 @@ Human must confirm:
 
 | Field | Value |
 |-------|-------|
-| Preview URL | _(e.g. `https://unstandard-xxx.vercel.app`)_ |
-| Git SHA | `4a5153e` _(or newer main)_ |
+| Vercel project | `unstandard-m9qj` |
+| Deployment type | **Production** (canonical staging host) |
+| Canonical URL | `https://unstandard-m9qj.vercel.app` |
+| `UNSTANDARD_APP_URL` | `https://unstandard-m9qj.vercel.app` |
+| Supabase Redirect URL | `https://unstandard-m9qj.vercel.app/auth/callback` |
+| Git SHA | _(record deployed Production SHA)_ |
 | Timestamp (UTC) | _(fill)_ |
 | Supabase project | _(name only, redacted ref)_ |
-| Tester | _(name)_ |
-| **Final verdict** | **PASS** / **NEEDS FIX** / **BLOCKED** |
+| Tester | Human founder (manual smoke) |
+| **Final verdict** | **PASS** |
+
+### Human-confirmed evidence (canonical staging, 2026-07)
+
+| Check | Result |
+|-------|--------|
+| Login works | ✅ PASS |
+| Authenticated settings page loads | ✅ PASS |
+| `/app/settings` shows authenticated session | ✅ PASS |
+| Logout works | ✅ PASS |
+| After logout, direct access to `/app/settings` redirects to `/login` | ✅ PASS |
+| Authenticated text not visible after logout | ✅ PASS |
+| Mobile partial smoke | ✅ Checked previously |
+
+> **Target lock:** Evidence from `unstandard`, `unstandard-f3nf`, `unstandard-fabi`, or any other Vercel project is **invalid** for this record unless the founder changes the canonical target in writing.
 
 ---
 

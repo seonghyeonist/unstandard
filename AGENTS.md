@@ -18,6 +18,31 @@
 - **빌드/린트/타입체크가 깨진 상태로 작업을 종료하지 않는다.**
 - 확신이 없으면 **수정 전에 먼저 질문**한다. 보안·유지보수성이 속도보다 우선.
 
+### Canonical Vercel Target Lock
+
+P0-5 인증·배포 증거는 **아래 단일 타깃만** 유효하다. 다른 Vercel 프로젝트의 로그·env·Preview URL·배포 상태를 **교환 가능한 증거로 쓰지 말 것.**
+
+| Field | Canonical value |
+|-------|-----------------|
+| Vercel project | `unstandard-m9qj` |
+| Host | `https://unstandard-m9qj.vercel.app` |
+| Required `UNSTANDARD_APP_URL` | `https://unstandard-m9qj.vercel.app` |
+| Required Supabase Redirect URL | `https://unstandard-m9qj.vercel.app/auth/callback` |
+
+**무효 증거 (founder가 서면으로 타깃을 바꾸기 전까지):** `unstandard`, `unstandard-f3nf`, `unstandard-fabi`, 그 밖의 **모든** Vercel 프로젝트.
+
+**스모크·배포 주장 전 필수 보고** (하나라도 확인 불가면 `target not confirmed`라고 하고 주장 중단):
+
+1. Vercel project name
+2. URL/host
+3. Preview 또는 Production
+4. Git commit SHA
+5. 가정한 Supabase redirect URL
+
+**Preview 증거와 Production 증거는 상호 대체 불가.** Preview PASS가 Production PASS를 의미하지 않는다.
+
+P0-5 auth smoke, Supabase redirect 설정, Vercel env 검증, callback 진단, 배포 증거는 **반드시 `unstandard-m9qj`만** 사용한다. 상세 절차: [`docs/STAGING_LOGIN_SMOKE.md`](./docs/STAGING_LOGIN_SMOKE.md).
+
 ### 요구되는 응답 흐름
 ```
 1. 진단 (무엇이 문제인가)
@@ -95,7 +120,7 @@ Mini-monorepo with two deliverables:
 - UI 리팩터, 제품 copy 변경 (전략 문서 승인 없이)
 
 ### 알려진 런타임 갭 (백로그, 이번 범위 아님)
-- Supabase login UI 미연결 — login 페이지는 dev mock만 (`app/login/page.tsx`)
+- Supabase login UI 존재 — P0-5 canonical staging (`unstandard-m9qj`) login/logout smoke **수동 통과** ([`docs/STAGING_LOGIN_SMOKE.md`](./docs/STAGING_LOGIN_SMOKE.md)). **알파는 여전히 BLOCKED** — DB/RLS/answers/reports/blocks/unlock/rate limiting 미완.
 - Reports: API는 있으나 `lib/server/report-store.server.ts` in-memory (NON-ALPHA-SAFE)
 - Unlock: DB source of truth 없음 (signed cookie only)
 - Block 기능 미구현
