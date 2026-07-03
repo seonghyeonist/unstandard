@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import type { Provider } from "@supabase/supabase-js";
 import { resolveOAuthProvider } from "@/lib/auth/supabase-oauth";
+import { getSupabaseAuthRedirectOrigin } from "@/lib/auth/supabase-request-origin";
 import { createClient } from "@/lib/supabase/server";
 import {
   getSupabaseOAuthProvider,
@@ -12,7 +13,7 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: "Supabase is not configured" }, { status: 503 });
   }
 
-  const { searchParams, origin } = new URL(request.url);
+  const { searchParams } = new URL(request.url);
   const provider = resolveOAuthProvider(
     searchParams.get("provider"),
     getSupabaseOAuthProvider(),
@@ -21,10 +22,11 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: "OAuth provider is not configured" }, { status: 400 });
   }
 
+  const redirectOrigin = await getSupabaseAuthRedirectOrigin();
   const supabase = await createClient();
   const { data, error } = await supabase.auth.signInWithOAuth({
     provider: provider as Provider,
-    options: { redirectTo: `${origin}/auth/callback` },
+    options: { redirectTo: `${redirectOrigin}/auth/callback` },
   });
 
   if (error || !data.url) {

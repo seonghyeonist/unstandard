@@ -17,6 +17,45 @@ Related (do not conflate):
 
 ---
 
+## Canonical P0-5 target (do not substitute)
+
+| Field | Value |
+|-------|-------|
+| Vercel project | `unstandard-m9qj` |
+| Vercel dashboard | https://vercel.com/unstandard/unstandard-m9qj |
+| Production host | `https://unstandard-m9qj.vercel.app` |
+| Required `UNSTANDARD_APP_URL` | `https://unstandard-m9qj.vercel.app` |
+| Required Supabase Redirect URL | `https://unstandard-m9qj.vercel.app/auth/callback` |
+
+**Evidence validity rule:** Evidence from `unstandard`, `unstandard-f3nf`, `unstandard-fabi`, or any other Vercel project is **invalid** for the reported `unstandard-m9qj` production callback failure unless the user explicitly changes the target.
+
+**Magic-link smoke:** **PAUSED** until Supabase email rate-limit cooldown is confirmed. Do not request another magic link before cooldown.
+
+**Branch preview evidence:** Valid only if the preview deployment belongs to the **`unstandard-m9qj`** Vercel project and host/env/Supabase Redirect URL all match that preview host.
+
+### PR preview vs production (do not conflate)
+
+- A PR **preview** deployment under `unstandard-m9qj` proves only that the preview build exists for that branch.
+- It does **NOT** prove production `https://unstandard-m9qj.vercel.app` contains the same commit.
+- **Production smoke** requires human confirmation that the latest **Production** deployment SHA on `unstandard-m9qj` includes the intended merge commit (e.g. PR #31 after merge).
+- Record both preview SHA and production SHA separately in evidence — never substitute one for the other.
+
+### Account-security gate (before deployment or smoke)
+
+Resolve any reported unknown Vercel account/session concern **before** deployment or smoke work.
+
+Human must confirm:
+
+- [ ] Unknown Vercel team member or session is removed or explained
+- [ ] GitHub / email / Vercel access is secured
+- [ ] 2FA or passkey status is checked on relevant accounts
+- [ ] Tokens and third-party integrations are reviewed
+- [ ] Sensitive env secrets are rotated if exposure is plausible
+
+**If this gate is unresolved, deployment and smoke are BLOCKED.**
+
+---
+
 ## Record template (fill after human-run smoke)
 
 | Field | Value |

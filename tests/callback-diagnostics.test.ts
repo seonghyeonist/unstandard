@@ -5,6 +5,7 @@ import {
   getRedirectOriginHostLabel,
   getRequestHostInfo,
   hasAuthErrorInRequestUrl,
+  sanitizeAuthErrorMessage,
 } from "../lib/auth/callback-diagnostics.ts";
 
 function makeCallbackRequest(
@@ -53,6 +54,41 @@ describe("hasAuthErrorInRequestUrl", () => {
       hasAuthErrorInRequestUrl("https://preview.example.com/auth/callback?code=abc"),
       false,
     );
+  });
+});
+
+describe("sanitizeAuthErrorMessage", () => {
+  it("preserves known safe provider messages", () => {
+    assert.equal(sanitizeAuthErrorMessage("email rate limit exceeded"), "email rate limit exceeded");
+    assert.equal(
+      sanitizeAuthErrorMessage("Email link is invalid or has expired"),
+      "Email link is invalid or has expired",
+    );
+  });
+
+  it("redacts email-like provider messages", () => {
+    assert.equal(
+      sanitizeAuthErrorMessage("User user@example.com is not allowed"),
+      "redacted_auth_error",
+    );
+  });
+
+  it("redacts token-like provider messages", () => {
+    assert.equal(
+      sanitizeAuthErrorMessage("Invalid bearer eyJhbGciOiJIUzI1NiJ9.payload"),
+      "redacted_auth_error",
+    );
+  });
+
+  it("redacts unknown provider messages", () => {
+    assert.equal(sanitizeAuthErrorMessage("secret internal failure detail"), "redacted_auth_error");
+  });
+
+  it("caps allowlisted provider messages to 80 characters", () => {
+    const longAllowed =
+      "Signups not allowed for this instance. Contact the project administrator for access to this application.";
+    assert.ok(longAllowed.length > 80);
+    assert.equal(sanitizeAuthErrorMessage(longAllowed), longAllowed.slice(0, 80));
   });
 });
 

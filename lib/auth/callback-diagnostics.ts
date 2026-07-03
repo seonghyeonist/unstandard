@@ -49,6 +49,35 @@ export type SafeAuthErrorFields = {
   errorCode: string | null;
 };
 
+/** Provider messages safe to log verbatim — no email, tokens, or user identifiers. */
+const ALLOWED_AUTH_ERROR_MESSAGES = new Set([
+  "Email link is invalid or has expired",
+  "email rate limit exceeded",
+  "Invalid login credentials",
+  "Signups not allowed for this instance",
+  "Email not confirmed",
+  "Signups not allowed for this instance. Contact the project administrator for access to this application.",
+]);
+
+export const MAX_SAFE_AUTH_ERROR_MESSAGE_LENGTH = 80;
+
+const EMAIL_LIKE_PATTERN = /@/;
+const TOKEN_LIKE_PATTERN = /\b(bearer\s+|eyJ[a-zA-Z0-9_-]{10,}|access_token|refresh_token|apikey)\b/i;
+
+export function sanitizeAuthErrorMessage(message: string): string {
+  const trimmed = message.trim();
+  if (!trimmed) {
+    return trimmed;
+  }
+  if (EMAIL_LIKE_PATTERN.test(trimmed) || TOKEN_LIKE_PATTERN.test(trimmed)) {
+    return "redacted_auth_error";
+  }
+  if (ALLOWED_AUTH_ERROR_MESSAGES.has(trimmed)) {
+    return trimmed.slice(0, MAX_SAFE_AUTH_ERROR_MESSAGE_LENGTH);
+  }
+  return "redacted_auth_error";
+}
+
 export function extractSafeAuthErrorFields(error: unknown): SafeAuthErrorFields {
   const result: SafeAuthErrorFields = {
     errorName: null,
@@ -67,7 +96,7 @@ export function extractSafeAuthErrorFields(error: unknown): SafeAuthErrorFields 
     result.errorName = record.name;
   }
   if (typeof record.message === "string") {
-    result.errorMessage = record.message;
+    result.errorMessage = sanitizeAuthErrorMessage(record.message);
   }
   if (typeof record.status === "number") {
     result.errorStatus = record.status;
