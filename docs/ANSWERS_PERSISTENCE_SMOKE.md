@@ -1,7 +1,8 @@
 # Answers Persistence Smoke — P0 (Onboarding)
 
 > **Status:** CODE READY — **DB/RLS NOT VERIFIED** until human applies migrations and runs smoke.  
-> **Alpha verdict:** **BLOCKED** — this slice alone does not unblock alpha.
+> **Alpha verdict:** **BLOCKED** — this slice alone does not unblock alpha.  
+> **Execution runbook:** [`ANSWERS_RLS_ADVERSARIAL_SMOKE.md`](./ANSWERS_RLS_ADVERSARIAL_SMOKE.md) (migration order, RLS matrix, evidence, rollback).
 
 ## Canonical target lock
 
@@ -11,7 +12,7 @@ Evidence and smoke must use only:
 - Callback: `https://unstandard-m9qj.vercel.app/auth/callback`
 
 P0-5 login/logout/protected-route smoke has **manually passed** on canonical `unstandard-m9qj`.  
-**Do not enable** `ANSWERS_PERSISTENCE_ADAPTER` until migrations **and** RLS adversarial smoke pass.
+**Do not enable** `ANSWERS_PERSISTENCE_ADAPTER` until **direct RLS adversarial smoke (§F)** passes per linked runbook.
 
 ## Scope
 
@@ -31,66 +32,59 @@ Plus existing `UNSTANDARD_SUPABASE_URL` + `UNSTANDARD_SUPABASE_PUBLISHABLE_KEY`.
 - Rate limiting
 - Reports DB/RLS smoke (separate gate)
 - Full alpha readiness
+- **Merge PR #30** (separate decision after smoke)
+
+## Smoke phases (strict order)
+
+| Phase | What | Adapter | Merge PR #30 |
+|-------|------|---------|--------------|
+| **1. Direct DB** | Apply `0001`–`0005`, §D schema + §F RLS adversarial | **Disabled** | Not required |
+| **2. App preview** | §G onboarding on `unstandard-m9qj` | Enable only after Phase 1 **PASS** | After Phase 1 **PASS**, before or after merge per founder |
+| **3. Merge decision** | Founder review | — | Only after Phase 1 **PASS** (Phase 2 optional gate) |
+
+**Current step:** Phase 1 planning/execution — see [`ANSWERS_RLS_ADVERSARIAL_SMOKE.md`](./ANSWERS_RLS_ADVERSARIAL_SMOKE.md).
 
 ## Required migrations (human — apply in order)
 
 1. `supabase/migrations/0001_initial_schema.sql`
 2. `supabase/migrations/0002_rls_policies.sql`
-3. `supabase/migrations/0003_reports_dedup_index.sql` (reports only; safe before answers smoke)
-4. `supabase/migrations/0004_onboarding_question_seed.sql` — **required** for answers FK
-5. `supabase/migrations/0005_answers_onboarding_hardening.sql` — unique index + hardened RLS insert policies
+3. `supabase/migrations/0003_reports_dedup_index.sql`
+4. `supabase/migrations/0004_onboarding_question_seed.sql`
+5. `supabase/migrations/0005_answers_onboarding_hardening.sql`
 
-Rollback (destructive — staging only):
+Pin PR #30 head: `f795038533ea4cfe55bd71fdb59de68eb97e69fc`
 
-```sql
-DELETE FROM public.depth_evaluations WHERE answer_id IN (
-  SELECT id FROM public.answers WHERE question_id = '22222222-2222-2222-2222-222222222222'
-);
-DELETE FROM public.answers WHERE question_id = '22222222-2222-2222-2222-222222222222';
-DELETE FROM public.questions WHERE id = '22222222-2222-2222-2222-222222222222';
-```
+## RLS expectations (runtime proof required)
 
-## RLS expectations
-
-Base policies: `0002_rls_policies.sql`  
-Hardened onboarding inserts: `0005_answers_onboarding_hardening.sql`
-
-| Table | Policy | Expectation |
-|-------|--------|-------------|
-| `profiles` | `profiles_insert_own` / `profiles_update_own` | User upserts own profile; `onboarded_at` only after answer+evaluation persist |
-| `answers` | `answers_insert_own` (0005) | `user_id` and `target_profile_id` must equal `auth.uid()` |
+| Table | Policy / object | Expectation |
+|-------|-----------------|-------------|
+| `profiles` | `profiles_insert_own` / `profiles_update_own` | Own row only |
+| `answers` | `answers_insert_own` (0005) | `user_id` = `target_profile_id` = `auth.uid()` |
 | `answers` | `idx_answers_user_question_unique` | One row per `(user_id, question_id)` |
 | `depth_evaluations` | `depth_evaluations_insert_own` (0005) | `answer_id` must belong to `auth.uid()` |
 
-**Runtime RLS adversarial smoke still required** (User A vs User B) after migrations apply.
-
-**Not logged:** raw `answer_text`, email, tokens, full UUIDs in application logs.
+Adversarial cases F1–F11: linked runbook §F.
 
 ## Vercel env (names only)
 
-| Variable | Required when enabling |
-|----------|------------------------|
-| `UNSTANDARD_SUPABASE_URL` | ✅ |
-| `UNSTANDARD_SUPABASE_PUBLISHABLE_KEY` | ✅ |
-| `AUTH_COOKIE_SECRET` | ✅ (production) |
-| `ANSWERS_PERSISTENCE_ADAPTER` | ✅ set to `supabase-alpha` **only after migration + RLS smoke** |
-| `UNSTANDARD_APP_URL` | ✅ `https://unstandard-m9qj.vercel.app` |
+| Variable | Phase 1 (RLS smoke) | Phase 2 (app smoke) |
+|----------|----------------------|---------------------|
+| `ANSWERS_PERSISTENCE_ADAPTER` | **Disabled / unset** | `supabase-alpha` after §F PASS |
+| `UNSTANDARD_SUPABASE_URL` | Set (auth) | Set |
+| `UNSTANDARD_SUPABASE_PUBLISHABLE_KEY` | Set | Set |
+| `UNSTANDARD_APP_URL` | `https://unstandard-m9qj.vercel.app` | Same |
 
-**Do not set:**
+**Do not set:** `SUPABASE_SERVICE_ROLE_KEY` for user paths.
 
-- `SUPABASE_SERVICE_ROLE_KEY` for this path (user-scoped publishable key + RLS only)
-
-## Smoke cases (after migrations 0001–0005 applied)
+## App smoke cases (Phase 2 only — after §F PASS)
 
 | # | Case | Expected |
 |---|------|----------|
-| 1 | Supabase login on `unstandard-m9qj` + adapter enabled | `/api/auth/session` → `onboarded: false` until onboarding |
-| 2 | Submit onboarding form | `POST /api/onboarding/answer` → 201; profile `onboarded_at` set **only after** answer+evaluation |
-| 3 | Session after onboarding | `GET /api/auth/session` → `onboarded: true`, nickname from profile |
-| 4 | Re-submit onboarding | 200 duplicate (idempotent) |
-| 5 | RLS adversarial | User B cannot `SELECT` user A's `answers` row |
-| 6 | RLS adversarial insert | User B cannot insert answer with `target_profile_id` = User A |
-| 7 | RLS adversarial evaluation | User B cannot insert `depth_evaluations` for User A's `answer_id` |
+| G3 | Login on `unstandard-m9qj` + adapter enabled | `onboarded: false` until onboarding |
+| G4 | Submit onboarding | 201; `onboarded_at` only after answer+evaluation |
+| G5 | Session after onboarding | `onboarded: true` |
+| G6 | Re-submit | 200 duplicate |
+| G7 | Logout / protected route | 307 → `/login` (P0-5 regression) |
 
 ## Code map
 
@@ -98,8 +92,6 @@ Hardened onboarding inserts: `0005_answers_onboarding_hardening.sql`
 |------|------|
 | `lib/config/answers-persistence-mode.ts` | Explicit adapter gate |
 | `lib/server/persistence/onboarding-finalize.ts` | Onboarded finalize gate |
-| `lib/server/persistence/answers.repository.*` | Repository boundary |
 | `lib/server/persistence/adapters/supabase/answers.repository.ts` | Alpha adapter (safe write order) |
 | `app/onboarding/actions.ts` | Server-side persist branch |
 | `app/api/onboarding/answer/route.ts` | HTTP entry (Supabase auth only) |
-| `lib/server/profile/profile-session.ts` | Loads `onboarded_at` for session |
