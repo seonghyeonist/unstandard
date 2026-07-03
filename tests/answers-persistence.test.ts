@@ -11,6 +11,7 @@ import {
 } from "../lib/server/persistence/answers.types.ts";
 import { validateOnboardingAnswerInput } from "../lib/security/onboarding-validation.ts";
 import { toPublicSessionUser } from "../lib/auth/session-view.ts";
+import { canMarkProfileOnboarded } from "../lib/server/persistence/onboarding-finalize.ts";
 
 const ENV_KEYS = [
   "ANSWERS_PERSISTENCE_ADAPTER",
@@ -96,6 +97,20 @@ describe("answers persistence activation gate", () => {
       },
     );
   });
+
+  it("is disabled for unknown adapter values", () => {
+    withEnv(
+      {
+        ANSWERS_PERSISTENCE_ADAPTER: "postgres",
+        UNSTANDARD_SUPABASE_URL: "https://staging.supabase.co",
+        UNSTANDARD_SUPABASE_PUBLISHABLE_KEY: "publishable-key",
+      },
+      () => {
+        assert.equal(getAnswersPersistenceAdapter(), "disabled");
+        assert.equal(isAnswersPersistenceEnabled(), false);
+      },
+    );
+  });
 });
 
 describe("mapSaveOnboardingAnswerResultToHttp", () => {
@@ -119,6 +134,19 @@ describe("mapSaveOnboardingAnswerResultToHttp", () => {
       saveOnboardingAnswerFailure("PERSISTENCE_DISABLED"),
     );
     assert.equal(mapped.status, 503);
+  });
+
+  it("does not expose sensitive fields in error responses", () => {
+    for (const code of ["PERSISTENCE_DISABLED", "SETUP_REQUIRED", "DB_ERROR", "INVALID_INPUT"] as const) {
+      const mapped = mapSaveOnboardingAnswerResultToHttp(saveOnboardingAnswerFailure(code));
+      const body = JSON.stringify(mapped.body);
+      assert.equal(body.includes("access_token"), false);
+      assert.equal(body.includes("refresh_token"), false);
+      assert.equal(body.includes("service_role"), false);
+      assert.equal(body.includes("@"), false);
+      assert.equal(Object.hasOwn(mapped.body, "id"), false);
+      assert.equal(Object.hasOwn(mapped.body, "email"), false);
+    }
   });
 });
 
@@ -158,5 +186,67 @@ describe("toPublicSessionUser with answers persistence", () => {
     );
     assert.equal(view.onboarded, true);
     assert.equal(view.nickname, "민");
+  });
+});
+
+describe("canMarkProfileOnboarded", () => {
+  it("does not mark onboarded when answer insert failed", () => {
+    assert.equal(
+      canMarkProfileOnboarded({
+        existingAnswerId: null,
+        existingEvaluationComplete: false,
+        answerInserted: false,
+        evaluationInserted: false,
+      }),
+      false,
+    );
+  });
+
+  it("does not mark onboarded when evaluation insert failed", () => {
+    assert.equal(
+      canMarkProfileOnboarded({
+        existingAnswerId: null,
+        existingEvaluationComplete: false,
+        answerInserted: true,
+        evaluationInserted: false,
+      }),
+      false,
+    );
+  });
+
+  it("marks onboarded only after answer and evaluation succeed", () => {
+    assert.equal(
+      canMarkProfileOnboarded({
+        existingAnswerId: null,
+        existingEvaluationComplete: false,
+        answerInserted: true,
+        evaluationInserted: true,
+      }),
+      true,
+    );
+  });
+
+  it("allows duplicate finalize when existing answer has evaluation", () => {
+    assert.equal(
+      canMarkProfileOnboarded({
+        existingAnswerId: "answer-id",
+        existingEvaluationComplete: true,
+        answerInserted: false,
+        evaluationInserted: false,
+      }),
+      true,
+    );
+  });
+
+  it("blocks duplicate finalize when existing answer lacks evaluation", () => {
+    assert.equal(
+      canMarkProfileOnboarded({
+        existingAnswerId: "answer-id",
+        existingEvaluationComplete: false,
+        answerInserted: false,
+        evaluationInserted: false,
+      }),
+      false,
+    );
   });
 });

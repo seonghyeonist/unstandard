@@ -1,6 +1,7 @@
 import "server-only";
 
 import { createClient } from "@/lib/supabase/server";
+import { canMarkProfileOnboarded } from "@/lib/server/persistence/onboarding-finalize";
 import type { SaveOnboardingAnswerInput } from "@/lib/server/persistence/answers.types";
 import {
   saveOnboardingAnswerFailure,
@@ -39,7 +40,22 @@ async function findExistingOnboardingAnswer(
   return data ? { id: data.id as string } : null;
 }
 
-async function upsertOnboardingProfile(
+async function hasDepthEvaluation(answerId: string): Promise<boolean> {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("depth_evaluations")
+    .select("id")
+    .eq("answer_id", answerId)
+    .maybeSingle();
+
+  if (error) {
+    throw new Error("Evaluation lookup failed");
+  }
+
+  return Boolean(data);
+}
+
+async function upsertProfileMetadata(
   userId: string,
   nickname: string,
 ): Promise<"ok" | "setup_required"> {
@@ -59,26 +75,22 @@ async function upsertOnboardingProfile(
   if (existing) {
     const { error: updateError } = await supabase
       .from("profiles")
-      .update({ nickname, onboarded_at: now, updated_at: now })
+      .update({ nickname, updated_at: now })
       .eq("id", userId);
 
-    if (updateError) {
-      return "setup_required";
-    }
-    return "ok";
+    return updateError ? "setup_required" : "ok";
   }
 
   const { error: insertError } = await supabase.from("profiles").insert({
     id: userId,
     nickname,
-    onboarded_at: now,
   });
 
   if (insertError) {
     if (insertError.code === "23505") {
       const { error: updateError } = await supabase
         .from("profiles")
-        .update({ nickname, onboarded_at: now, updated_at: now })
+        .update({ nickname, updated_at: now })
         .eq("id", userId);
       return updateError ? "setup_required" : "ok";
     }
@@ -88,19 +100,97 @@ async function upsertOnboardingProfile(
   return "ok";
 }
 
+async function markProfileOnboarded(userId: string, nickname: string): Promise<"ok" | "setup_required"> {
+  const supabase = await createClient();
+  const now = new Date().toISOString();
+
+  const { error } = await supabase
+    .from("profiles")
+    .update({ nickname, onboarded_at: now, updated_at: now })
+    .eq("id", userId);
+
+  if (error) {
+    return "setup_required";
+  }
+
+  return "ok";
+}
+
+async function insertDepthEvaluation(
+  input: SaveOnboardingAnswerInput,
+  answerId: string,
+): Promise<"ok" | "db_error"> {
+  const supabase = await createClient();
+  const { error } = await supabase.from("depth_evaluations").insert({
+    answer_id: answerId,
+    user_id: input.userId,
+    verdict: input.evaluation.verdict,
+    score: input.evaluation.score,
+    path: input.evaluation.path,
+    reason_codes: input.evaluation.reasonCodes,
+    model_version: input.evaluation.modelVersion,
+  });
+
+  return error ? "db_error" : "ok";
+}
+
+async function finalizeOnboardingProfile(
+  input: SaveOnboardingAnswerInput,
+  state: {
+    existingAnswerId: string | null;
+    existingEvaluationComplete: boolean;
+    answerInserted: boolean;
+    evaluationInserted: boolean;
+  },
+): Promise<"ok" | "setup_required"> {
+  if (!canMarkProfileOnboarded(state)) {
+    return "setup_required";
+  }
+
+  return markProfileOnboarded(input.userId, input.nickname);
+}
+
+async function completeExistingOnboardingAnswer(
+  input: SaveOnboardingAnswerInput,
+  answerId: string,
+): Promise<SaveOnboardingAnswerResult> {
+  const metadataResult = await upsertProfileMetadata(input.userId, input.nickname);
+  if (metadataResult !== "ok") {
+    return saveOnboardingAnswerFailure("SETUP_REQUIRED");
+  }
+
+  let evaluationComplete = await hasDepthEvaluation(answerId);
+  if (!evaluationComplete) {
+    const evaluationResult = await insertDepthEvaluation(input, answerId);
+    if (evaluationResult !== "ok") {
+      return saveOnboardingAnswerFailure("DB_ERROR");
+    }
+    evaluationComplete = true;
+  }
+
+  const finalizeResult = await finalizeOnboardingProfile(input, {
+    existingAnswerId: answerId,
+    existingEvaluationComplete: evaluationComplete,
+    answerInserted: false,
+    evaluationInserted: false,
+  });
+
+  if (finalizeResult !== "ok") {
+    return saveOnboardingAnswerFailure("SETUP_REQUIRED");
+  }
+
+  return saveOnboardingAnswerSuccess(answerId, true);
+}
+
 async function saveOnboardingAnswer(input: SaveOnboardingAnswerInput): Promise<SaveOnboardingAnswerResult> {
   try {
     const existing = await findExistingOnboardingAnswer(input.userId, input.questionId);
     if (existing) {
-      const profileResult = await upsertOnboardingProfile(input.userId, input.nickname);
-      if (profileResult !== "ok") {
-        return saveOnboardingAnswerFailure("SETUP_REQUIRED");
-      }
-      return saveOnboardingAnswerSuccess(existing.id, true);
+      return completeExistingOnboardingAnswer(input, existing.id);
     }
 
-    const profileResult = await upsertOnboardingProfile(input.userId, input.nickname);
-    if (profileResult !== "ok") {
+    const metadataResult = await upsertProfileMetadata(input.userId, input.nickname);
+    if (metadataResult !== "ok") {
       return saveOnboardingAnswerFailure("SETUP_REQUIRED");
     }
 
@@ -121,7 +211,7 @@ async function saveOnboardingAnswer(input: SaveOnboardingAnswerInput): Promise<S
       if (answerError.code === "23505") {
         const duplicate = await findExistingOnboardingAnswer(input.userId, input.questionId);
         if (duplicate) {
-          return saveOnboardingAnswerSuccess(duplicate.id, true);
+          return completeExistingOnboardingAnswer(input, duplicate.id);
         }
       }
       if (answerError.code === "23503") {
@@ -132,18 +222,20 @@ async function saveOnboardingAnswer(input: SaveOnboardingAnswerInput): Promise<S
 
     const answerId = answerRow.id as string;
 
-    const { error: evaluationError } = await supabase.from("depth_evaluations").insert({
-      answer_id: answerId,
-      user_id: input.userId,
-      verdict: input.evaluation.verdict,
-      score: input.evaluation.score,
-      path: input.evaluation.path,
-      reason_codes: input.evaluation.reasonCodes,
-      model_version: input.evaluation.modelVersion,
+    const evaluationResult = await insertDepthEvaluation(input, answerId);
+    if (evaluationResult !== "ok") {
+      return saveOnboardingAnswerFailure("DB_ERROR");
+    }
+
+    const finalizeResult = await finalizeOnboardingProfile(input, {
+      existingAnswerId: null,
+      existingEvaluationComplete: false,
+      answerInserted: true,
+      evaluationInserted: true,
     });
 
-    if (evaluationError) {
-      return saveOnboardingAnswerFailure("DB_ERROR");
+    if (finalizeResult !== "ok") {
+      return saveOnboardingAnswerFailure("SETUP_REQUIRED");
     }
 
     return saveOnboardingAnswerSuccess(answerId, false);
