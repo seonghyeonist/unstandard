@@ -17,7 +17,7 @@
 | Required `UNSTANDARD_APP_URL` | `https://unstandard-m9qj.vercel.app` |
 | Required Supabase Redirect URL | `https://unstandard-m9qj.vercel.app/auth/callback` |
 
-`unstandard`, `unstandard-f3nf`, `unstandard-fabi` 등 **다른 Vercel 프로젝트 증거**는 보고된 `unstandard-m9qj` production 실패에 **적용 불가**. Magic-link smoke는 rate-limit cooldown 확인 전까지 **중단**.
+`unstandard`, `unstandard-f3nf`, `unstandard-fabi` 등 **다른 Vercel 프로젝트 증거**는 P0-5 auth/deployment 주장에 **무효** (founder가 서면으로 canonical target을 바꾸기 전까지). Magic-link smoke는 rate-limit cooldown 확인 전까지 **중단**.
 
 ---
 
@@ -25,7 +25,7 @@
 
 ### 인증·세션
 
-- [ ] Supabase login UI 연결 및 실제 로그인 플로우 테스트 (OAuth 또는 magic link) — 코드: `/login` + `/api/auth/supabase/oauth` + magic link; **staging 실측 증거 없음** → [`docs/STAGING_LOGIN_SMOKE.md`](./STAGING_LOGIN_SMOKE.md) (P0-5)
+- [x] Supabase login UI 연결 및 실제 로그인 플로우 테스트 (OAuth 또는 magic link) — 코드: `/login` + `/api/auth/supabase/oauth` + magic link; **canonical staging (`unstandard-m9qj`) login/logout smoke 수동 통과** → [`docs/STAGING_LOGIN_SMOKE.md`](./STAGING_LOGIN_SMOKE.md) (P0-5)
 - [ ] 서버 측 세션 검증 (`middleware.ts` + API route `requireAuthenticatedUser`)
 - [ ] Production에서 mock auth 비활성 (`isMockAuthAllowed() === false`)
 - [ ] Vercel preview/prod env 검증 (`UNSTANDARD_SUPABASE_URL`, `UNSTANDARD_SUPABASE_PUBLISHABLE_KEY`, `AUTH_COOKIE_SECRET`)
@@ -91,7 +91,7 @@
 
 | 항목 | 현재 상태 |
 |------|-----------|
-| Login UI | Minimal staging entry merged (PR #18); **live staging smoke pending** — [`STAGING_LOGIN_SMOKE.md`](./STAGING_LOGIN_SMOKE.md) |
+| Login UI | Supabase login UI 연결됨; **P0-5 canonical staging (`unstandard-m9qj`) login/logout smoke 수동 통과** — [`STAGING_LOGIN_SMOKE.md`](./STAGING_LOGIN_SMOKE.md). 알파 전체는 여전히 BLOCKED. |
 | Reports | `ReportsRepository` + explicit adapter gate; `ensureReporterProfile` before insert when enabled |
 | Blocks | 미구현 |
 | Unlock | HMAC HttpOnly cookie only (DB 없음) |
