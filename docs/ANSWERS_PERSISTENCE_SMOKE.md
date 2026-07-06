@@ -4,14 +4,17 @@
 > **Alpha verdict:** **BLOCKED** — this slice alone does not unblock alpha.  
 > **Execution runbook:** [`ANSWERS_RLS_ADVERSARIAL_SMOKE.md`](./ANSWERS_RLS_ADVERSARIAL_SMOKE.md) (migration order, RLS matrix, evidence, rollback).
 
-## Canonical target lock
+## Environment target matrix (founder-finalized)
 
-Evidence and smoke must use only:
-- Vercel project: `unstandard-m9qj`
-- Host: `https://unstandard-m9qj.vercel.app`
-- Callback: `https://unstandard-m9qj.vercel.app/auth/callback`
+| Vercel environment | Supabase project | DB purpose | Auth callback domain | PR #30 evidence? | Adapter enable? |
+|--------------------|------------------|------------|----------------------|------------------|-----------------|
+| **Preview** | Unstandard-staging | Staging / migration + RLS smoke | `https://<preview-host>/auth/callback` | **Yes** — Phase 1 DB + Phase 2 app smoke | **No** until §F PASS + founder approval |
+| **Production** | Main (prod) | Production — **untouchable** for PR #30 | `https://<production-host>/auth/callback` | **No** for PR #30 migration/RLS | **No** |
 
-P0-5 login/logout/protected-route smoke has **manually passed** on canonical `unstandard-m9qj`.  
+**P0-5 historical lock (separate):** login/logout smoke **manually passed** on `unstandard-m9qj` Production host — see [`STAGING_LOGIN_SMOKE.md`](./STAGING_LOGIN_SMOKE.md). That record does **not** authorize PR #30 migrations on prod DB or adapter enable on Production.
+
+**Invalid evidence:** `unstandard`, `unstandard-f3nf`, `unstandard-fabi`, or any other Vercel project (unless founder reassigns in writing).
+
 **Do not enable** `ANSWERS_PERSISTENCE_ADAPTER` until **direct RLS adversarial smoke (§F)** passes per linked runbook.
 
 ## Scope
@@ -39,7 +42,7 @@ Plus existing `UNSTANDARD_SUPABASE_URL` + `UNSTANDARD_SUPABASE_PUBLISHABLE_KEY`.
 | Phase | What | Adapter | Merge PR #30 |
 |-------|------|---------|--------------|
 | **1. Direct DB** | Apply `0001`–`0005`, §D schema + §F RLS adversarial | **Disabled** | Not required |
-| **2. App preview** | §G onboarding on `unstandard-m9qj` | Enable only after Phase 1 **PASS** | After Phase 1 **PASS**, before or after merge per founder |
+| **2. App preview** | §G onboarding on **Vercel Preview** + staging Supabase | Enable only after Phase 1 **PASS** | After Phase 1 **PASS**, before or after merge per founder |
 | **3. Merge decision** | Founder review | — | Only after Phase 1 **PASS** (Phase 2 optional gate) |
 
 **Current step:** Phase 1 planning/execution — see [`ANSWERS_RLS_ADVERSARIAL_SMOKE.md`](./ANSWERS_RLS_ADVERSARIAL_SMOKE.md).
@@ -52,7 +55,10 @@ Plus existing `UNSTANDARD_SUPABASE_URL` + `UNSTANDARD_SUPABASE_PUBLISHABLE_KEY`.
 4. `supabase/migrations/0004_onboarding_question_seed.sql`
 5. `supabase/migrations/0005_answers_onboarding_hardening.sql`
 
-Pin PR #30 head: `f795038533ea4cfe55bd71fdb59de68eb97e69fc`
+Pin PR #30 head: `0dae7c987db01b654b69878643d82ea64ae419da`
+Base `main` SHA (merge target): `12ccb77395858a3778ace4d61693bc4b29f8c503`
+
+> This pin is for evidence/rollback/smoke traceability only. It is not merge approval.
 
 ## RLS expectations (runtime proof required)
 
@@ -72,7 +78,7 @@ Adversarial cases F1–F11: linked runbook §F.
 | `ANSWERS_PERSISTENCE_ADAPTER` | **Disabled / unset** | `supabase-alpha` after §F PASS |
 | `UNSTANDARD_SUPABASE_URL` | Set (auth) | Set |
 | `UNSTANDARD_SUPABASE_PUBLISHABLE_KEY` | Set | Set |
-| `UNSTANDARD_APP_URL` | `https://unstandard-m9qj.vercel.app` | Same |
+| `UNSTANDARD_APP_URL` | Exact **Preview** deployment origin | Same |
 
 **Do not set:** `SUPABASE_SERVICE_ROLE_KEY` for user paths.
 
@@ -80,11 +86,11 @@ Adversarial cases F1–F11: linked runbook §F.
 
 | # | Case | Expected |
 |---|------|----------|
-| G3 | Login on `unstandard-m9qj` + adapter enabled | `onboarded: false` until onboarding |
+| G3 | Login on **Vercel Preview** + adapter enabled | `onboarded: false` until onboarding |
 | G4 | Submit onboarding | 201; `onboarded_at` only after answer+evaluation |
 | G5 | Session after onboarding | `onboarded: true` |
 | G6 | Re-submit | 200 duplicate |
-| G7 | Logout / protected route | 307 → `/login` (P0-5 regression) |
+| G7 | Logout / protected route | 307 → `/login` (P0-5 regression on Preview) |
 
 ## Code map
 

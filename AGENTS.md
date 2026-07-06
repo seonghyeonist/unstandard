@@ -41,6 +41,15 @@ P0-5 인증·배포 증거는 **아래 단일 타깃만** 유효하다. 다른 V
 
 **Preview 증거와 Production 증거는 상호 대체 불가.** Preview PASS가 Production PASS를 의미하지 않는다.
 
+### Environment target matrix (founder-finalized)
+
+| Vercel environment | Supabase project | DB purpose | Auth callback | PR #30 evidence? | `ANSWERS_PERSISTENCE_ADAPTER` |
+|--------------------|------------------|------------|---------------|------------------|------------------------------|
+| **Preview** | Unstandard-staging | Staging — migrations, RLS smoke, PR #30 app smoke | `https://<preview-host>/auth/callback` | **Yes** | **Disabled** until §F PASS + founder approval |
+| **Production** | Main (prod) | Production — **untouchable** for PR #30 | `https://<production-host>/auth/callback` | **No** for PR #30 | **Disabled** |
+
+**P0-5 historical lock (below)** records login smoke on `unstandard-m9qj` Production host. That evidence is **not** interchangeable with PR #30 staging DB work or Preview deployment evidence.
+
 P0-5 auth smoke, Supabase redirect 설정, Vercel env 검증, callback 진단, 배포 증거는 **반드시 `unstandard-m9qj`만** 사용한다. 상세 절차: [`docs/STAGING_LOGIN_SMOKE.md`](./docs/STAGING_LOGIN_SMOKE.md).
 
 ### 요구되는 응답 흐름

@@ -19,6 +19,15 @@
 
 `unstandard`, `unstandard-f3nf`, `unstandard-fabi` 등 **다른 Vercel 프로젝트 증거**는 P0-5 auth/deployment 주장에 **무효** (founder가 서면으로 canonical target을 바꾸기 전까지). Magic-link smoke는 rate-limit cooldown 확인 전까지 **중단**.
 
+### Environment target matrix (founder-finalized — do not conflate with P0-5 record above)
+
+| Vercel environment | Supabase project | DB purpose | PR #30 work? | Adapter enable? |
+|--------------------|------------------|------------|--------------|-----------------|
+| **Preview** | Unstandard-staging | Staging migrations + RLS + app smoke | **Yes** | **No** until RLS §F PASS |
+| **Production** | Main (prod) | Production — **untouchable** for PR #30 | **No** | **No** |
+
+Preview evidence and Production evidence are **not interchangeable**. P0-5 PASS on `unstandard-m9qj` Production host does **not** authorize PR #30 migrations on prod DB.
+
 ---
 
 ## P0 — 50인 알파 전 필수
