@@ -1,9 +1,11 @@
 # Answers RLS Adversarial Smoke — Execution Runbook (PR #30)
 
-> **Task:** Staging-only direct migration + RLS adversarial smoke for PR #30 onboarding answers.  
-> **PR #30 head SHA (pin before run):** `f795038533ea4cfe55bd71fdb59de68eb97e69fc`  
-> **Branch:** `cursor/db-backed-answers-8eec`  
+> **Task:** Staging-only direct migration + RLS adversarial smoke for PR #30 onboarding answers.
+> **PR #30 head SHA (pin before run):** `0dae7c987db01b654b69878643d82ea64ae419da`
+> **Base `main` SHA (merge target):** `12ccb77395858a3778ace4d61693bc4b29f8c503`
+> **Branch:** `cursor/db-backed-answers-8eec`
 > **Alpha verdict:** **BLOCKED** — this runbook does not change that.
+> **Pin note:** This pin is for evidence/rollback/smoke traceability only. It is not merge approval.
 
 Related:
 - [`ANSWERS_PERSISTENCE_SMOKE.md`](./ANSWERS_PERSISTENCE_SMOKE.md) — app-level smoke (later phase)
@@ -35,16 +37,19 @@ Related:
 | Rate limiting / abuse guard | Out of scope |
 | Production Supabase / production Vercel | **ABORT if detected** |
 
-### Canonical target lock (app smoke phase only — not direct DB phase)
+### Environment target (app smoke phase only — not direct DB phase)
 
-| Field | Value |
-|-------|--------|
-| Vercel project | `unstandard-m9qj` |
-| Host | `https://unstandard-m9qj.vercel.app` |
-| Callback | `https://unstandard-m9qj.vercel.app/auth/callback` |
-| `UNSTANDARD_APP_URL` | `https://unstandard-m9qj.vercel.app` |
+| Field | Preview (PR #30 app smoke) | Production |
+|-------|---------------------------|------------|
+| Vercel environment | **Preview** | Production — **not for PR #30** |
+| Supabase project | **Unstandard-staging** | Main (prod) — **ABORT** |
+| Host | `https://<preview-deployment-host>` | Do not use for PR #30 |
+| Callback | `https://<preview-host>/auth/callback` | — |
+| `UNSTANDARD_APP_URL` | Exact Preview origin | — |
 
-**Invalid evidence:** `unstandard`, `unstandard-f3nf`, `unstandard-fabi`, any other Vercel project.
+**P0-5 historical evidence** on `unstandard-m9qj` Production host is valid for login smoke only — not interchangeable with PR #30 staging migration evidence.
+
+**Invalid evidence:** `unstandard`, `unstandard-f3nf`, `unstandard-fabi`, any other Vercel project; Production Vercel + prod Supabase for PR #30 work.
 
 ---
 
@@ -53,15 +58,15 @@ Related:
 | # | Check | Pass | Evidence |
 |---|-------|------|----------|
 | P1 | Supabase project is **staging**, not production | ☐ | Dashboard project name (redacted) |
-| P2 | Founder confirms staging project ref matches Vercel `UNSTANDARD_SUPABASE_URL` on `unstandard-m9qj` | ☐ | Env var **name** only on Vercel |
-| P3 | PR #30 head SHA = `f795038533ea4cfe55bd71fdb59de68eb97e69fc` | ☐ | `git rev-parse origin/cursor/db-backed-answers-8eec` |
-| P4 | Local migration files match PR #30 (`0001`–`0005` in repo at that SHA) | ☐ | `git show f795038:supabase/migrations/` |
+| P2 | Founder confirms staging project ref matches Vercel **Preview** `UNSTANDARD_SUPABASE_URL` | ☐ | Env var **name** only on Vercel Preview |
+| P3 | PR #30 head SHA = `0dae7c987db01b654b69878643d82ea64ae419da` | ☐ | `git rev-parse origin/cursor/db-backed-answers-8eec` |
+| P4 | Local migration files match PR #30 (`0001`–`0005` in repo at that SHA) | ☐ | `git show 0dae7c9:supabase/migrations/` |
 | P5 | Rollback posture agreed (§H) — founder approval to proceed | ☐ | Sign-off |
 | P6 | **User A** exists — disposable email `staging-a+*@...` | ☐ | User id prefix only in log |
 | P7 | **User B** exists — disposable email `staging-b+*@...` | ☐ | User id prefix only in log |
 | P8 | Record User A UUID and User B UUID locally (not in git) | ☐ | Local secure note |
 | P9 | Staging has **no irreplaceable real user data**, or data inventory recorded | ☐ | Note |
-| P10 | `ANSWERS_PERSISTENCE_ADAPTER` **unset or disabled** on `unstandard-m9qj` | ☐ | Vercel env screenshot (values redacted) |
+| P10 | `ANSWERS_PERSISTENCE_ADAPTER` **unset or disabled** on Vercel **Preview** | ☐ | Vercel Preview env screenshot (values redacted) |
 | P11 | `SUPABASE_SERVICE_ROLE_KEY` **not** added to Vercel for this smoke | ☐ | Env names only |
 | P12 | P0-5 auth smoke passed on `unstandard-m9qj` (login/logout/protected route) | ☐ | [`STAGING_LOGIN_SMOKE.md`](./STAGING_LOGIN_SMOKE.md) |
 
@@ -256,7 +261,7 @@ ORDER BY 1;
 
 ### Obtaining user JWT locally (never commit)
 
-1. Login User A via magic link on `https://unstandard-m9qj.vercel.app/login` (adapter **still disabled**).
+1. Login User A via magic link on **Vercel Preview** `/login` (adapter **still disabled**).
 2. Browser DevTools → Network → filter `token` or inspect Supabase auth cookie/session.
 3. Copy `access_token` to **local terminal env only**: `export USER_A_TOKEN='...'`
 4. **Never** paste into GitHub, PR comments, or this repo.
@@ -309,8 +314,8 @@ PostgREST returns `201` on success, `401`/`403` on RLS denial (often empty body 
 | F7 | User B cannot insert eval for A answer | F3, capture `ANSWER_A_ID` | POST `/rest/v1/depth_evaluations` `answer_id=ANSWER_A_ID`, `user_id=B`, verdict PASS | B | **403/401** | **201** | status | **BLOCKED** |
 | F8 | Duplicate answer rejected | F3 done | Repeat F3 identical `user_id`+`question_id` | A | **409** unique violation | second 201 row | status + count | **BLOCKED** if duplicate row |
 | F9 | Anon cannot insert profile | No Authorization header | POST `/rest/v1/profiles` with apikey only | anon | 401/403 | 201 | status | **BLOCKED** |
-| F10 | Logged-out app route blocked | Adapter disabled OK | `curl -X POST https://unstandard-m9qj.vercel.app/api/onboarding/answer` no cookies, valid JSON body | none | **401** or **403** | 201 | status | **BLOCKED** if 201 |
-| F11 | Session API safe fields | Login A on canonical host | `curl -b cookies.txt https://unstandard-m9qj.vercel.app/api/auth/session` | A | keys: nickname, onboarded, idPrefix only | email/token/id present | redacted JSON | **BLOCKED** |
+| F10 | Logged-out app route blocked | Adapter disabled OK | `curl -X POST https://<preview-host>/api/onboarding/answer` no cookies, valid JSON body | none | **401** or **403** | 201 | status | **BLOCKED** if 201 |
+| F11 | Session API safe fields | Login A on Preview host | `curl -b cookies.txt https://<preview-host>/api/auth/session` | A | keys: nickname, onboarded, idPrefix only | email/token/id present | redacted JSON | **BLOCKED** |
 
 ### F8 validation query (service role / SQL editor read-only OK)
 
@@ -338,8 +343,8 @@ Execute **only after** §F verdict = **PASS**.
 
 | Step | Action | Gate |
 |------|--------|------|
-| G1 | Founder approval to set `ANSWERS_PERSISTENCE_ADAPTER=supabase-alpha` on **`unstandard-m9qj` only** | Written approval |
-| G2 | Redeploy Production on `unstandard-m9qj` | Record deployment SHA |
+| G1 | Founder approval to set `ANSWERS_PERSISTENCE_ADAPTER=supabase-alpha` on **Vercel Preview only** (staging Supabase) | Written approval |
+| G2 | Redeploy **Preview** for PR #30 branch | Record Preview deployment SHA |
 | G3 | Login User A → `GET /api/auth/session` → `onboarded: false` | |
 | G4 | Submit onboarding → `POST /api/onboarding/answer` or UI → **201** | |
 | G5 | Verify `profiles.onboarded_at` set **only after** answer + depth_evaluation exist (SQL read-only) | |
@@ -405,8 +410,9 @@ Drop tables in reverse FK order or restore Supabase branch backup if available.
 |-------|--------|
 | Timestamp (UTC) | |
 | Supabase project | `staging-***` (redacted ref) |
-| PR #30 SHA | `f795038` |
-| Vercel target | `unstandard-m9qj` (app tests only) |
+| PR #30 SHA | `0dae7c9` |
+| Base main SHA | `12ccb773` |
+| Vercel target | Preview deployment host (app tests only) |
 | Migration step | 0001–0005 / F1–F11 / G* |
 | Actor | User A / User B / anon / SQL-readonly |
 | Command | curl/SQL (**no tokens**) |
@@ -444,5 +450,5 @@ Preconditions (§B)
   → Apply 0005 → validate D.5–D.6
   → Adversarial RLS F1–F11 (authenticated JWT, NOT SQL editor writes)
   → Verdict (§J)
-  → [Later, founder approval] App smoke §G with adapter on unstandard-m9qj only
+  → [Later, founder approval] App smoke §G with adapter on Vercel Preview + staging Supabase only
 ```

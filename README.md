@@ -15,7 +15,7 @@
 | 목표 | 50명 클로즈드 알파 테스트 |
 | 배포 | Vercel (예정) |
 
-> 현재 프론트엔드는 **mock 데이터로 단독 실행** 가능합니다. Supabase **minimal login entry**(PR #18)는 머지되었으나 **live staging smoke·DB 영속·RLS는 미완** — 50인 알파는 **BLOCKED**. Staging login smoke: [`docs/STAGING_LOGIN_SMOKE.md`](./docs/STAGING_LOGIN_SMOKE.md). 제품 전략: [`docs/PRODUCT_DIRECTION.md`](./docs/PRODUCT_DIRECTION.md) · 게이트: [`docs/ALPHA_READINESS_CHECKLIST.md`](./docs/ALPHA_READINESS_CHECKLIST.md).
+> 현재 프론트엔드는 **mock 데이터로 단독 실행** 가능합니다. Supabase **minimal login entry**(PR #18)는 머지되었으나 **live staging smoke·DB 영속·RLS는 미완** — 50인 알파는 **BLOCKED**. Staging login smoke: [`docs/STAGING_LOGIN_SMOKE.md`](./docs/STAGING_LOGIN_SMOKE.md). **Env mapping:** Vercel Preview → staging Supabase; Vercel Production → prod Supabase (see [`AGENTS.md`](./AGENTS.md)). 제품 전략: [`docs/PRODUCT_DIRECTION.md`](./docs/PRODUCT_DIRECTION.md) · 게이트: [`docs/ALPHA_READINESS_CHECKLIST.md`](./docs/ALPHA_READINESS_CHECKLIST.md).
 
 ## 기술 스택
 

@@ -1,9 +1,13 @@
 # Staging Login Smoke — P0-5
 
-> **Task:** `P0-5: Vercel/Supabase Live Login Smoke`  
-> **Status:** **PASS (canonical staging, human-confirmed)** — login/logout smoke on `unstandard-m9qj` production host.  
-> **Alpha verdict:** **BLOCKED** — this smoke does not change that. DB/RLS/answers/reports/blocks/unlock/rate limiting remain incomplete.  
+> **Task:** `P0-5: Vercel/Supabase Live Login Smoke`
+> **Status:** **PASS (canonical staging, human-confirmed)** — login/logout smoke on `unstandard-m9qj` production host.
+> **Alpha verdict:** **BLOCKED** — this smoke does not change that. DB/RLS/answers/reports/blocks/unlock/rate limiting remain incomplete.
 > **Merge baseline:** `4a5153e` (PR #18 — minimal Supabase login entry)
+
+> **Environment mapping (founder-finalized, separate from this P0-5 record):**
+> Vercel **Preview** → Unstandard-staging Supabase. Vercel **Production** → main Supabase (prod DB).
+> This document's PASS evidence is **historical P0-5 login smoke** on `unstandard-m9qj` Production host — not PR #30 migration approval and not interchangeable with Preview/staging evidence.
 
 This document is **evidence gathering**, not product expansion.  
 Prove the merged login entry works on a real **Vercel Preview + Supabase staging** project.
