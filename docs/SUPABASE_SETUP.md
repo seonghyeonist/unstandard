@@ -52,12 +52,14 @@ DATABASE_URL=postgresql://postgres.<ref>:<password>@aws-0-<region>.pooler.supaba
 
 ## 3. Migration workflow (when ready)
 
+For the recommended staging workflow, see [`STAGING_MIGRATION_AUTOMATION.md`](./STAGING_MIGRATION_AUTOMATION.md). It uses `supabase db push --linked` with a dry-run gate and is safer than manual SQL Editor copy-paste.
+
+Manual fallback (document and reconcile history afterwards):
+
 ```bash
-# Supabase CLI 설치 후 (별도 승인 필요)
-supabase db push
-# 또는
 psql "$DATABASE_URL" -f supabase/migrations/0001_initial_schema.sql
 psql "$DATABASE_URL" -f supabase/migrations/0002_rls_policies.sql
+psql "$DATABASE_URL" -f supabase/migrations/0003_reports_dedup_index.sql
 ```
 
 마이그레이션 파일:
