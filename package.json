@@ -9,7 +9,10 @@
     "lint": "eslint . --max-warnings=0",
     "typecheck": "tsc --noEmit",
     "check": "npm run lint && npm run typecheck && npm run test && npm run build",
-    "test": "tsx --test lib/**/*.test.ts tests/*.test.ts"
+    "test": "tsx --test lib/**/*.test.ts tests/*.test.ts",
+    "db:staging:dry-run": "supabase db push --linked --dry-run",
+    "db:staging:push": "supabase db push --linked",
+    "smoke:rls": "tsx scripts/smoke/rls-adversarial.ts"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.0.1",
@@ -34,6 +37,7 @@
     "@types/react-dom": "^19.0.9",
     "eslint": "^9.27.0",
     "eslint-config-next": "^15.3.2",
+    "supabase": "^2.109.0",
     "tailwindcss": "^4.1.7",
     "tsx": "^4.22.4",
     "typescript": "^5.8.3"
