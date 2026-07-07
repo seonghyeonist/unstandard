@@ -64,6 +64,7 @@ next-env.d.ts
 
 # --- Supabase ---
 supabase/.temp/
+supabase/config.toml
 
 # --- Docker ---
 docker-compose.override.yml
