@@ -3,6 +3,18 @@
 > Local, founder-run Supabase CLI workflow for applying PR #30 migrations to **Unstandard-staging only**.
 > This document does **not** authorize production changes, automatic pushes, or adapter enablement.
 
+## Canonical Vercel target lock
+
+**The only valid app host and Vercel project for this workflow:**
+
+| Field | Required value |
+|---|---|
+| Vercel project | `unstandard-m9qj` |
+| Host | `https://unstandard-m9qj.vercel.app` |
+| `UNSTANDARD_APP_URL` | `https://unstandard-m9qj.vercel.app` |
+
+Do not deploy, smoke-test, or collect evidence on any other Vercel project or domain. If the host is not `unstandard-m9qj.vercel.app`, **stop**.
+
 ## Ownership
 
 | PR | Owns |
@@ -15,7 +27,7 @@ PR #51 does **not** ship the RLS smoke script. After Phase 2 verification PASS b
 ## Target & scope
 
 - **Target database:** Unstandard-staging only.
-- **Canonical app host:** `https://unstandard-m9qj.vercel.app` only. Do not use `unstandard.com` or other Vercel projects for staging smoke evidence.
+- **Target app:** `https://unstandard-m9qj.vercel.app` only (`unstandard-m9qj` Vercel project).
 - **Production is untouchable.** Never run these commands against production.
 - **Adapter:** Do not enable any adapter until PR #35 RLS smoke passes.
 - **Service role:** Do not use or request `SUPABASE_SERVICE_ROLE_KEY`.
@@ -154,7 +166,7 @@ If any check fails, stop. Do not run PR #35 RLS smoke. Do not enable adapter.
 
 ## RLS smoke (PR #35 — not owned by #51)
 
-After Phase 2 verification PASS, switch to the **PR #35** branch (`cursor/rls-adversarial-smoke-2aa9`) and run the adversarial RLS smoke tool from that PR:
+After Phase 2 verification PASS, switch to the **PR #35** branch (`cursor/rls-adversarial-smoke-2aa9`). Set `STAGING_APP_URL=https://unstandard-m9qj.vercel.app` and run:
 
 ```bash
 # On PR #35 branch only — see PR #35 body for required env vars
@@ -163,7 +175,7 @@ npm run smoke:rls
 
 PR #51 does not include `scripts/smoke/rls-adversarial.ts` or `smoke:rls` in `package.json`. Do not merge #51 expecting a working smoke command.
 
-Do not enable any adapter until PR #35 RLS smoke passes on `https://unstandard-m9qj.vercel.app`.
+Do not enable any adapter until PR #35 RLS smoke passes on `https://unstandard-m9qj.vercel.app` only.
 
 ## Rollback and stop rules
 
@@ -171,6 +183,7 @@ Stop immediately and do not apply if:
 
 - `db:staging:dry-run` fails or reports unexpected changes.
 - The target is not Unstandard-staging.
+- App host is not `https://unstandard-m9qj.vercel.app` (Vercel project `unstandard-m9qj`).
 - You are not healthy enough to supervise the operation.
 - The migration history on the remote does not match local files.
 - `SUPABASE_SERVICE_ROLE_KEY` is requested or exposed.
@@ -200,8 +213,8 @@ This workflow uses the authenticated developer token from `npx supabase login`. 
 Adapters, external integrations, or feature flags that depend on the new schema must remain disabled until:
 
 - Phase 2 verification passes.
-- PR #35 `npm run smoke:rls` passes.
-- The target is confirmed as staging.
+- PR #35 `npm run smoke:rls` passes on `https://unstandard-m9qj.vercel.app`.
+- The target is confirmed as staging (`unstandard-m9qj` only).
 
 ## Final recommendation
 
