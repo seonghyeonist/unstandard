@@ -3,11 +3,21 @@
 > Local, founder-run Supabase CLI workflow for applying PR #30 migrations to **Unstandard-staging only**.
 > This document does **not** authorize production changes, automatic pushes, or adapter enablement.
 
+## Ownership
+
+| PR | Owns |
+|---|---|
+| **#51 (this doc)** | Supabase CLI `db push` dry-run / apply scripts only (`db:staging:dry-run`, `db:staging:push`) |
+| **#35** | RLS adversarial smoke tool (`scripts/smoke/rls-adversarial.ts`, `npm run smoke:rls`) |
+
+PR #51 does **not** ship the RLS smoke script. After Phase 2 verification PASS below, run RLS smoke from the **PR #35 branch/tool** — not from #51.
+
 ## Target & scope
 
 - **Target database:** Unstandard-staging only.
+- **Canonical app host:** `https://unstandard-m9qj.vercel.app` only. Do not use `unstandard.com` or other Vercel projects for staging smoke evidence.
 - **Production is untouchable.** Never run these commands against production.
-- **Adapter:** Do not enable any adapter until the RLS smoke passes.
+- **Adapter:** Do not enable any adapter until PR #35 RLS smoke passes.
 - **Service role:** Do not use or request `SUPABASE_SERVICE_ROLE_KEY`.
 - **Migration SQL:** Do not edit migration files as part of this workflow.
 - **Automation:** No GitHub Actions workflow is created yet. All pushes are manual and intentional.
@@ -21,7 +31,7 @@
 | No dry-run before apply | `--dry-run` shows the diff before anything runs |
 | No local audit trail | SQL files are versioned in Git |
 | Often requires service role for complex DDL | Uses authenticated user token via `supabase login` |
-| Bypasses RLS/verification guardrails | Post-apply verification and RLS smoke are built-in steps |
+| Bypasses verification guardrails | Phase 2 SQL verification + PR #35 RLS smoke are separate follow-up steps |
 
 ## Prerequisites
 
@@ -79,52 +89,81 @@ npm run db:staging:push
 
 This runs `supabase db push --linked` and applies pending migrations.
 
-## Post-apply verification
+## Phase 2 verification (PR #30)
 
 Run the following SQL in the Supabase Dashboard SQL Editor for staging **after** push:
 
 ```sql
--- 1. Confirm all expected migrations appear in remote history
-SELECT version, name, statements
-FROM supabase_migrations.schema_migrations
-ORDER BY version;
-
--- 2. Confirm every public table has RLS enabled
-SELECT schemaname, tablename, rowsecurity
+-- 1) RLS enabled on required PR #30 tables
+SELECT tablename, rowsecurity
 FROM pg_tables
 WHERE schemaname = 'public'
+  AND tablename IN (
+    'profiles','profile_private','questions','answers',
+    'depth_evaluations','reports','blocks','events','unlocks'
+  )
 ORDER BY tablename;
 
--- 3. Fail if any public table lacks RLS
-SELECT tablename
-FROM pg_tables
-WHERE schemaname = 'public' AND rowsecurity = false;
+-- 2) onboarding question seed
+SELECT id, active, left(prompt, 40) AS prompt_prefix
+FROM public.questions
+WHERE id = '22222222-2222-2222-2222-222222222222';
 
--- 4. List active RLS policies
-SELECT schemaname, tablename, policyname, permissive, roles
-FROM pg_policies
+-- 3) answers unique index
+SELECT indexname, indexdef
+FROM pg_indexes
 WHERE schemaname = 'public'
-ORDER BY tablename, policyname;
+  AND tablename = 'answers'
+  AND indexname = 'idx_answers_user_question_unique';
+
+-- 4) reports dedup index
+SELECT indexname, indexdef
+FROM pg_indexes
+WHERE schemaname = 'public'
+  AND tablename = 'reports'
+  AND indexname = 'idx_reports_open_dedup';
+
+-- 5) answers policies
+SELECT policyname, cmd, qual, with_check
+FROM pg_policies
+WHERE schemaname = 'public' AND tablename = 'answers'
+ORDER BY policyname;
+
+-- 6) duplicate answers must be 0 rows
+SELECT user_id, question_id, COUNT(*) AS n
+FROM public.answers
+GROUP BY 1, 2
+HAVING COUNT(*) > 1;
 ```
 
-Expected:
+### PASS criteria
 
-- Migration versions match the local filenames in `supabase/migrations/`.
-- All public tables show `rowsecurity = true`.
-- The query in step 3 returns zero rows.
-- Policies exist for every exposed table.
+All must be true before proceeding to PR #35 RLS smoke:
 
-## RLS smoke
+- All **9** listed tables have `rowsecurity = true`.
+- Seed question `22222222-2222-2222-2222-222222222222` exists and `active = true`.
+- `idx_answers_user_question_unique` exists.
+- `idx_reports_open_dedup` exists.
+- `answers` policies are owner-scoped (inspect `qual` / `with_check` from query 5).
+- Duplicate answers query (6) returns **0 rows**.
+- Production untouched.
+- Adapter not enabled.
+- Service role not used.
 
-After the post-apply verification passes, run the adversarial RLS smoke test:
+If any check fails, stop. Do not run PR #35 RLS smoke. Do not enable adapter.
+
+## RLS smoke (PR #35 — not owned by #51)
+
+After Phase 2 verification PASS, switch to the **PR #35** branch (`cursor/rls-adversarial-smoke-2aa9`) and run the adversarial RLS smoke tool from that PR:
 
 ```bash
+# On PR #35 branch only — see PR #35 body for required env vars
 npm run smoke:rls
 ```
 
-> This script is provided by PR #35 (`cursor/rls-adversarial-smoke-2aa9`). Do not merge that branch into this workflow; the smoke file must be present in your working tree before running.
+PR #51 does not include `scripts/smoke/rls-adversarial.ts` or `smoke:rls` in `package.json`. Do not merge #51 expecting a working smoke command.
 
-Do not enable any adapter until this smoke command passes.
+Do not enable any adapter until PR #35 RLS smoke passes on `https://unstandard-m9qj.vercel.app`.
 
 ## Rollback and stop rules
 
@@ -139,7 +178,7 @@ Stop immediately and do not apply if:
 If a push fails mid-way:
 
 1. Do not enable any adapter.
-2. Inspect the remote schema state with the verification SQL above.
+2. Inspect the remote schema state with the Phase 2 verification SQL above.
 3. Only if the schema is inconsistent, consider `supabase migration repair` after verifying the actual state.
 4. Prefer fixing forward with a new migration rather than editing or rewriting already-pushed migration files.
 
@@ -148,7 +187,7 @@ If a push fails mid-way:
 If migrations were already applied manually via SQL Editor, the remote `supabase_migrations.schema_migrations` table may be missing entries even though the schema objects exist. In that case:
 
 - `supabase db push` may fail because objects already exist.
-- Do not run `supabase migration repair` until you have verified the actual schema state with the verification SQL above.
+- Do not run `supabase migration repair` until you have verified the actual schema state with the Phase 2 verification SQL above.
 - If the schema matches the migration files, you can mark the migrations as applied using `supabase migration repair --status applied <version>`.
 - If the schema diverges, reconcile manually under supervision and create a new migration to fix the drift.
 
@@ -160,8 +199,8 @@ This workflow uses the authenticated developer token from `npx supabase login`. 
 
 Adapters, external integrations, or feature flags that depend on the new schema must remain disabled until:
 
-- Post-apply verification passes.
-- `npm run smoke:rls` passes.
+- Phase 2 verification passes.
+- PR #35 `npm run smoke:rls` passes.
 - The target is confirmed as staging.
 
 ## Final recommendation

@@ -11,8 +11,7 @@
     "check": "npm run lint && npm run typecheck && npm run test && npm run build",
     "test": "tsx --test lib/**/*.test.ts tests/*.test.ts",
     "db:staging:dry-run": "supabase db push --linked --dry-run",
-    "db:staging:push": "supabase db push --linked",
-    "smoke:rls": "tsx scripts/smoke/rls-adversarial.ts"
+    "db:staging:push": "supabase db push --linked"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.0.1",
