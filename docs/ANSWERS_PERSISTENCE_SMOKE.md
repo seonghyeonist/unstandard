@@ -60,7 +60,7 @@ Plus existing `UNSTANDARD_SUPABASE_URL` + `UNSTANDARD_SUPABASE_PUBLISHABLE_KEY`.
 - Code/migration execution snapshot (PR #30 `app`/`lib`/`supabase/migrations` through 0005): `f795038533ea4cfe55bd71fdb59de68eb97e69fc`
 - PR #30 head (may include docs-only drift): `945b739c00a2cb2043cf8da46d919b7c480dcde3`
 - Base `main` SHA (merge target): `12ccb77395858a3778ace4d61693bc4b29f8c503`
-- Migration `0006` lives on the PR #35 smoke stack (verify at run time)
+- Migration `0006` lives on **PR #52** (superseding PR #35) — verify at run time
 
 > These pins are for evidence/rollback/smoke traceability only. They are not merge approval.
 

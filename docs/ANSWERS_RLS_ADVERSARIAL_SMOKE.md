@@ -1,4 +1,4 @@
-# Answers RLS Adversarial Smoke — Execution Runbook (PR #30 + PR #35)
+# Answers RLS Adversarial Smoke — Execution Runbook (PR #30 + PR #52)
 
 > **Task:** Staging-only direct migration + RLS adversarial smoke for PR #30 onboarding answers.
 > **Alpha verdict:** **BLOCKED** — this runbook does not change that.
@@ -9,13 +9,21 @@
 | Role | SHA | Notes |
 |------|-----|--------|
 | Base `main` (merge target) | `12ccb77395858a3778ace4d61693bc4b29f8c503` | Do not commit to `main` |
-| **Code/migration execution snapshot** | `f795038533ea4cfe55bd71fdb59de68eb97e69fc` | Last PR #30 change under `app` / `lib` / `supabase/migrations` before docs-only commits |
-| PR #30 head (may include docs-only drift) | `945b739c00a2cb2043cf8da46d919b7c480dcde3` | Docs/env matrix commits after execution snapshot — **not** a substitute for the execution snapshot |
-| PR #35 smoke harness | stacked on PR #30; includes `scripts/smoke/rls-adversarial.ts` + migration `0006` | Verify with `git rev-parse` at run time |
+| **Code/migration execution snapshot (through 0005)** | `f795038533ea4cfe55bd71fdb59de68eb97e69fc` | Last PR #30 change under `app` / `lib` / `supabase/migrations` before docs-only commits — **not** interchangeable with PR #30 head |
+| **Current PR #30 head** | `945b739c00a2cb2043cf8da46d919b7c480dcde3` | May include docs-only drift after the execution snapshot — **not** a substitute for the execution snapshot |
+| **PR #52 (superseding PR #35)** | `ecaa19601afdd64a6464264bfc1ff4924d3c3676` (verify at run time) | Smoke harness + migration `0006`; stacked on PR #30 |
+| Historical (superseded) | PR #35 head `0f51c42…` | Historical only — do not execute from PR #35 |
 
 **Rule:** `git diff --name-only f795038 945b739c -- app lib supabase/migrations` was empty at recon (docs-only between those heads for runtime paths). If a later commit changes `app` / `lib` / `supabase/migrations`, **stop** and re-pin the execution snapshot before staging mutation.
 
-**Branches:** PR #30 `cursor/db-backed-answers-8eec` · PR #35 smoke branch (stacked).
+**Branches:** PR #30 `cursor/db-backed-answers-8eec` · **PR #52** `cursor/rls-adversarial-smoke-fix-909d` (supersedes PR #35).
+
+**Changed files on PR #52 (vs PR #30):**
+- `package.json` (`smoke:rls`)
+- `scripts/smoke/rls-adversarial.ts`
+- `supabase/migrations/0006_answers_update_target_invariant.sql`
+- `docs/ANSWERS_RLS_ADVERSARIAL_SMOKE.md`
+- `docs/ANSWERS_PERSISTENCE_SMOKE.md`
 
 Related:
 - [`ANSWERS_PERSISTENCE_SMOKE.md`](./ANSWERS_PERSISTENCE_SMOKE.md) — app-level smoke (later phase)
@@ -28,7 +36,7 @@ Related:
 
 ### In scope (staging only)
 
-- Apply migrations `0001` → `0006` (PR #30 `0001`–`0005` + PR #35 `0006` UPDATE invariant) to **staging Supabase** (human executes — only after explicit `RUN STAGING MIGRATIONS`).
+- Apply migrations `0001` → `0006` (PR #30 `0001`–`0005` + **PR #52** `0006` UPDATE invariant) to **staging Supabase** (human executes — only after explicit `RUN STAGING MIGRATIONS`).
 - Validate schema, RLS enabled, policies, unique index, seed row.
 - Adversarial RLS tests with **User A** and **User B** via **authenticated client** (not service role).
 - Automated harness: `npm run smoke:rls` (`scripts/smoke/rls-adversarial.ts`).
@@ -373,7 +381,7 @@ npm run smoke:rls
 |----|------|-------|------------------|-------|------|------|----------|--------------|
 | F1 | User A insert/update own profile | A logged in | POST/PATCH `/rest/v1/profiles` | A | HTTP 201/204 or harness PASS | 401/403 unexpected | status code | No — retry setup |
 | F1b | User B insert/update own profile | B logged in | same | B | same | same | status | No — needed so cross-target FK exists |
-| F4 | User A cannot target User B profile | F1+F1b; **before** F3 | POST answers `user_id=A`, `target_profile_id=B` | A | **403/401 / 42501** | **201** or **23505/23503 counted as pass** | status/code | **BLOCKED** |
+| F4 | User A cannot target User B profile | F1+F1b; **before** F3 | POST answers `user_id=A`, `target_profile_id=B` | A | **42501** or explicit RLS/permission denial **only** | **201** (bypass) — also **FAIL/UNVERIFIED** if only `23503` (FK) or `23505` (unique): those are **NOT RLS PASS** | status/code | **BLOCKED** |
 | F3 | User A insert own onboarding answer | After F4 | POST answers `user_id=A`, `target_profile_id=A` | A | HTTP 201 | 403 | status, redacted id | **STOP** if 403 |
 | F3b | User B insert own answer | After F1b | POST answers for B | B | HTTP 201 | 403 | status | No — needed for F5 |
 | F5 | User A cannot SELECT B answers | F3b | GET answers `user_id=eq.USER_B_ID` | A | `[]` or 42501 | B's rows visible | row count 0 | **BLOCKED** |
