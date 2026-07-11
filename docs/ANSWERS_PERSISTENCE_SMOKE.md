@@ -54,11 +54,15 @@ Plus existing `UNSTANDARD_SUPABASE_URL` + `UNSTANDARD_SUPABASE_PUBLISHABLE_KEY`.
 3. `supabase/migrations/0003_reports_dedup_index.sql`
 4. `supabase/migrations/0004_onboarding_question_seed.sql`
 5. `supabase/migrations/0005_answers_onboarding_hardening.sql`
+6. `supabase/migrations/0006_answers_update_target_invariant.sql` (**required** — closes UPDATE retarget hole)
 
-Pin PR #30 head: `0dae7c987db01b654b69878643d82ea64ae419da`
-Base `main` SHA (merge target): `12ccb77395858a3778ace4d61693bc4b29f8c503`
+**SHA pins (do not collapse):**
+- Code/migration execution snapshot (PR #30 `app`/`lib`/`supabase/migrations` through 0005): `f795038533ea4cfe55bd71fdb59de68eb97e69fc`
+- PR #30 head (may include docs-only drift): `945b739c00a2cb2043cf8da46d919b7c480dcde3`
+- Base `main` SHA (merge target): `12ccb77395858a3778ace4d61693bc4b29f8c503`
+- Migration `0006` lives on **PR #52** (superseding PR #35) — verify at run time
 
-> This pin is for evidence/rollback/smoke traceability only. It is not merge approval.
+> These pins are for evidence/rollback/smoke traceability only. They are not merge approval.
 
 ## RLS expectations (runtime proof required)
 
@@ -66,6 +70,7 @@ Base `main` SHA (merge target): `12ccb77395858a3778ace4d61693bc4b29f8c503`
 |-------|-----------------|-------------|
 | `profiles` | `profiles_insert_own` / `profiles_update_own` | Own row only |
 | `answers` | `answers_insert_own` (0005) | `user_id` = `target_profile_id` = `auth.uid()` |
+| `answers` | `answers_update_own` (0006) | Owner cannot change `target_profile_id` to another user |
 | `answers` | `idx_answers_user_question_unique` | One row per `(user_id, question_id)` |
 | `depth_evaluations` | `depth_evaluations_insert_own` (0005) | `answer_id` must belong to `auth.uid()` |
 
