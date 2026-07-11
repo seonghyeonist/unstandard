@@ -3,6 +3,7 @@ import "server-only";
 import { isSupabaseAuthEnabled } from "@/lib/config/auth-mode";
 import { resolveSessionUser } from "@/lib/auth/mock-session.server";
 import { createClient } from "@/lib/supabase/server";
+import { loadProfileSessionFields } from "@/lib/server/profile/profile-session";
 
 export type AuthenticatedUser = {
   id: string;
@@ -26,7 +27,14 @@ export async function getAuthenticatedUser(): Promise<AuthenticatedUser | null> 
       error,
     } = await supabase.auth.getUser();
     if (error || !user) return null;
-    return { id: user.id, email: user.email };
+
+    const profileFields = await loadProfileSessionFields(user.id);
+    return {
+      id: user.id,
+      email: user.email,
+      nickname: profileFields?.nickname,
+      onboarded: profileFields?.onboarded,
+    };
   }
 
   return resolveSessionUser();

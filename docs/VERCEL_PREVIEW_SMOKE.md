@@ -1,11 +1,13 @@
 # Vercel Preview Smoke Checklist
 
-> **Status (2026-06-28):** Vercel Edge middleware runtime remains **UNVERIFIED**.  
-> Local `npm run build` passes but emits a Supabase Edge Runtime warning.  
+> **Status (2026-06-28):** Vercel Edge middleware runtime remains **UNVERIFIED**.
+> Local `npm run build` passes but emits a Supabase Edge Runtime warning.
 > Do not deploy to production alpha until this checklist is completed on a real Vercel preview.
 >
-> **Login smoke (P0-5)** is a separate checklist: [`STAGING_LOGIN_SMOKE.md`](./STAGING_LOGIN_SMOKE.md).  
+> **Login smoke (P0-5)** is a separate checklist: [`STAGING_LOGIN_SMOKE.md`](./STAGING_LOGIN_SMOKE.md).
 > Complete login smoke first; then run Edge/middleware cases below on the same Preview deployment.
+>
+> **Env mapping:** Vercel Preview → Unstandard-staging Supabase. Vercel Production → main Supabase (prod). Preview and Production evidence are not interchangeable.
 
 ---
 
