@@ -2,26 +2,57 @@
  * Staging-only RLS adversarial smoke (anon/publishable key + user JWTs).
  * Does NOT use SUPABASE_SERVICE_ROLE_KEY.
  *
- * Required env:
- *   STAGING_SUPABASE_URL
- *   STAGING_SUPABASE_ANON_KEY
- *   USER_A_JWT
- *   USER_B_JWT
- *   TEST_QUESTION_ID (default: 22222222-2222-2222-2222-222222222222)
+ * Required env (local only — never commit values):
+ *   STAGING_SUPABASE_URL          — Unstandard-staging project URL
+ *   STAGING_SUPABASE_ANON_KEY     — publishable/anon key (not service role)
+ *   USER_A_JWT                    — User A access_token
+ *   USER_B_JWT                    — User B access_token
+ *   STAGING_APP_URL               — explicit Vercel Preview origin (required)
  *
  * Optional env:
- *   STAGING_APP_URL (default: https://unstandard-m9qj.vercel.app) — app route checks only
+ *   TEST_QUESTION_ID              — default onboarding seed UUID
+ *   USER_A_SESSION_COOKIE         — cookie header for authenticated /api/auth/session
+ *
+ * Env name map (runbook ↔ script):
+ *   STAGING_SUPABASE_URL       ≈ UNSTANDARD_SUPABASE_URL (Vercel) / SUPABASE_URL (curl samples)
+ *   STAGING_SUPABASE_ANON_KEY  ≈ UNSTANDARD_SUPABASE_PUBLISHABLE_KEY / SUPABASE_PUBLISHABLE_KEY
+ *   USER_A_JWT / USER_B_JWT    ≈ USER_A_TOKEN / USER_B_TOKEN
+ *   STAGING_APP_URL            = Preview host only (no Production default)
  */
 
-import { createClient, type SupabaseClient } from "@supabase/supabase-js";
+import { createClient, type SupabaseClient, type PostgrestError } from "@supabase/supabase-js";
 
-type TestResult = "PASS" | "FAIL" | "SKIP";
+type TestResult = "PASS" | "FAIL" | "SKIP" | "INCOMPLETE" | "MANUAL";
 
 const DEFAULT_QUESTION_ID = "22222222-2222-2222-2222-222222222222";
-const DEFAULT_APP_URL = "https://unstandard-m9qj.vercel.app";
+/** Historical P0-5 Production host — invalid for PR #30 Preview app checks. */
+const REJECTED_PRODUCTION_APP_HOSTS = new Set([
+  "unstandard-m9qj.vercel.app",
+  "www.unstandard-m9qj.vercel.app",
+]);
 
 const results: { name: string; result: TestResult; detail: string }[] = [];
 const createdRowIds: { table: string; id: string }[] = [];
+
+/** Required cases — SKIP/MANUAL/INCOMPLETE on these makes the run non-PASS. */
+const REQUIRED_CASES = new Set([
+  "0-distinct-users",
+  "1-user-a-profile",
+  "1b-user-b-profile",
+  "2a-user-a-cross-target-insert-denied",
+  "2b-user-a-answer",
+  "2c-user-b-answer",
+  "3a-user-a-read-user-b-answer",
+  "3b-user-b-read-user-a-answer",
+  "4-user-b-update-user-a-answer",
+  "4b-user-a-update-retarget-denied",
+  "5-user-b-insert-depth-eval-for-user-a",
+  "6-anonymous-insert-blocked-by-rls",
+  "7-duplicate-answer-deterministic",
+  "8a-session-api-unauthenticated",
+  "8b-session-api-authenticated-safe-fields",
+  "9-protected-route-redirect",
+]);
 
 function requireEnv(name: string): string {
   const value = process.env[name]?.trim();
@@ -55,6 +86,59 @@ function record(name: string, result: TestResult, detail: string): void {
   console.log(`[${result}] ${name} — ${detail}`);
 }
 
+/**
+ * Only PostgreSQL 42501 or explicit permission-denied text counts as RLS denial.
+ * 23503 (FK), 23505 (unique), validation, and other DB errors must never count as RLS PASS.
+ */
+function isRlsDenial(error: PostgrestError | null): boolean {
+  if (!error) return false;
+  if (error.code === "42501") return true;
+  const message = (error.message ?? "").toLowerCase();
+  const details = (error.details ?? "").toLowerCase();
+  const hint = (error.hint ?? "").toLowerCase();
+  const combined = `${message} ${details} ${hint}`;
+  return (
+    combined.includes("row-level security") ||
+    combined.includes("row level security") ||
+    combined.includes("permission denied") ||
+    combined.includes("violates row-level security policy") ||
+    combined.includes("new row violates row-level security")
+  );
+}
+
+function describeError(error: PostgrestError): string {
+  const code = error.code ?? "unknown";
+  if (code === "23503") return "23503 FK/referential (not RLS proof)";
+  if (code === "23505") return "23505 unique violation (not RLS proof)";
+  if (code === "42501") return "42501 RLS/permission denied";
+  return `${code}`;
+}
+
+function resolvePreviewAppUrl(): string {
+  const raw = process.env.STAGING_APP_URL?.trim();
+  if (!raw) {
+    throw new Error(
+      "missing required env: STAGING_APP_URL (explicit Vercel Preview origin; no Production default)",
+    );
+  }
+  let parsed: URL;
+  try {
+    parsed = new URL(raw);
+  } catch {
+    throw new Error("STAGING_APP_URL is not a valid URL");
+  }
+  if (parsed.protocol !== "https:") {
+    throw new Error("STAGING_APP_URL must be https");
+  }
+  const host = parsed.hostname.toLowerCase();
+  if (REJECTED_PRODUCTION_APP_HOSTS.has(host)) {
+    throw new Error(
+      `STAGING_APP_URL rejects historical Production host (${host}); use the PR Preview deployment origin`,
+    );
+  }
+  return `${parsed.origin}`;
+}
+
 function createAuthedClient(url: string, anonKey: string, jwt: string): SupabaseClient {
   return createClient(url, anonKey, {
     auth: { autoRefreshToken: false, persistSession: false },
@@ -68,8 +152,12 @@ function createAnonClient(url: string, anonKey: string): SupabaseClient {
   });
 }
 
-async function testUserAProfile(client: SupabaseClient, userId: string): Promise<void> {
-  const nickname = `rls-smoke-${Date.now()}`;
+async function ensureOwnProfile(
+  client: SupabaseClient,
+  userId: string,
+  caseName: string,
+): Promise<boolean> {
+  const nickname = `rls-smoke-${caseName}-${Date.now()}`;
   const { data: existing, error: selectError } = await client
     .from("profiles")
     .select("id")
@@ -77,8 +165,8 @@ async function testUserAProfile(client: SupabaseClient, userId: string): Promise
     .maybeSingle();
 
   if (selectError) {
-    record("1-user-a-profile", "FAIL", `select failed: ${selectError.code ?? "unknown"}`);
-    return;
+    record(caseName, "FAIL", `select failed: ${describeError(selectError)}`);
+    return false;
   }
 
   if (existing) {
@@ -87,11 +175,11 @@ async function testUserAProfile(client: SupabaseClient, userId: string): Promise
       .update({ nickname, updated_at: new Date().toISOString() })
       .eq("id", userId);
     if (updateError) {
-      record("1-user-a-profile", "FAIL", `update failed: ${updateError.code ?? "unknown"}`);
-      return;
+      record(caseName, "FAIL", `update failed: ${describeError(updateError)}`);
+      return false;
     }
-    record("1-user-a-profile", "PASS", `updated own profile (${redactId(userId)})`);
-    return;
+    record(caseName, "PASS", `updated own profile (${redactId(userId)})`);
+    return true;
   }
 
   const { error: insertError } = await client.from("profiles").insert({
@@ -99,17 +187,66 @@ async function testUserAProfile(client: SupabaseClient, userId: string): Promise
     nickname,
   });
   if (insertError) {
-    record("1-user-a-profile", "FAIL", `insert failed: ${insertError.code ?? "unknown"}`);
-    return;
+    record(caseName, "FAIL", `insert failed: ${describeError(insertError)}`);
+    return false;
   }
   createdRowIds.push({ table: "profiles", id: userId });
-  record("1-user-a-profile", "PASS", `inserted own profile (${redactId(userId)})`);
+  record(caseName, "PASS", `inserted own profile (${redactId(userId)})`);
+  return true;
 }
 
-async function testUserAAnswer(
+/**
+ * Cross-target insert MUST run before User A's own answer on the same question,
+ * so a uniqueness violation cannot mask the RLS denial.
+ */
+async function testCrossTargetInsertDenied(
+  client: SupabaseClient,
+  userAId: string,
+  userBId: string,
+  questionId: string,
+): Promise<void> {
+  const { data, error } = await client
+    .from("answers")
+    .insert({
+      user_id: userAId,
+      question_id: questionId,
+      target_profile_id: userBId,
+      answer_text: "cross-target insert must be denied by RLS policy.",
+    })
+    .select("id")
+    .single();
+
+  if (!error && data) {
+    createdRowIds.push({ table: "answers", id: data.id as string });
+    record(
+      "2a-user-a-cross-target-insert-denied",
+      "FAIL",
+      "User A inserted answer targeting User B profile (RLS bypass)",
+    );
+    return;
+  }
+
+  if (isRlsDenial(error)) {
+    record(
+      "2a-user-a-cross-target-insert-denied",
+      "PASS",
+      `cross-target insert denied by RLS (${describeError(error!)})`,
+    );
+    return;
+  }
+
+  record(
+    "2a-user-a-cross-target-insert-denied",
+    "FAIL",
+    `expected RLS denial (42501); got ${error ? describeError(error) : "no error"} — FK/unique must not count as PASS`,
+  );
+}
+
+async function testOwnAnswerInsert(
   client: SupabaseClient,
   userId: string,
   questionId: string,
+  caseName: string,
 ): Promise<string | null> {
   const answerText = `rls-smoke answer ${Date.now()} — at least twenty chars here.`;
 
@@ -133,48 +270,48 @@ async function testUserAAnswer(
         .eq("question_id", questionId)
         .maybeSingle();
       if (lookupError || !existing) {
-        record("2-user-a-answer", "FAIL", "duplicate without readable own row");
+        record(caseName, "FAIL", "duplicate without readable own row");
         return null;
       }
-      record("2-user-a-answer", "PASS", `reused existing answer (${redactId(existing.id as string)})`);
+      record(caseName, "PASS", `reused existing answer (${redactId(existing.id as string)})`);
       return existing.id as string;
     }
-    record("2-user-a-answer", "FAIL", `insert failed: ${error.code ?? "unknown"}`);
+    record(caseName, "FAIL", `insert failed: ${describeError(error)}`);
     return null;
   }
 
   const answerId = data.id as string;
   createdRowIds.push({ table: "answers", id: answerId });
-  record("2-user-a-answer", "PASS", `inserted own answer (${redactId(answerId)})`);
+  record(caseName, "PASS", `inserted own answer (${redactId(answerId)})`);
   return answerId;
 }
 
-async function testUserBReadsUserAAnswer(
+async function testCannotReadOtherUserAnswers(
   client: SupabaseClient,
-  userAId: string,
-  answerId: string,
+  otherUserId: string,
+  otherAnswerId: string,
+  caseName: string,
 ): Promise<void> {
   const { data, error } = await client
     .from("answers")
     .select("id, user_id, answer_text")
-    .eq("user_id", userAId);
+    .eq("user_id", otherUserId);
 
   if (error) {
-    const blocked = error.code === "42501" || error.message.toLowerCase().includes("permission");
-    record(
-      "3-user-b-read-user-a-answer",
-      blocked ? "PASS" : "FAIL",
-      blocked ? "read blocked by RLS" : `unexpected error: ${error.code ?? "unknown"}`,
-    );
+    if (isRlsDenial(error)) {
+      record(caseName, "PASS", "read blocked by RLS (42501/permission)");
+      return;
+    }
+    record(caseName, "FAIL", `unexpected error (not RLS proof): ${describeError(error)}`);
     return;
   }
 
-  const leaked = (data ?? []).some((row) => row.id === answerId);
+  const leaked = (data ?? []).some((row) => row.id === otherAnswerId || row.user_id === otherUserId);
   if (leaked) {
-    record("3-user-b-read-user-a-answer", "FAIL", "User B could read User A answer row");
+    record(caseName, "FAIL", "other user's answer row visible");
     return;
   }
-  record("3-user-b-read-user-a-answer", "PASS", "no User A rows visible to User B");
+  record(caseName, "PASS", "no other-user rows visible (empty under RLS)");
 }
 
 async function testUserBUpdatesUserAAnswer(
@@ -188,20 +325,82 @@ async function testUserBUpdatesUserAAnswer(
     .select("id");
 
   if (error) {
-    const blocked = error.code === "42501" || error.message.toLowerCase().includes("permission");
+    if (isRlsDenial(error)) {
+      record("4-user-b-update-user-a-answer", "PASS", "update blocked by RLS");
+      return;
+    }
     record(
       "4-user-b-update-user-a-answer",
-      blocked ? "PASS" : "FAIL",
-      blocked ? "update blocked by RLS" : `unexpected error: ${error.code ?? "unknown"}`,
+      "FAIL",
+      `unexpected error (not RLS proof): ${describeError(error)}`,
     );
     return;
   }
 
   if (!data || data.length === 0) {
-    record("4-user-b-update-user-a-answer", "PASS", "update affected 0 rows");
+    // Row invisible under SELECT/USING — acceptable RLS outcome for UPDATE.
+    record("4-user-b-update-user-a-answer", "PASS", "update affected 0 rows (not visible under RLS)");
     return;
   }
   record("4-user-b-update-user-a-answer", "FAIL", "User B updated User A answer");
+}
+
+/**
+ * MERGE BLOCKER if this passes without migration 0006:
+ * answers_update_own must not allow changing target_profile_id to another user.
+ */
+async function testUserACannotRetargetOwnAnswer(
+  client: SupabaseClient,
+  answerId: string,
+  userBId: string,
+): Promise<void> {
+  const { data, error } = await client
+    .from("answers")
+    .update({ target_profile_id: userBId })
+    .eq("id", answerId)
+    .select("id, target_profile_id");
+
+  if (error) {
+    if (isRlsDenial(error)) {
+      record(
+        "4b-user-a-update-retarget-denied",
+        "PASS",
+        "retarget UPDATE blocked by RLS WITH CHECK",
+      );
+      return;
+    }
+    record(
+      "4b-user-a-update-retarget-denied",
+      "FAIL",
+      `unexpected error (not RLS proof): ${describeError(error)}`,
+    );
+    return;
+  }
+
+  const retargeted = (data ?? []).some((row) => row.target_profile_id === userBId);
+  if (retargeted) {
+    record(
+      "4b-user-a-update-retarget-denied",
+      "FAIL",
+      "MERGE BLOCKER: answers UPDATE allowed target_profile_id change to another user — apply 0006",
+    );
+    return;
+  }
+
+  if (!data || data.length === 0) {
+    record(
+      "4b-user-a-update-retarget-denied",
+      "INCOMPLETE",
+      "update returned 0 rows — cannot confirm WITH CHECK invariant",
+    );
+    return;
+  }
+
+  record(
+    "4b-user-a-update-retarget-denied",
+    "PASS",
+    "retarget did not persist (target unchanged)",
+  );
 }
 
 async function testUserBInsertsDepthEvalForUserA(
@@ -219,59 +418,83 @@ async function testUserBInsertsDepthEvalForUserA(
     model_version: "rls-smoke",
   });
 
-  if (error) {
-    const blocked =
-      error.code === "42501" ||
-      error.code === "23503" ||
-      error.message.toLowerCase().includes("permission");
+  if (!error) {
     record(
       "5-user-b-insert-depth-eval-for-user-a",
-      blocked ? "PASS" : "FAIL",
-      blocked ? `insert blocked (${error.code ?? "rls"})` : `unexpected: ${error.code ?? "unknown"}`,
+      "FAIL",
+      "User B inserted depth_evaluation for User A answer",
     );
     return;
   }
-  record("5-user-b-insert-depth-eval-for-user-a", "FAIL", "User B inserted depth_evaluation for User A answer");
+
+  if (isRlsDenial(error)) {
+    record(
+      "5-user-b-insert-depth-eval-for-user-a",
+      "PASS",
+      `insert blocked by RLS (${describeError(error)})`,
+    );
+    return;
+  }
+
+  record(
+    "5-user-b-insert-depth-eval-for-user-a",
+    "FAIL",
+    `expected RLS denial; got ${describeError(error)} — FK/unique must not count as PASS`,
+  );
 }
 
-async function testAnonymousInserts(url: string, anonKey: string, questionId: string): Promise<void> {
+/**
+ * Anonymous inserts must fail RLS even when FK targets exist (User A profile).
+ * 23503 alone is NOT proof of RLS.
+ */
+async function testAnonymousInsertsBlockedByRls(
+  url: string,
+  anonKey: string,
+  questionId: string,
+  existingUserId: string,
+): Promise<void> {
   const anon = createAnonClient(url, anonKey);
-  const fakeUserId = "00000000-0000-4000-8000-000000000001";
 
   const profileResult = await anon.from("profiles").insert({
-    id: fakeUserId,
-    nickname: "anon-should-fail",
+    id: existingUserId,
+    nickname: "anon-should-fail-rls",
   });
 
   const answerResult = await anon.from("answers").insert({
-    user_id: fakeUserId,
+    user_id: existingUserId,
     question_id: questionId,
-    target_profile_id: fakeUserId,
+    target_profile_id: existingUserId,
     answer_text: "anonymous insert should never succeed here.",
   });
 
   const profileError = profileResult.error;
   const answerError = answerResult.error;
 
-  const profileBlocked =
-    profileError !== null &&
-    (profileError.code === "42501" ||
-      profileError.message.toLowerCase().includes("permission") ||
-      profileError.code === "23503");
-  const answerBlocked =
-    answerError !== null &&
-    (answerError.code === "42501" ||
-      answerError.message.toLowerCase().includes("permission") ||
-      answerError.code === "23503");
+  const profileRls = isRlsDenial(profileError);
+  const answerRls = isRlsDenial(answerError);
 
-  if (profileBlocked && answerBlocked) {
-    record("6-anonymous-insert-blocked", "PASS", "anonymous profile and answer inserts blocked");
+  if (profileRls && answerRls) {
+    record(
+      "6-anonymous-insert-blocked-by-rls",
+      "PASS",
+      "anonymous profile and answer inserts denied by RLS (FK-satisfying ids)",
+    );
     return;
   }
+
+  if (!profileError || !answerError) {
+    record(
+      "6-anonymous-insert-blocked-by-rls",
+      "FAIL",
+      `anonymous insert succeeded (profileError=${profileError == null} answerError=${answerError == null})`,
+    );
+    return;
+  }
+
   record(
-    "6-anonymous-insert-blocked",
+    "6-anonymous-insert-blocked-by-rls",
     "FAIL",
-    `profileBlocked=${profileBlocked} answerBlocked=${answerBlocked}`,
+    `RLS not proven — profile=${describeError(profileError)} answer=${describeError(answerError)}`,
   );
 }
 
@@ -297,14 +520,23 @@ async function testDuplicateAnswerDeterministic(
     return;
   }
 
+  if (isRlsDenial(error)) {
+    record(
+      "7-duplicate-answer-deterministic",
+      "FAIL",
+      "got RLS denial instead of 23505 — unique index path not verified",
+    );
+    return;
+  }
+
   record(
     "7-duplicate-answer-deterministic",
     "FAIL",
-    `expected 23505, got ${error.code ?? "unknown"}`,
+    `expected 23505, got ${describeError(error)}`,
   );
 }
 
-async function testSessionApiSafeFields(appUrl: string): Promise<void> {
+async function testSessionApiUnauthenticated(appUrl: string): Promise<void> {
   const response = await fetch(`${appUrl}/api/auth/session`, {
     method: "GET",
     redirect: "manual",
@@ -312,7 +544,7 @@ async function testSessionApiSafeFields(appUrl: string): Promise<void> {
 
   if (response.status !== 401) {
     record(
-      "8-session-api-safe-fields",
+      "8a-session-api-unauthenticated",
       "FAIL",
       `unauthenticated session expected 401, got ${response.status}`,
     );
@@ -323,21 +555,91 @@ async function testSessionApiSafeFields(appUrl: string): Promise<void> {
   try {
     body = await response.json();
   } catch {
-    record("8-session-api-safe-fields", "FAIL", "session response is not JSON");
+    record("8a-session-api-unauthenticated", "FAIL", "session response is not JSON");
     return;
   }
 
   const user = (body as { user?: unknown }).user;
   if (user !== null) {
-    record("8-session-api-safe-fields", "FAIL", "unauthenticated session user is not null");
+    record("8a-session-api-unauthenticated", "FAIL", "unauthenticated session user is not null");
     return;
   }
 
-  const allowedKeys = new Set(["nickname", "onboarded", "idPrefix"]);
+  record("8a-session-api-unauthenticated", "PASS", "unauthenticated 401 with user:null");
+}
+
+async function testSessionApiAuthenticatedSafeFields(appUrl: string): Promise<void> {
+  const cookie = process.env.USER_A_SESSION_COOKIE?.trim();
+  if (!cookie) {
+    record(
+      "8b-session-api-authenticated-safe-fields",
+      "MANUAL",
+      "set USER_A_SESSION_COOKIE locally to verify authenticated keys (nickname, onboarded, idPrefix only)",
+    );
+    return;
+  }
+
+  const response = await fetch(`${appUrl}/api/auth/session`, {
+    method: "GET",
+    redirect: "manual",
+    headers: { Cookie: cookie },
+  });
+
+  if (response.status !== 200) {
+    record(
+      "8b-session-api-authenticated-safe-fields",
+      "FAIL",
+      `authenticated session expected 200, got ${response.status}`,
+    );
+    return;
+  }
+
+  let body: unknown;
+  try {
+    body = await response.json();
+  } catch {
+    record("8b-session-api-authenticated-safe-fields", "FAIL", "session response is not JSON");
+    return;
+  }
+
+  const user = (body as { user?: Record<string, unknown> | null }).user;
+  if (!user || typeof user !== "object") {
+    record("8b-session-api-authenticated-safe-fields", "FAIL", "authenticated session missing user object");
+    return;
+  }
+
+  const allowedKeys = ["nickname", "onboarded", "idPrefix"] as const;
+  const allowedKeySet = new Set<string>(allowedKeys);
+  const actualKeys = Object.keys(user);
+  const unexpected = actualKeys.filter((key) => !allowedKeySet.has(key));
+  const forbiddenPresent = ["email", "id", "token", "access_token", "refresh_token", "phone"].filter(
+    (key) => key in user,
+  );
+
+  if (unexpected.length > 0 || forbiddenPresent.length > 0) {
+    record(
+      "8b-session-api-authenticated-safe-fields",
+      "FAIL",
+      `unsafe or unexpected keys: ${[...unexpected, ...forbiddenPresent].join(", ") || "(none)"}`,
+    );
+    return;
+  }
+
+  for (const key of allowedKeys) {
+    if (!(key in user)) {
+      record(
+        "8b-session-api-authenticated-safe-fields",
+        "FAIL",
+        `missing required safe field: ${key}`,
+      );
+      return;
+    }
+  }
+
   record(
-    "8-session-api-safe-fields",
+    "8b-session-api-authenticated-safe-fields",
     "PASS",
-    `unauthenticated 401; allowed authenticated keys documented: ${[...allowedKeys].join(", ")} (cookie session not exercised in script)`,
+    "authenticated session contains only nickname, onboarded, idPrefix",
   );
 }
 
@@ -364,13 +666,67 @@ async function testProtectedRouteRedirect(appUrl: string): Promise<void> {
   );
 }
 
+function printSummaryAndExit(): void {
+  const failed = results.filter((r) => r.result === "FAIL");
+  const skipped = results.filter((r) => r.result === "SKIP");
+  const incomplete = results.filter((r) => r.result === "INCOMPLETE");
+  const manual = results.filter((r) => r.result === "MANUAL");
+
+  const requiredIncomplete = results.filter(
+    (r) =>
+      REQUIRED_CASES.has(r.name) &&
+      (r.result === "SKIP" || r.result === "INCOMPLETE" || r.result === "MANUAL"),
+  );
+
+  console.log("\n--- summary ---");
+  for (const row of results) {
+    console.log(`${row.result.padEnd(10)} ${row.name}`);
+  }
+
+  if (createdRowIds.length > 0) {
+    console.log("\n--- created test rows (no service-role cleanup) ---");
+    for (const row of createdRowIds) {
+      console.log(`${row.table}: ${redactId(row.id)}`);
+    }
+  }
+
+  if (skipped.length > 0) {
+    console.log(`\nSKIP count: ${skipped.length}`);
+  }
+  if (incomplete.length > 0) {
+    console.log(`INCOMPLETE count: ${incomplete.length}`);
+  }
+  if (manual.length > 0) {
+    console.log(`MANUAL count: ${manual.length} (required MANUAL => non-PASS until verified)`);
+  }
+
+  if (failed.length > 0) {
+    console.error(`\nRLS adversarial smoke FAILED (${failed.length} required defect(s))`);
+    process.exit(1);
+  }
+
+  if (requiredIncomplete.length > 0) {
+    console.error(
+      `\nRLS adversarial smoke INCOMPLETE (${requiredIncomplete.length} required case(s) SKIP/MANUAL/INCOMPLETE) — not PASSED`,
+    );
+    process.exit(1);
+  }
+
+  console.log("\nRLS adversarial smoke PASSED");
+}
+
 async function main(): Promise<void> {
   const url = requireEnv("STAGING_SUPABASE_URL");
   const anonKey = requireEnv("STAGING_SUPABASE_ANON_KEY");
   const userAJwt = requireEnv("USER_A_JWT");
   const userBJwt = requireEnv("USER_B_JWT");
   const questionId = process.env.TEST_QUESTION_ID?.trim() || DEFAULT_QUESTION_ID;
-  const appUrl = (process.env.STAGING_APP_URL?.trim() || DEFAULT_APP_URL).replace(/\/$/, "");
+  const appUrl = resolvePreviewAppUrl();
+
+  console.log("RLS adversarial smoke — staging only");
+  console.log(`Preview app URL host: ${new URL(appUrl).hostname}`);
+  console.log("Supabase URL/project: verify manually is Unstandard-staging (value not printed)");
+  console.log("Service role key: not used");
 
   let userAId: string;
   let userBId: string;
@@ -384,57 +740,63 @@ async function main(): Promise<void> {
 
   if (userAId === userBId) {
     record("0-distinct-users", "FAIL", "USER_A_JWT and USER_B_JWT resolve to same sub");
-    process.exit(1);
+    printSummaryAndExit();
+    return;
   }
   record("0-distinct-users", "PASS", `User A ${redactId(userAId)} / User B ${redactId(userBId)}`);
 
   const clientA = createAuthedClient(url, anonKey, userAJwt);
   const clientB = createAuthedClient(url, anonKey, userBJwt);
 
-  await testUserAProfile(clientA, userAId);
-  const answerId = await testUserAAnswer(clientA, userAId, questionId);
+  const profileAOk = await ensureOwnProfile(clientA, userAId, "1-user-a-profile");
+  const profileBOk = await ensureOwnProfile(clientB, userBId, "1b-user-b-profile");
 
-  if (answerId) {
-    await testUserBReadsUserAAnswer(clientB, userAId, answerId);
-    await testUserBUpdatesUserAAnswer(clientB, answerId);
-    await testUserBInsertsDepthEvalForUserA(clientB, userBId, answerId);
-    await testDuplicateAnswerDeterministic(clientA, userAId, questionId);
+  if (!profileAOk || !profileBOk) {
+    record("2a-user-a-cross-target-insert-denied", "SKIP", "profiles not ready");
+    record("2b-user-a-answer", "SKIP", "profiles not ready");
+    record("2c-user-b-answer", "SKIP", "profiles not ready");
+    record("3a-user-a-read-user-b-answer", "SKIP", "profiles not ready");
+    record("3b-user-b-read-user-a-answer", "SKIP", "profiles not ready");
+    record("4-user-b-update-user-a-answer", "SKIP", "profiles not ready");
+    record("4b-user-a-update-retarget-denied", "SKIP", "profiles not ready");
+    record("5-user-b-insert-depth-eval-for-user-a", "SKIP", "profiles not ready");
+    record("6-anonymous-insert-blocked-by-rls", "SKIP", "profiles not ready");
+    record("7-duplicate-answer-deterministic", "SKIP", "profiles not ready");
   } else {
-    record("3-user-b-read-user-a-answer", "SKIP", "no User A answer id");
-    record("4-user-b-update-user-a-answer", "SKIP", "no User A answer id");
-    record("5-user-b-insert-depth-eval-for-user-a", "SKIP", "no User A answer id");
-    record("7-duplicate-answer-deterministic", "SKIP", "no User A answer id");
+    // Cross-target BEFORE own answer so 23505 cannot mask RLS denial.
+    await testCrossTargetInsertDenied(clientA, userAId, userBId, questionId);
+
+    const answerAId = await testOwnAnswerInsert(clientA, userAId, questionId, "2b-user-a-answer");
+    const answerBId = await testOwnAnswerInsert(clientB, userBId, questionId, "2c-user-b-answer");
+
+    if (answerBId) {
+      await testCannotReadOtherUserAnswers(clientA, userBId, answerBId, "3a-user-a-read-user-b-answer");
+    } else {
+      record("3a-user-a-read-user-b-answer", "SKIP", "no User B answer id");
+    }
+
+    if (answerAId) {
+      await testCannotReadOtherUserAnswers(clientB, userAId, answerAId, "3b-user-b-read-user-a-answer");
+      await testUserBUpdatesUserAAnswer(clientB, answerAId);
+      await testUserACannotRetargetOwnAnswer(clientA, answerAId, userBId);
+      await testUserBInsertsDepthEvalForUserA(clientB, userBId, answerAId);
+      await testDuplicateAnswerDeterministic(clientA, userAId, questionId);
+    } else {
+      record("3b-user-b-read-user-a-answer", "SKIP", "no User A answer id");
+      record("4-user-b-update-user-a-answer", "SKIP", "no User A answer id");
+      record("4b-user-a-update-retarget-denied", "SKIP", "no User A answer id");
+      record("5-user-b-insert-depth-eval-for-user-a", "SKIP", "no User A answer id");
+      record("7-duplicate-answer-deterministic", "SKIP", "no User A answer id");
+    }
+
+    await testAnonymousInsertsBlockedByRls(url, anonKey, questionId, userAId);
   }
 
-  await testAnonymousInserts(url, anonKey, questionId);
-  await testSessionApiSafeFields(appUrl);
+  await testSessionApiUnauthenticated(appUrl);
+  await testSessionApiAuthenticatedSafeFields(appUrl);
   await testProtectedRouteRedirect(appUrl);
 
-  const failed = results.filter((r) => r.result === "FAIL");
-  const skipped = results.filter((r) => r.result === "SKIP");
-
-  console.log("\n--- summary ---");
-  for (const row of results) {
-    console.log(`${row.result.padEnd(4)} ${row.name}`);
-  }
-
-  if (createdRowIds.length > 0) {
-    console.log("\n--- created test rows (no service-role cleanup) ---");
-    for (const row of createdRowIds) {
-      console.log(`${row.table}: ${redactId(row.id)}`);
-    }
-  }
-
-  if (skipped.length > 0) {
-    console.log(`\nSKIP count: ${skipped.length}`);
-  }
-
-  if (failed.length > 0) {
-    console.error(`\nRLS adversarial smoke FAILED (${failed.length} test(s))`);
-    process.exit(1);
-  }
-
-  console.log("\nRLS adversarial smoke PASSED");
+  printSummaryAndExit();
 }
 
 main().catch((error) => {
