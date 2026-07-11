@@ -11,12 +11,13 @@
 | Base `main` (merge target) | `12ccb77395858a3778ace4d61693bc4b29f8c503` | Do not commit to `main` |
 | **Code/migration execution snapshot (through 0005)** | `f795038533ea4cfe55bd71fdb59de68eb97e69fc` | Last PR #30 change under `app` / `lib` / `supabase/migrations` before docs-only commits — **not** interchangeable with PR #30 head |
 | **Current PR #30 head** | `945b739c00a2cb2043cf8da46d919b7c480dcde3` | May include docs-only drift after the execution snapshot — **not** a substitute for the execution snapshot |
-| **PR #52 (superseding PR #35)** | `ecaa19601afdd64a6464264bfc1ff4924d3c3676` (verify at run time) | Smoke harness + migration `0006`; stacked on PR #30 |
+| **PR #52 (superseding PR #35)** | verify at run time (`git rev-parse` on PR #52 / execution branch) | Smoke harness + migration `0006`; stacked on PR #30 |
 | Historical (superseded) | PR #35 head `0f51c42…` | Historical only — do not execute from PR #35 |
+| Execution checkout (db scripts + smoke) | temporary branch stacked on PR #52 | Adds `db:staging:dry-run` / `db:staging:push` from PR #51 tooling |
 
 **Rule:** `git diff --name-only f795038 945b739c -- app lib supabase/migrations` was empty at recon (docs-only between those heads for runtime paths). If a later commit changes `app` / `lib` / `supabase/migrations`, **stop** and re-pin the execution snapshot before staging mutation.
 
-**Branches:** PR #30 `cursor/db-backed-answers-8eec` · **PR #52** `cursor/rls-adversarial-smoke-fix-909d` (supersedes PR #35).
+**Branches:** PR #30 `cursor/db-backed-answers-8eec` · **PR #52** `cursor/rls-adversarial-smoke-fix-909d` (supersedes PR #35) · execution checkout stacked on PR #52 (adds `db:staging:*`).
 
 **Changed files on PR #52 (vs PR #30):**
 - `package.json` (`smoke:rls`)
@@ -24,6 +25,10 @@
 - `supabase/migrations/0006_answers_update_target_invariant.sql`
 - `docs/ANSWERS_RLS_ADVERSARIAL_SMOKE.md`
 - `docs/ANSWERS_PERSISTENCE_SMOKE.md`
+
+**Execution checkout additionally includes (from PR #51 tooling):**
+- `package.json` (`db:staging:dry-run`, `db:staging:push`) + `supabase` devDependency / lockfile
+- `docs/STAGING_MIGRATION_AUTOMATION.md`
 
 Related:
 - [`ANSWERS_PERSISTENCE_SMOKE.md`](./ANSWERS_PERSISTENCE_SMOKE.md) — app-level smoke (later phase)
