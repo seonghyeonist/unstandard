@@ -7,7 +7,7 @@ import { useState } from "react";
 import { AppShell } from "@/components/layout/app-shell";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { requestSupabaseMagicLink, startMockSession } from "@/app/login/actions";
+import { startMockSession } from "@/app/login/actions";
 
 type LoginClientProps = {
   mockAllowed: boolean;
@@ -16,12 +16,34 @@ type LoginClientProps = {
   errorCode?: string;
 };
 
+type MagicLinkResponse = {
+  ok?: boolean;
+  error?: string;
+};
+
+async function requestSupabaseMagicLink(email: string) {
+  const response = await fetch("/api/auth/supabase/magic-link", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ email }),
+  });
+
+  const payload = (await response.json().catch(() => ({}))) as MagicLinkResponse;
+  if (!response.ok || !payload.ok) {
+    throw new Error(payload.error ?? "Magic link request failed. Try again.");
+  }
+
+  return { ok: true as const };
+}
+
 function resolveLoginError(errorCode?: string): string | null {
   if (errorCode === "auth_not_configured") {
     return "Auth is not configured for this environment.";
   }
   if (errorCode === "auth_callback_failed") {
-    return "Sign-in callback failed. Try again.";
+    return "Sign-in callback failed. Request a new link and open it in this browser.";
   }
   return null;
 }
@@ -86,7 +108,7 @@ export default function LoginClient({
             </form>
             {magicLinkMutation.isSuccess ? (
               <p className="mt-3 text-sm text-foreground/70">
-                Check your inbox for the staging magic link.
+                Check your inbox and open the newest link in this same browser.
               </p>
             ) : null}
             {oauthProvider ? (
