@@ -140,8 +140,8 @@ asdfasdf              ← 의미 없음
 ## 보안 원칙
 
 - 환경변수는 `.env.local`에만 저장
-- `SUPABASE_SERVICE_ROLE_KEY`는 절대 클라이언트에 노출 금지
+- `DATABASE_URL`, `BETTER_AUTH_SECRET`는 절대 클라이언트에 노출 금지
 - `NEXT_PUBLIC_` 접두어가 붙은 변수만 클라이언트에서 접근 가능
-- Supabase RLS 정책 필수 검토
+- 애플리케이션 authorization + SQL constraints 필수 검토
 - Markdown 렌더링 시 XSS 방지 확인
 - 배포 전 악마의 대변인 검증 프롬프트 실행

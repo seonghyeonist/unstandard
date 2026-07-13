@@ -65,7 +65,7 @@ Unstandard는 **철학적으로 차별화된 관계/소개 웹앱**이다.
 
 1. **미래 설정**은 타깃 코호트·staged reveal 단계를 바꿀 수 있어야 하며, 현재 알파 가정을 코드에 박아 넣지 않는다.
 2. **제품 카피**는 대학생에 과적합(overfit)하지 않는다. 랜딩·온보딩은 “질문·답변·진정성” 중심을 유지한다.
-3. **알파 확장 전 필수**: DB 영속, Supabase Auth UI, RLS 검증, 신고/차단, unlock DB source of truth, abuse guard.  
+3. **알파 확장 전 필수**: DB 영속, Better Auth, authorization 검증, 신고/차단, unlock DB source of truth, abuse guard.  
    → 상세 게이트: [`ALPHA_READINESS_CHECKLIST.md`](./ALPHA_READINESS_CHECKLIST.md)
 4. **`sessionStorage` / `localStorage`**는 알파-safe 인증·중재·신고의 source of truth가 될 수 없다. (온보딩 데모 영속은 임시)
 5. **P0 안전 게이트 통과 전** 고급 AI·매칭·사진 reveal·개인화를 구현하지 않는다.
