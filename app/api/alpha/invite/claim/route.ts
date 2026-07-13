@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { isDatabaseAuthConfigured } from "@/lib/config/runtime-mode";
-import { claimInviteForEmail } from "@/lib/auth/invite-gate";
+import { reserveInviteForEmail } from "@/lib/auth/invite-gate";
 import { normalizeEmail } from "@/lib/auth/invite-crypto";
 import {
   createRegistrationTicket,
@@ -32,7 +32,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Invalid invite claim" }, { status: 422 });
   }
 
-  const claim = await claimInviteForEmail(code, email);
+  const claim = await reserveInviteForEmail(code, email);
   if (!claim.ok) {
     return NextResponse.json({ error: "Invalid invite claim" }, { status: 403 });
   }
@@ -42,7 +42,12 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Registration unavailable" }, { status: 503 });
   }
 
-  const ticket = createRegistrationTicket(claim.inviteId, claim.email, secret);
+  const ticket = createRegistrationTicket(
+    claim.inviteId,
+    claim.email,
+    claim.reservationCapability,
+    secret,
+  );
   const cookieStore = await cookies();
   cookieStore.set(getRegistrationTicketCookieName(), ticket.token, {
     httpOnly: true,

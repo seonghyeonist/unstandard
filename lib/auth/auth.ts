@@ -4,9 +4,19 @@ import { betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { APIError, createAuthMiddleware } from "better-auth/api";
 import { cookies } from "next/headers";
+import { eq } from "drizzle-orm";
 import { getDb } from "@/lib/db/client";
+import { users } from "@/lib/db/schema/auth";
 import { schema } from "@/lib/db/schema";
-import { consumeInviteForUser } from "@/lib/auth/invite-gate";
+import {
+  consumeReservedInvite,
+  verifyInviteReservation,
+} from "@/lib/auth/invite-gate";
+import {
+  compensateFailedRegistration,
+  isUserInviteFinalized,
+  markUserInviteFinalized,
+} from "@/lib/auth/invite-finalization";
 import { normalizeEmail } from "@/lib/auth/invite-crypto";
 import {
   getRegistrationTicketCookieName,
@@ -63,15 +73,35 @@ const inviteGatePlugin = () => ({
               message: "Registration is invite-only",
             });
           }
+
+          const reservationValid = await verifyInviteReservation(ticket);
+          if (!reservationValid) {
+            throw APIError.from("FORBIDDEN", {
+              code: "INVITE_RESERVATION_INVALID",
+              message: "Invite reservation is no longer valid",
+            });
+          }
         }),
       },
-    ],
-    after: [
       {
-        matcher: (context: { path?: string }) => context.path === "/sign-up/email",
-        handler: createAuthMiddleware(async () => {
-          const cookieStore = await cookies();
-          cookieStore.delete(getRegistrationTicketCookieName());
+        matcher: (context: { path?: string }) => context.path === "/sign-in/email",
+        handler: createAuthMiddleware(async (ctx) => {
+          const email = normalizeEmail(String(ctx.body?.email ?? ""));
+          if (!email) return;
+
+          const db = getDb();
+          const [existingUser] = await db
+            .select({ id: users.id })
+            .from(users)
+            .where(eq(users.email, email))
+            .limit(1);
+
+          if (existingUser && !(await isUserInviteFinalized(existingUser.id))) {
+            throw APIError.from("FORBIDDEN", {
+              code: "ACCOUNT_NOT_FINALIZED",
+              message: "Account registration was not completed",
+            });
+          }
         }),
       },
     ],
@@ -104,10 +134,27 @@ export function getAuth(): ReturnType<typeof betterAuth> {
         create: {
           after: async (user) => {
             const ticket = await readRegistrationTicket();
-            if (ticket) {
-              await consumeInviteForUser(ticket.inviteId, user.id);
+            if (!ticket) {
+              await compensateFailedRegistration(user.id);
+              throw new Error("Invite ticket missing during registration finalization");
             }
+
+            const consumed = await consumeReservedInvite(
+              ticket.inviteId,
+              user.id,
+              ticket.capability,
+            );
+
+            if (!consumed.ok) {
+              await compensateFailedRegistration(user.id);
+              throw new Error(`Invite finalization failed: ${consumed.code}`);
+            }
+
+            await markUserInviteFinalized(user.id);
             await ensureProfileForUser({ id: user.id, email: user.email });
+
+            const cookieStore = await cookies();
+            cookieStore.delete(getRegistrationTicketCookieName());
           },
         },
       },

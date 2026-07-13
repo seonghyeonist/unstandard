@@ -12,6 +12,14 @@ export function generateInviteCode(): string {
   return randomBytes(24).toString("base64url");
 }
 
+export function generateReservationNonce(): string {
+  return randomBytes(32).toString("base64url");
+}
+
+export function hashReservationNonce(nonce: string, pepper: string): string {
+  return createHash("sha256").update(`${pepper}:reservation:${nonce}`).digest("hex");
+}
+
 export function requireInvitePepper(): string {
   const pepper = process.env.ALPHA_INVITE_PEPPER?.trim() || process.env.BETTER_AUTH_SECRET?.trim();
   if (!pepper) {

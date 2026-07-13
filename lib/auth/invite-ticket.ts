@@ -3,6 +3,7 @@ import { createHmac, timingSafeEqual } from "node:crypto";
 export type RegistrationTicket = {
   inviteId: string;
   email: string;
+  capability: string;
   exp: number;
 };
 
@@ -38,7 +39,7 @@ export function verifyRegistrationTicket(
 
   try {
     const payload = JSON.parse(Buffer.from(data, "base64url").toString("utf8")) as RegistrationTicket;
-    if (!payload.inviteId || !payload.email || !payload.exp) return null;
+    if (!payload.inviteId || !payload.email || !payload.capability || !payload.exp) return null;
     if (Date.now() > payload.exp) return null;
     return payload;
   } catch {
@@ -49,11 +50,14 @@ export function verifyRegistrationTicket(
 export function createRegistrationTicket(
   inviteId: string,
   email: string,
+  capability: string,
   secret: string,
 ): { token: string; maxAge: number } {
   const exp = Date.now() + TICKET_TTL_SECONDS * 1000;
   return {
-    token: signRegistrationTicket({ inviteId, email, exp }, secret),
+    token: signRegistrationTicket({ inviteId, email, capability, exp }, secret),
     maxAge: TICKET_TTL_SECONDS,
   };
 }
+
+export const INVITE_RESERVATION_TTL_MS = TICKET_TTL_SECONDS * 1000;

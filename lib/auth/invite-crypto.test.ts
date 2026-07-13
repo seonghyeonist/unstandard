@@ -31,9 +31,11 @@ describe("invite-crypto", () => {
 describe("invite-ticket", () => {
   it("signs and verifies registration tickets", () => {
     const secret = "x".repeat(32);
-    const { token } = createRegistrationTicket("invite-id", "user@example.com", secret);
+    const capability = "reservation-capability-token";
+    const { token } = createRegistrationTicket("invite-id", "user@example.com", capability, secret);
     const verified = verifyRegistrationTicket(token, secret);
     assert.equal(verified?.inviteId, "invite-id");
     assert.equal(verified?.email, "user@example.com");
+    assert.equal(verified?.capability, capability);
   });
 });

@@ -6,6 +6,7 @@ CREATE TABLE "users" (
 	"email" text NOT NULL,
 	"email_verified" boolean DEFAULT false NOT NULL,
 	"image" text,
+	"invite_finalized_at" timestamp with time zone,
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
 	"updated_at" timestamp with time zone DEFAULT now() NOT NULL,
 	CONSTRAINT "users_email_unique" UNIQUE("email")
@@ -136,6 +137,7 @@ CREATE TABLE "alpha_invites" (
 	"status" text DEFAULT 'pending' NOT NULL,
 	"expires_at" timestamp with time zone NOT NULL,
 	"reserved_at" timestamp with time zone,
+	"reservation_nonce_hash" text,
 	"consumed_at" timestamp with time zone,
 	"consumed_by_user_id" text,
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
@@ -211,6 +213,10 @@ CREATE INDEX "unlocks_profile_id_idx" ON "unlocks" USING btree ("profile_id");
 CREATE UNIQUE INDEX "alpha_invites_code_hash_unique" ON "alpha_invites" USING btree ("code_hash");
 --> statement-breakpoint
 CREATE INDEX "alpha_invites_email_idx" ON "alpha_invites" USING btree ("email_normalized");
+--> statement-breakpoint
+CREATE INDEX "alpha_invites_reserved_stale_idx" ON "alpha_invites" USING btree ("status","reserved_at");
+--> statement-breakpoint
+CREATE INDEX "alpha_invites_claim_idx" ON "alpha_invites" USING btree ("code_hash","email_normalized","status");
 --> statement-breakpoint
 CREATE INDEX "sessions_user_id_idx" ON "sessions" USING btree ("user_id");
 --> statement-breakpoint

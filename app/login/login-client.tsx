@@ -19,6 +19,9 @@ function resolveLoginError(errorCode?: string): string | null {
   if (errorCode === "auth_not_configured") {
     return "Auth is not configured for this environment.";
   }
+  if (errorCode === "auth_callback_failed") {
+    return "Sign-in callback failed. Request a new link and open it in this browser.";
+  }
   return null;
 }
 
