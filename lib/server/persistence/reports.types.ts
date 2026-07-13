@@ -1,7 +1,8 @@
 import type { ReportTargetType } from "@/types/api";
 
-/** Backend-agnostic report creation input. */
+/** Backend-agnostic report creation input — reporterUserId is the Better Auth users.id. */
 export type CreateReportInput = {
+  /** Better Auth user ID stored in reports.reporter_user_id */
   reporterUserId: string;
   targetType: ReportTargetType;
   targetId: string;

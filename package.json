@@ -2,6 +2,9 @@
   "name": "unstandard-alpha-web",
   "version": "0.1.0",
   "private": true,
+  "engines": {
+    "node": ">=24"
+  },
   "scripts": {
     "dev": "next dev",
     "build": "next build",
@@ -38,14 +41,16 @@
     "react-hook-form": "^7.56.4",
     "server-only": "^0.0.1",
     "tailwind-merge": "^3.3.0",
+    "ws": "^8.18.3",
     "zod": "^3.25.28"
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3.3.1",
     "@tailwindcss/postcss": "^4.1.7",
-    "@types/node": "^22.15.21",
+    "@types/node": "^24.0.0",
     "@types/react": "^19.0.14",
     "@types/react-dom": "^19.0.9",
+    "@types/ws": "^8.18.1",
     "dotenv": "^17.4.2",
     "drizzle-kit": "^0.31.10",
     "eslint": "^9.27.0",

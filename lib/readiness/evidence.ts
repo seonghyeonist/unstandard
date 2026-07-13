@@ -17,7 +17,7 @@ export type ReadinessEvidence = {
   };
 };
 
-const REQUIRED_SMOKE_CASES = [
+export const REQUIRED_HTTP_SMOKE_CASES = [
   "anonymous_denied",
   "user_a_login",
   "user_b_login",
@@ -25,12 +25,27 @@ const REQUIRED_SMOKE_CASES = [
   "user_b_session",
   "user_a_owns_session",
   "user_b_owns_session",
+  "user_a_cannot_read_user_b_private_profile",
   "forged_reporter_id_rejected",
   "self_report_rejected",
+  "duplicate_open_report_is_idempotent",
   "session_response_redacted",
   "logout_invalidates_session",
   "revoked_session_rejected",
-];
+] as const;
+
+export const REQUIRED_INTEGRATION_CASES = [
+  "report_user_fk",
+  "invite_consumed_by_user_fk",
+  "lowercase_report_target_type",
+  "duplicate_report_idempotency",
+  "no_duplicate_report_row",
+  "block_uniqueness",
+  "unlock_uniqueness",
+  "invite_concurrency",
+  "invite_finalization_success",
+  "invite_finalization_rollback",
+] as const;
 
 export function loadReadinessEvidence(path: string): ReadinessEvidence {
   const raw = readFileSync(path, "utf8");
@@ -74,9 +89,16 @@ export function validateReadinessEvidence(
   }
 
   const smokeNames = new Set(evidence.smoke.cases.map((item) => item.name));
-  for (const required of REQUIRED_SMOKE_CASES) {
+  for (const required of REQUIRED_HTTP_SMOKE_CASES) {
     if (!smokeNames.has(required)) {
-      failures.push(`smoke evidence missing required case: ${required}`);
+      failures.push(`smoke evidence missing required HTTP case: ${required}`);
+    }
+  }
+
+  const integrationNames = new Set(evidence.integration.cases.map((item) => item.name));
+  for (const required of REQUIRED_INTEGRATION_CASES) {
+    if (!integrationNames.has(required)) {
+      failures.push(`integration evidence missing required DB case: ${required}`);
     }
   }
 
@@ -93,7 +115,8 @@ export function sanitizeEvidenceForOutput(evidence: ReadinessEvidence): Record<s
     timestamp: evidence.timestamp,
     integrationVerdict: evidence.integration.verdict,
     smokeVerdict: evidence.smoke.verdict,
-    requiredSmokeCases: evidence.smoke.cases.map((item) => item.name),
+    requiredHttpSmokeCases: evidence.smoke.cases.map((item) => item.name),
+    requiredIntegrationCases: evidence.integration.cases.map((item) => item.name),
   };
 }
 

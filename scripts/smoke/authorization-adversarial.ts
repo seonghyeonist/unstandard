@@ -1,6 +1,6 @@
 /**
  * Deployed Preview adversarial authorization smoke (HTTP boundary).
- * Requires SMOKE_BASE_URL and two test accounts.
+ * Required HTTP Alpha surface only — DB-only proofs belong in test:integration.
  */
 
 const baseUrl = process.env.SMOKE_BASE_URL?.trim();
@@ -9,13 +9,17 @@ const userAPassword = process.env.SMOKE_USER_A_PASSWORD;
 const userBEmail = process.env.SMOKE_USER_B_EMAIL?.trim();
 const userBPassword = process.env.SMOKE_USER_B_PASSWORD;
 const previewBypass = process.env.SMOKE_VERCEL_PROTECTION_BYPASS?.trim();
+const profileAId = process.env.SMOKE_USER_A_PROFILE_ID?.trim();
 const profileBId = process.env.SMOKE_USER_B_PROFILE_ID?.trim();
 
 type SmokeCase = {
   name: string;
   pass: boolean;
-  skipped?: boolean;
-  reason?: string;
+};
+
+type FutureCase = {
+  name: string;
+  reason: string;
 };
 
 function redact(value: string): string {
@@ -56,7 +60,7 @@ async function fetchJson(
   path: string,
   init: RequestInit = {},
   jar?: CookieJar,
-): Promise<{ status: number; body: unknown; setCookie: string | null }> {
+): Promise<{ status: number; body: unknown }> {
   const headers = new Headers(init.headers ?? {});
   if (previewBypass) {
     headers.set("x-vercel-protection-bypass", previewBypass);
@@ -71,8 +75,7 @@ async function fetchJson(
     headers,
   });
 
-  const setCookie = response.headers.get("set-cookie");
-  jar?.ingest(setCookie);
+  jar?.ingest(response.headers.get("set-cookie"));
 
   const text = await response.text();
   let body: unknown = null;
@@ -82,7 +85,7 @@ async function fetchJson(
     body = { raw: text.slice(0, 120) };
   }
 
-  return { status: response.status, body, setCookie };
+  return { status: response.status, body };
 }
 
 async function signIn(
@@ -114,7 +117,25 @@ function sessionHasSensitiveFields(body: unknown): boolean {
 }
 
 async function main(): Promise<void> {
-  const cases: SmokeCase[] = [];
+  const requiredCases: SmokeCase[] = [];
+  const futureNotApplicable: FutureCase[] = [
+    {
+      name: "duplicate_block_rejected",
+      reason: "No HTTP block endpoint in alpha rebuild",
+    },
+    {
+      name: "duplicate_unlock_rejected",
+      reason: "Unlock duplicate contract is DB/integration-only in alpha rebuild",
+    },
+    {
+      name: "user_a_cannot_modify_user_b_profile",
+      reason: "No profile mutation HTTP endpoint in alpha rebuild",
+    },
+    {
+      name: "user_a_cannot_update_or_delete_user_b_answer",
+      reason: "No cross-user answer mutation HTTP endpoint in alpha rebuild",
+    },
+  ];
 
   if (!baseUrl) {
     console.error("BLOCKED_EXTERNAL: SMOKE_BASE_URL missing");
@@ -123,6 +144,11 @@ async function main(): Promise<void> {
 
   if (!userAEmail || !userAPassword || !userBEmail || !userBPassword) {
     console.error("BLOCKED_EXTERNAL: SMOKE_USER_A_* and SMOKE_USER_B_* credentials are required");
+    process.exit(2);
+  }
+
+  if (!profileAId || !profileBId) {
+    console.error("BLOCKED_EXTERNAL: SMOKE_USER_A_PROFILE_ID and SMOKE_USER_B_PROFILE_ID are required");
     process.exit(2);
   }
 
@@ -140,45 +166,39 @@ async function main(): Promise<void> {
     process.exit(2);
   }
 
-  const anonJar = new CookieJar();
-  const anonSession = await fetchJson("/api/auth/session", {}, anonJar);
-  cases.push({ name: "anonymous_denied", pass: anonSession.status === 401 });
+  const anonSession = await fetchJson("/api/auth/session");
+  requiredCases.push({ name: "anonymous_denied", pass: anonSession.status === 401 });
 
   const jarA = new CookieJar();
   const loginA = await signIn(userAEmail, userAPassword, jarA);
-  cases.push({ name: "user_a_login", pass: loginA.ok });
+  requiredCases.push({ name: "user_a_login", pass: loginA.ok });
   const sessionA = await fetchJson("/api/auth/session", {}, jarA);
-  cases.push({ name: "user_a_session", pass: sessionA.status === 200 });
+  requiredCases.push({ name: "user_a_session", pass: sessionA.status === 200 });
 
   const jarB = new CookieJar();
   const loginB = await signIn(userBEmail, userBPassword, jarB);
-  cases.push({ name: "user_b_login", pass: loginB.ok });
+  requiredCases.push({ name: "user_b_login", pass: loginB.ok });
   const sessionB = await fetchJson("/api/auth/session", {}, jarB);
-  cases.push({ name: "user_b_session", pass: sessionB.status === 200 });
+  requiredCases.push({ name: "user_b_session", pass: sessionB.status === 200 });
 
-  cases.push({
+  requiredCases.push({
     name: "user_a_owns_session",
-    pass: sessionA.status === 200 && typeof (sessionA.body as { user?: { nickname?: string } })?.user?.nickname === "string",
+    pass:
+      sessionA.status === 200 &&
+      typeof (sessionA.body as { user?: { nickname?: string } })?.user?.nickname === "string",
   });
-  cases.push({
+  requiredCases.push({
     name: "user_b_owns_session",
-    pass: sessionB.status === 200 && typeof (sessionB.body as { user?: { nickname?: string } })?.user?.nickname === "string",
+    pass:
+      sessionB.status === 200 &&
+      typeof (sessionB.body as { user?: { nickname?: string } })?.user?.nickname === "string",
   });
 
-  if (profileBId) {
-    const crossRead = await fetchJson(`/api/profile/${profileBId}/private`, {}, jarA);
-    cases.push({
-      name: "user_a_cannot_read_user_b_private_profile",
-      pass: crossRead.status === 401 || crossRead.status === 403,
-    });
-  } else {
-    cases.push({
-      name: "user_a_cannot_read_user_b_private_profile",
-      pass: false,
-      skipped: true,
-      reason: "SMOKE_USER_B_PROFILE_ID missing",
-    });
-  }
+  const crossRead = await fetchJson(`/api/profile/${profileBId}/private`, {}, jarA);
+  requiredCases.push({
+    name: "user_a_cannot_read_user_b_private_profile",
+    pass: crossRead.status === 401 || crossRead.status === 403,
+  });
 
   const forgedReport = await fetchJson(
     "/api/reports",
@@ -186,17 +206,17 @@ async function main(): Promise<void> {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({
-        targetType: "PROFILE",
-        targetId: "profile-test",
-        reason: "forged",
+        targetType: "profile",
+        targetId: profileBId,
+        reason: "forged reporter attempt",
         reporterUserId: "00000000-0000-4000-8000-000000000000",
       }),
     },
     jarA,
   );
-  cases.push({
+  requiredCases.push({
     name: "forged_reporter_id_rejected",
-    pass: forgedReport.status === 400 || forgedReport.status === 403,
+    pass: forgedReport.status === 400,
   });
 
   const selfReport = await fetchJson(
@@ -205,96 +225,64 @@ async function main(): Promise<void> {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({
-        targetType: "PROFILE",
-        targetId: profileBId ?? "profile-self",
-        reason: "self",
-        reporterUserId: (sessionA.body as { user?: { idPrefix?: string } })?.user?.idPrefix,
+        targetType: "profile",
+        targetId: profileAId,
+        reason: "self report attempt",
       }),
     },
     jarA,
   );
-  cases.push({
+  requiredCases.push({
     name: "self_report_rejected",
-    pass: selfReport.status === 400 || selfReport.status === 403,
+    pass: selfReport.status === 400,
   });
 
-  if (profileBId) {
-    const firstReport = await fetchJson(
-      "/api/reports",
-      {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({
-          targetType: "PROFILE",
-          targetId: profileBId,
-          reason: "duplicate-open-report",
-        }),
-      },
-      jarA,
-    );
-    const duplicateReport = await fetchJson(
-      "/api/reports",
-      {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({
-          targetType: "PROFILE",
-          targetId: profileBId,
-          reason: "duplicate-open-report-2",
-        }),
-      },
-      jarA,
-    );
-    cases.push({
-      name: "duplicate_open_report_rejected",
-      pass:
-        firstReport.status >= 200 &&
-        firstReport.status < 300 &&
-        duplicateReport.status === 409,
-    });
-  } else {
-    cases.push({
-      name: "duplicate_open_report_rejected",
-      pass: false,
-      skipped: true,
-      reason: "SMOKE_USER_B_PROFILE_ID missing",
-    });
-  }
-
-  cases.push({
-    name: "duplicate_block_rejected",
-    pass: false,
-    skipped: true,
-    reason: "No HTTP block endpoint in alpha rebuild",
-  });
-  cases.push({
-    name: "duplicate_unlock_rejected",
-    pass: false,
-    skipped: true,
-    reason: "Unlock persistence is cookie-based without duplicate HTTP contract",
-  });
-  cases.push({
-    name: "user_a_cannot_modify_user_b_profile",
-    pass: false,
-    skipped: true,
-    reason: "No profile mutation HTTP endpoint in alpha rebuild",
-  });
-  cases.push({
-    name: "user_a_cannot_update_or_delete_user_b_answer",
-    pass: false,
-    skipped: true,
-    reason: "No cross-user answer mutation HTTP endpoint in alpha rebuild",
+  const firstReport = await fetchJson(
+    "/api/reports",
+    {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        targetType: "profile",
+        targetId: profileBId,
+        reason: "duplicate-open-report",
+      }),
+    },
+    jarA,
+  );
+  const duplicateReport = await fetchJson(
+    "/api/reports",
+    {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        targetType: "profile",
+        targetId: profileBId,
+        reason: "duplicate-open-report-2",
+      }),
+    },
+    jarA,
+  );
+  const firstId = (firstReport.body as { id?: string })?.id;
+  const duplicateId = (duplicateReport.body as { id?: string })?.id;
+  requiredCases.push({
+    name: "duplicate_open_report_is_idempotent",
+    pass:
+      firstReport.status === 201 &&
+      duplicateReport.status === 200 &&
+      Boolean(firstId) &&
+      firstId === duplicateId,
   });
 
   const redactionCheck = await fetchJson("/api/auth/session", {}, jarA);
-  cases.push({
+  requiredCases.push({
     name: "session_response_redacted",
     pass: redactionCheck.status === 200 && !sessionHasSensitiveFields(redactionCheck.body),
   });
 
   const logout = await fetchJson("/api/auth/logout", { method: "POST" }, jarA);
   const afterLogout = await fetchJson("/api/auth/session", {}, jarA);
-  cases.push({
+  requiredCases.push({
     name: "logout_invalidates_session",
     pass: logout.status >= 200 && logout.status < 300 && afterLogout.status === 401,
   });
@@ -303,24 +291,22 @@ async function main(): Promise<void> {
   await signIn(userAEmail, userAPassword, revokedJar);
   revokedJar.clear();
   const revokedSession = await fetchJson("/api/auth/session", {}, revokedJar);
-  cases.push({
+  requiredCases.push({
     name: "revoked_session_rejected",
     pass: revokedSession.status === 401,
   });
 
-  const requiredCases = cases.filter((item) => !item.skipped);
-  const skippedCases = cases.filter((item) => item.skipped);
   const allRequiredPass = requiredCases.every((item) => item.pass);
-  const verdict = skippedCases.length > 0 ? "INCOMPLETE" : allRequiredPass ? "PASS" : "FAIL";
+  const verdict = allRequiredPass ? "PASS" : "FAIL";
 
   console.log(
     JSON.stringify(
       {
         verdict,
+        matrix: "deployed_http_alpha_surface",
         baseUrl: redact(baseUrl),
-        cases,
-        requiredCount: requiredCases.length,
-        skippedCount: skippedCases.length,
+        requiredCases,
+        futureNotApplicable,
         timestamp: new Date().toISOString(),
       },
       null,
@@ -328,9 +314,6 @@ async function main(): Promise<void> {
     ),
   );
 
-  if (skippedCases.length > 0) {
-    process.exit(1);
-  }
   if (!allRequiredPass) {
     process.exit(1);
   }

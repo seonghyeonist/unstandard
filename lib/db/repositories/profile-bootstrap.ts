@@ -2,16 +2,19 @@ import "server-only";
 
 import { eq } from "drizzle-orm";
 import { getDb } from "@/lib/db/client";
+import type { DbExecutor } from "@/lib/db/types";
 import { profiles } from "@/lib/db/schema/profiles";
 import type { AuthenticatedUser } from "@/lib/auth/server";
 import { resolveReporterNickname } from "@/lib/server/profile/reporter-nickname";
 
-export async function ensureProfileForUser(user: AuthenticatedUser): Promise<{
+export async function ensureProfileForUser(
+  user: AuthenticatedUser,
+  db: DbExecutor = getDb(),
+): Promise<{
   profileId: string;
   nickname: string;
   onboarded: boolean;
 }> {
-  const db = getDb();
   const nickname = resolveReporterNickname(user);
 
   const existing = await db

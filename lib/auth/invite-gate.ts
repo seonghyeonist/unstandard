@@ -2,6 +2,7 @@ import "server-only";
 
 import { and, eq, gt, lt } from "drizzle-orm";
 import { getDb } from "@/lib/db/client";
+import type { DbExecutor } from "@/lib/db/types";
 import { alphaInvites } from "@/lib/db/schema/invites";
 import {
   generateReservationNonce,
@@ -122,10 +123,10 @@ export async function consumeReservedInvite(
   inviteId: string,
   userId: string,
   reservationCapability: string,
+  db: DbExecutor = getDb(),
 ): Promise<InviteConsumeResult> {
   const pepper = requireInvitePepper();
   const nonceHash = hashReservationNonce(reservationCapability, pepper);
-  const db = getDb();
   const now = new Date();
 
   const consumed = await db

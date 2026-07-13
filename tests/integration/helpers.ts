@@ -1,10 +1,14 @@
-import { neon } from "@neondatabase/serverless";
-import { drizzle, type NeonHttpDatabase } from "drizzle-orm/neon-http";
+import { Pool, neonConfig } from "@neondatabase/serverless";
+import { drizzle } from "drizzle-orm/neon-serverless";
+import ws from "ws";
 import { assertTestDatabaseEnv } from "@/lib/config/database-env";
 import { requireDestructiveTestConfirmation, requireTestDatabaseUrl } from "@/lib/db/migration-guards";
 import { schema } from "@/lib/db/schema";
+import type { DbExecutor } from "@/lib/db/types";
 
-export type IntegrationDb = NeonHttpDatabase<typeof schema>;
+neonConfig.webSocketConstructor = ws;
+
+export type IntegrationDb = DbExecutor;
 
 export function getIntegrationDatabaseUrl(): string {
   assertTestDatabaseEnv();
@@ -17,11 +21,17 @@ export function createIntegrationDb(url = getIntegrationDatabaseUrl()): Integrat
     throw new Error("Integration database helper requires DATABASE_ENV=test");
   }
 
-  const sql = neon(url);
-  return drizzle(sql, { schema });
+  const pool = new Pool({ connectionString: url });
+  return drizzle(pool, { schema });
 }
 
 export async function assertDatabaseReachable(url: string): Promise<void> {
-  const sql = neon(url);
-  await sql`SELECT 1`;
+  const pool = new Pool({ connectionString: url });
+  const client = await pool.connect();
+  try {
+    await client.query("SELECT 1");
+  } finally {
+    client.release();
+    await pool.end();
+  }
 }

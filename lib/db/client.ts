@@ -1,36 +1,47 @@
 import "server-only";
 
-import { neon } from "@neondatabase/serverless";
-import { drizzle, type NeonHttpDatabase } from "drizzle-orm/neon-http";
-import { getDatabaseUrl } from "@/lib/db/config";
+import { Pool, neonConfig } from "@neondatabase/serverless";
+import { drizzle } from "drizzle-orm/neon-serverless";
+import ws from "ws";
+import { requireDatabaseUrl } from "@/lib/db/config";
 import { schema } from "@/lib/db/schema";
+import type { DbExecutor } from "@/lib/db/types";
 
-export type AppDatabase = NeonHttpDatabase<typeof schema>;
+neonConfig.webSocketConstructor = ws;
 
+export type AppDatabase = DbExecutor;
+
+let poolInstance: Pool | null = null;
 let dbInstance: AppDatabase | null = null;
 
+function getPool(): Pool {
+  if (poolInstance) {
+    return poolInstance;
+  }
+
+  poolInstance = new Pool({ connectionString: requireDatabaseUrl() });
+  return poolInstance;
+}
+
 /**
- * Lazy database handle — never contacts Neon during build/import without DATABASE_URL.
+ * Lazy database handle with transaction support (Neon serverless Pool + WebSocket).
  */
 export function getDb(): AppDatabase {
   if (dbInstance) {
     return dbInstance;
   }
 
-  const url = getDatabaseUrl();
-  if (!url) {
-    throw new Error("DATABASE_URL is not configured");
-  }
-
-  const sql = neon(url);
-  dbInstance = drizzle(sql, { schema });
+  dbInstance = drizzle(getPool(), { schema });
   return dbInstance;
 }
 
 export async function pingDatabase(): Promise<boolean> {
-  const url = getDatabaseUrl();
-  if (!url) return false;
-  const sql = neon(url);
-  await sql`SELECT 1`;
-  return true;
+  const pool = getPool();
+  const client = await pool.connect();
+  try {
+    await client.query("SELECT 1");
+    return true;
+  } finally {
+    client.release();
+  }
 }

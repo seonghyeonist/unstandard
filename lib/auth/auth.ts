@@ -8,21 +8,18 @@ import { eq } from "drizzle-orm";
 import { getDb } from "@/lib/db/client";
 import { users } from "@/lib/db/schema/auth";
 import { schema } from "@/lib/db/schema";
-import {
-  consumeReservedInvite,
-  verifyInviteReservation,
-} from "@/lib/auth/invite-gate";
+import { verifyInviteReservation } from "@/lib/auth/invite-gate";
 import {
   compensateFailedRegistration,
+  clearRegistrationTicketCookie,
+  finalizeInviteRegistration,
   isUserInviteFinalized,
-  markUserInviteFinalized,
 } from "@/lib/auth/invite-finalization";
 import { normalizeEmail } from "@/lib/auth/invite-crypto";
 import {
   getRegistrationTicketCookieName,
   verifyRegistrationTicket,
 } from "@/lib/auth/invite-ticket";
-import { ensureProfileForUser } from "@/lib/db/repositories/profile-bootstrap";
 
 function getTrustedOrigins(): string[] {
   const origins = new Set<string>();
@@ -136,25 +133,20 @@ export function getAuth(): ReturnType<typeof betterAuth> {
             const ticket = await readRegistrationTicket();
             if (!ticket) {
               await compensateFailedRegistration(user.id);
+              await clearRegistrationTicketCookie();
               throw new Error("Invite ticket missing during registration finalization");
             }
 
-            const consumed = await consumeReservedInvite(
-              ticket.inviteId,
-              user.id,
-              ticket.capability,
-            );
-
-            if (!consumed.ok) {
-              await compensateFailedRegistration(user.id);
-              throw new Error(`Invite finalization failed: ${consumed.code}`);
+            try {
+              await finalizeInviteRegistration({
+                inviteId: ticket.inviteId,
+                userId: user.id,
+                reservationCapability: ticket.capability,
+                email: user.email,
+              });
+            } catch {
+              throw new Error("Invite registration finalization failed");
             }
-
-            await markUserInviteFinalized(user.id);
-            await ensureProfileForUser({ id: user.id, email: user.email });
-
-            const cookieStore = await cookies();
-            cookieStore.delete(getRegistrationTicketCookieName());
           },
         },
       },
