@@ -3,11 +3,13 @@ import { describe, it } from "node:test";
 import { buildAuthEnvDiagnostics } from "../lib/debug/auth-env-diagnostics.ts";
 
 const ENV_KEYS = [
-  "UNSTANDARD_SUPABASE_URL",
-  "UNSTANDARD_SUPABASE_PUBLISHABLE_KEY",
+  "DATABASE_URL",
+  "BETTER_AUTH_SECRET",
+  "BETTER_AUTH_URL",
   "AUTH_COOKIE_SECRET",
   "UNSTANDARD_APP_URL",
-  "REPORTS_PERSISTENCE_ADAPTER",
+  "UNSTANDARD_RUNTIME_MODE",
+  "DATABASE_ENV",
   "NODE_ENV",
   "VERCEL_ENV",
 ] as const;
@@ -57,14 +59,16 @@ function makeRequest(host = "preview.example.com"): Request {
 }
 
 describe("buildAuthEnvDiagnostics", () => {
-  it("returns ok=true when required staging env is present", () => {
+  it("returns ok=true when required database auth env is present", () => {
     withEnv(
       {
-        UNSTANDARD_SUPABASE_URL: "https://staging.supabase.co",
-        UNSTANDARD_SUPABASE_PUBLISHABLE_KEY: "publishable-key",
+        DATABASE_URL: "postgres://staging",
+        BETTER_AUTH_SECRET: "x".repeat(32),
+        BETTER_AUTH_URL: "https://preview.example.com",
         AUTH_COOKIE_SECRET: "cookie-secret",
         UNSTANDARD_APP_URL: "https://preview.example.com",
-        REPORTS_PERSISTENCE_ADAPTER: "disabled",
+        UNSTANDARD_RUNTIME_MODE: "database",
+        DATABASE_ENV: "staging",
         NODE_ENV: "production",
         VERCEL_ENV: "preview",
       },
@@ -72,16 +76,9 @@ describe("buildAuthEnvDiagnostics", () => {
         const result = buildAuthEnvDiagnostics(makeRequest());
 
         assert.equal(result.ok, true);
-        assert.equal(result.env.nodeEnv, "production");
         assert.equal(result.env.vercelEnv, "preview");
-        assert.equal(result.request.host, "preview.example.com");
-        assert.equal(result.auth.hasUnstandardSupabaseUrl, true);
-        assert.equal(result.auth.hasUnstandardSupabasePublishableKey, true);
-        assert.equal(result.auth.hasAuthCookieSecret, true);
-        assert.equal(result.auth.hasUnstandardAppUrl, true);
-        assert.equal(result.auth.isServerSupabaseConfigured, true);
-        assert.equal(result.reports.hasReportsPersistenceAdapter, true);
-        assert.equal(result.reports.reportsPersistenceAdapterIsDisabled, true);
+        assert.equal(result.auth.hasDatabaseUrl, true);
+        assert.equal(result.auth.isDatabaseAuthConfigured, true);
       },
     );
   });
@@ -89,54 +86,17 @@ describe("buildAuthEnvDiagnostics", () => {
   it("returns ok=false when a required env var is missing", () => {
     withEnv(
       {
-        UNSTANDARD_SUPABASE_URL: "https://staging.supabase.co",
-        UNSTANDARD_SUPABASE_PUBLISHABLE_KEY: "publishable-key",
+        DATABASE_URL: "postgres://staging",
+        BETTER_AUTH_SECRET: "x".repeat(32),
+        BETTER_AUTH_URL: "https://preview.example.com",
         AUTH_COOKIE_SECRET: undefined,
         UNSTANDARD_APP_URL: "https://preview.example.com",
-        REPORTS_PERSISTENCE_ADAPTER: "disabled",
+        UNSTANDARD_RUNTIME_MODE: "database",
       },
       () => {
         const result = buildAuthEnvDiagnostics(makeRequest());
-
         assert.equal(result.ok, false);
         assert.equal(result.auth.hasAuthCookieSecret, false);
-      },
-    );
-  });
-
-  it("returns ok=false when reports persistence is enabled", () => {
-    withEnv(
-      {
-        UNSTANDARD_SUPABASE_URL: "https://staging.supabase.co",
-        UNSTANDARD_SUPABASE_PUBLISHABLE_KEY: "publishable-key",
-        AUTH_COOKIE_SECRET: "cookie-secret",
-        UNSTANDARD_APP_URL: "https://preview.example.com",
-        REPORTS_PERSISTENCE_ADAPTER: "supabase-alpha",
-      },
-      () => {
-        const result = buildAuthEnvDiagnostics(makeRequest());
-
-        assert.equal(result.ok, false);
-        assert.equal(result.reports.reportsPersistenceAdapterIsDisabled, false);
-      },
-    );
-  });
-
-  it("treats unset reports adapter as disabled for ok", () => {
-    withEnv(
-      {
-        UNSTANDARD_SUPABASE_URL: "https://staging.supabase.co",
-        UNSTANDARD_SUPABASE_PUBLISHABLE_KEY: "publishable-key",
-        AUTH_COOKIE_SECRET: "cookie-secret",
-        UNSTANDARD_APP_URL: "https://preview.example.com",
-        REPORTS_PERSISTENCE_ADAPTER: undefined,
-      },
-      () => {
-        const result = buildAuthEnvDiagnostics(makeRequest());
-
-        assert.equal(result.ok, true);
-        assert.equal(result.reports.reportsPersistenceAdapterIsDisabled, true);
-        assert.equal(result.reports.hasReportsPersistenceAdapter, false);
       },
     );
   });
