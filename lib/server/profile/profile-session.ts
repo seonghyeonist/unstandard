@@ -1,35 +1,36 @@
 import "server-only";
 
-import { createClient } from "@/lib/supabase/server";
+import { eq } from "drizzle-orm";
 import { isAnswersPersistenceEnabled } from "@/lib/config/answers-persistence-mode";
+import { getDb } from "@/lib/db/client";
+import { profiles } from "@/lib/db/schema/profiles";
 
 export type ProfileSessionFields = {
   nickname?: string;
   onboarded: boolean;
 };
 
-/**
- * Loads profile session fields when answers persistence is enabled.
- * Returns onboarded=false when profile row or onboarded_at is missing.
- */
 export async function loadProfileSessionFields(userId: string): Promise<ProfileSessionFields | null> {
   if (!isAnswersPersistenceEnabled()) {
     return null;
   }
 
-  const supabase = await createClient();
-  const { data, error } = await supabase
-    .from("profiles")
-    .select("nickname, onboarded_at")
-    .eq("id", userId)
-    .maybeSingle();
+  const db = getDb();
+  const [row] = await db
+    .select({
+      nickname: profiles.nickname,
+      onboardedAt: profiles.onboardedAt,
+    })
+    .from(profiles)
+    .where(eq(profiles.userId, userId))
+    .limit(1);
 
-  if (error || !data) {
+  if (!row) {
     return { onboarded: false };
   }
 
   return {
-    nickname: typeof data.nickname === "string" ? data.nickname : undefined,
-    onboarded: Boolean(data.onboarded_at),
+    nickname: row.nickname,
+    onboarded: Boolean(row.onboardedAt),
   };
 }

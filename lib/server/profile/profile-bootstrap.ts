@@ -2,16 +2,13 @@ import "server-only";
 
 import type { AuthenticatedUser } from "@/lib/auth/server";
 import { isReportsPersistenceEnabled } from "@/lib/config/persistence-mode";
-import { ensureReporterProfileSupabase } from "@/lib/server/profile/adapters/supabase/reporter-profile.bootstrap";
+import { ensureProfileForUser } from "@/lib/db/repositories/profile-bootstrap";
 import {
+  reporterProfileSetupRequired,
   reporterProfileSuccess,
   type ReporterProfileResult,
 } from "@/lib/server/profile/profile.types";
 
-/**
- * Ensures a reporter profile row exists before reports persistence (alpha adapter path).
- * When reports persistence is disabled, returns auth user id without touching DB.
- */
 export async function ensureReporterProfile(
   user: AuthenticatedUser,
 ): Promise<ReporterProfileResult> {
@@ -19,7 +16,12 @@ export async function ensureReporterProfile(
     return reporterProfileSuccess(user.id);
   }
 
-  return ensureReporterProfileSupabase(user);
+  try {
+    const profile = await ensureProfileForUser(user);
+    return reporterProfileSuccess(profile.profileId);
+  } catch {
+    return reporterProfileSetupRequired();
+  }
 }
 
 export type { ReporterProfileResult };

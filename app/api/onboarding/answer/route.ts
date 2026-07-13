@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { AuthError, requireAuthenticatedUser } from "@/lib/auth/server";
-import { isSupabaseAuthEnabled } from "@/lib/config/auth-mode";
+import { isDatabaseAuthConfigured } from "@/lib/config/runtime-mode";
 import { onboardingQuestion } from "@/lib/data/mock-public";
 import {
   DEPTH_MOCK_MODEL_VERSION,
@@ -11,8 +11,8 @@ import { createAnswersRepository } from "@/lib/server/persistence/answers.reposi
 import { validateOnboardingAnswerInput } from "@/lib/security/onboarding-validation";
 
 export async function POST(request: Request) {
-  if (!isSupabaseAuthEnabled()) {
-    return NextResponse.json({ error: "Supabase auth required" }, { status: 403 });
+  if (!isDatabaseAuthConfigured()) {
+    return NextResponse.json({ error: "Database auth required" }, { status: 403 });
   }
 
   let user;

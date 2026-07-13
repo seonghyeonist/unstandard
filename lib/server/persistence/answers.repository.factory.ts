@@ -7,7 +7,7 @@ import type {
   SaveOnboardingAnswerResult,
 } from "@/lib/server/persistence/answers.types";
 import { saveOnboardingAnswerFailure } from "@/lib/server/persistence/answers.types";
-import { createSupabaseAnswersRepository } from "@/lib/server/persistence/adapters/supabase/answers.repository";
+import { createDrizzleAnswersRepository } from "@/lib/db/repositories/answers.repository";
 
 const persistenceDisabledRepository: AnswersRepository = {
   async saveOnboardingAnswer(): Promise<SaveOnboardingAnswerResult> {
@@ -15,15 +15,11 @@ const persistenceDisabledRepository: AnswersRepository = {
   },
 };
 
-/**
- * Wires the active alpha persistence adapter. Route imports this only.
- * Current wiring: Supabase alpha adapter when explicitly enabled — not production architecture.
- */
 export function createAnswersRepository(): AnswersRepository {
   if (!isAnswersPersistenceEnabled()) {
     return persistenceDisabledRepository;
   }
-  return createSupabaseAnswersRepository();
+  return createDrizzleAnswersRepository();
 }
 
 export type { SaveOnboardingAnswerInput, SaveOnboardingAnswerResult };

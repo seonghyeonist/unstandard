@@ -1,6 +1,6 @@
 import type { ReportTargetType } from "@/types/api";
 
-/** Backend-agnostic report creation input — no Supabase types. */
+/** Backend-agnostic report creation input. */
 export type CreateReportInput = {
   reporterUserId: string;
   targetType: ReportTargetType;

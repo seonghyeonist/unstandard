@@ -2,7 +2,7 @@
 
 import { completeMockOnboarding } from "@/app/login/actions";
 import { AuthError, requireAuthenticatedUser } from "@/lib/auth/server";
-import { isMockAuthAllowed, isSupabaseAuthEnabled } from "@/lib/config/auth-mode";
+import { isDatabaseAuthConfigured, isMockAuthAllowed } from "@/lib/config/auth-mode";
 import { isAnswersPersistenceEnabled } from "@/lib/config/answers-persistence-mode";
 import { onboardingQuestion } from "@/lib/data/mock-public";
 import type { OnboardingResponse } from "@/lib/api/onboarding-store";
@@ -23,7 +23,7 @@ export async function persistOnboardingAnswer(input: {
   nickname: string;
   answer: string;
 }): Promise<PersistOnboardingAnswerResult> {
-  if (isSupabaseAuthEnabled() && isAnswersPersistenceEnabled()) {
+  if (isDatabaseAuthConfigured() && isAnswersPersistenceEnabled()) {
     let user;
     try {
       user = await requireAuthenticatedUser();
