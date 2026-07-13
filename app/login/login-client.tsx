@@ -7,12 +7,11 @@ import { useState } from "react";
 import { AppShell } from "@/components/layout/app-shell";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { requestSupabaseMagicLink, startMockSession } from "@/app/login/actions";
+import { signInWithEmailPassword, startMockSession } from "@/app/login/actions";
 
 type LoginClientProps = {
   mockAllowed: boolean;
-  supabaseEnabled: boolean;
-  oauthProvider?: string;
+  databaseAuthEnabled: boolean;
   errorCode?: string;
 };
 
@@ -20,21 +19,18 @@ function resolveLoginError(errorCode?: string): string | null {
   if (errorCode === "auth_not_configured") {
     return "Auth is not configured for this environment.";
   }
-  if (errorCode === "auth_callback_failed") {
-    return "Sign-in callback failed. Try again.";
-  }
   return null;
 }
 
 export default function LoginClient({
   mockAllowed,
-  supabaseEnabled,
-  oauthProvider,
+  databaseAuthEnabled,
   errorCode,
 }: LoginClientProps) {
   const router = useRouter();
   const queryClient = useQueryClient();
   const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const loginError = resolveLoginError(errorCode);
 
   const mockMutation = useMutation({
@@ -45,58 +41,64 @@ export default function LoginClient({
     },
   });
 
-  const magicLinkMutation = useMutation({
-    mutationFn: async () => requestSupabaseMagicLink(email),
+  const signInMutation = useMutation({
+    mutationFn: async () => signInWithEmailPassword(email, password),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ["current-user"] });
+      router.push("/onboarding");
+    },
   });
 
   return (
     <AppShell title="닫힌 문 앞에서" eyebrow="login">
       <Card>
-        {supabaseEnabled ? (
+        {databaseAuthEnabled ? (
           <>
             <p className="text-sm text-foreground/60">
-              Closed alpha staging login. Do not use production credentials.
-            </p>
-            <p className="mt-3 text-lg leading-8 text-foreground/75">
-              Staging Supabase sign-in for smoke tests. Use a staging test account only.
+              Closed alpha — invite-only registration. Existing members sign in with email and password.
             </p>
             <form
               className="mt-6 space-y-3"
               onSubmit={(event) => {
                 event.preventDefault();
-                magicLinkMutation.mutate();
+                signInMutation.mutate();
               }}
             >
-              <label className="block text-sm text-foreground/70" htmlFor="staging-email">
-                Email (magic link)
+              <label className="block text-sm text-foreground/70" htmlFor="login-email">
+                Email
               </label>
               <input
-                id="staging-email"
+                id="login-email"
                 type="email"
                 autoComplete="email"
                 className="w-full rounded-xl border border-foreground/15 bg-background px-4 py-3 text-sm"
-                placeholder="you@staging.example"
                 value={email}
                 onChange={(event) => setEmail(event.target.value)}
-                disabled={magicLinkMutation.isPending}
+                disabled={signInMutation.isPending}
               />
-              <Button className="w-full" type="submit" disabled={magicLinkMutation.isPending || !email.trim()}>
-                {magicLinkMutation.isPending ? "Sending link…" : "Send magic link"}
+              <label className="block text-sm text-foreground/70" htmlFor="login-password">
+                Password
+              </label>
+              <input
+                id="login-password"
+                type="password"
+                autoComplete="current-password"
+                className="w-full rounded-xl border border-foreground/15 bg-background px-4 py-3 text-sm"
+                value={password}
+                onChange={(event) => setPassword(event.target.value)}
+                disabled={signInMutation.isPending}
+              />
+              <Button
+                className="w-full"
+                type="submit"
+                disabled={signInMutation.isPending || !email.trim() || password.length < 10}
+              >
+                {signInMutation.isPending ? "Signing in…" : "Sign in"}
               </Button>
             </form>
-            {magicLinkMutation.isSuccess ? (
-              <p className="mt-3 text-sm text-foreground/70">
-                Check your inbox for the staging magic link.
-              </p>
-            ) : null}
-            {oauthProvider ? (
-              <a
-                className="mt-4 inline-flex w-full items-center justify-center rounded-xl border border-foreground/15 px-4 py-3 text-sm font-medium hover:bg-foreground/5"
-                href={`/api/auth/supabase/oauth?provider=${encodeURIComponent(oauthProvider)}`}
-              >
-                Continue with {oauthProvider}
-              </a>
-            ) : null}
+            <Link className="mt-4 inline-block text-sm text-foreground/70 underline" href="/register">
+              Have an invite? Create your account
+            </Link>
           </>
         ) : (
           <p className="text-lg leading-8 text-foreground/75">
@@ -106,7 +108,7 @@ export default function LoginClient({
 
         {mockAllowed ? (
           <Button
-            className={`mt-6 w-full ${supabaseEnabled ? "bg-foreground/10 text-foreground hover:bg-foreground/15" : ""}`}
+            className={`mt-6 w-full ${databaseAuthEnabled ? "bg-foreground/10 text-foreground hover:bg-foreground/15" : ""}`}
             onClick={() => mockMutation.mutate()}
             disabled={mockMutation.isPending}
           >
@@ -114,16 +116,16 @@ export default function LoginClient({
           </Button>
         ) : null}
 
-        {!mockAllowed && !supabaseEnabled ? (
-          <p className="mt-4 text-sm text-danger">Supabase Auth is required in this environment.</p>
+        {!mockAllowed && !databaseAuthEnabled ? (
+          <p className="mt-4 text-sm text-danger">Database auth is required in this environment.</p>
         ) : null}
 
         {loginError ? <p className="mt-3 text-sm text-danger">{loginError}</p> : null}
         {mockMutation.isError ? (
           <p className="mt-3 text-sm text-danger">{(mockMutation.error as Error).message}</p>
         ) : null}
-        {magicLinkMutation.isError ? (
-          <p className="mt-3 text-sm text-danger">{(magicLinkMutation.error as Error).message}</p>
+        {signInMutation.isError ? (
+          <p className="mt-3 text-sm text-danger">{(signInMutation.error as Error).message}</p>
         ) : null}
 
         <Link className="mt-6 inline-block text-sm text-foreground/60 underline" href="/">

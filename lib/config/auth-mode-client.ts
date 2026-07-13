@@ -1,13 +1,7 @@
 /**
- * @deprecated Prefer server-provided auth mode props on /login.
- * Client bundles cannot read UNSTANDARD_* server env; do not expand NEXT_PUBLIC Supabase usage.
+ * Client-side auth hints — never reads secrets or DATABASE_URL.
  */
 
-export function isSupabaseAuthEnabled(): boolean {
-  return Boolean(process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY);
-}
-
-export function isMockAuthAllowed(): boolean {
-  if (process.env.NODE_ENV === "production") return false;
-  return !isSupabaseAuthEnabled();
+export function isDatabaseAuthExpected(): boolean {
+  return process.env.NEXT_PUBLIC_RUNTIME_MODE === "database";
 }

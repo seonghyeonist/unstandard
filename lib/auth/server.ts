@@ -1,9 +1,10 @@
 import "server-only";
 
-import { isSupabaseAuthEnabled } from "@/lib/config/auth-mode";
-import { resolveSessionUser } from "@/lib/auth/mock-session.server";
-import { createClient } from "@/lib/supabase/server";
-import { loadProfileSessionFields } from "@/lib/server/profile/profile-session";
+import { headers } from "next/headers";
+import { isDatabaseAuthConfigured, isMockAuthAllowed } from "@/lib/config/auth-mode";
+import { getAuth } from "@/lib/auth/auth";
+import { clearMockSessionUser, getMockSessionUser } from "@/lib/auth/mock-session.server";
+import { ensureProfileForUser } from "@/lib/db/repositories/profile-bootstrap";
 
 export type AuthenticatedUser = {
   id: string;
@@ -20,24 +21,47 @@ export class AuthError extends Error {
 }
 
 export async function getAuthenticatedUser(): Promise<AuthenticatedUser | null> {
-  if (isSupabaseAuthEnabled()) {
-    const supabase = await createClient();
-    const {
-      data: { user },
-      error,
-    } = await supabase.auth.getUser();
-    if (error || !user) return null;
-
-    const profileFields = await loadProfileSessionFields(user.id);
+  if (isMockAuthAllowed()) {
+    const mockUser = await getMockSessionUser();
+    if (!mockUser) return null;
     return {
-      id: user.id,
-      email: user.email,
-      nickname: profileFields?.nickname,
-      onboarded: profileFields?.onboarded,
+      id: mockUser.id,
+      nickname: mockUser.nickname,
+      onboarded: mockUser.onboarded,
     };
   }
 
-  return resolveSessionUser();
+  if (!isDatabaseAuthConfigured()) {
+    return null;
+  }
+
+  const auth = getAuth();
+  const session = await auth.api.getSession({
+    headers: await headers(),
+  });
+
+  if (!session?.user) {
+    return null;
+  }
+
+  try {
+    const profile = await ensureProfileForUser({
+      id: session.user.id,
+      email: session.user.email,
+    });
+    return {
+      id: session.user.id,
+      email: session.user.email,
+      nickname: profile.nickname,
+      onboarded: profile.onboarded,
+    };
+  } catch {
+    return {
+      id: session.user.id,
+      email: session.user.email,
+      onboarded: false,
+    };
+  }
 }
 
 export async function requireAuthenticatedUser(): Promise<AuthenticatedUser> {
@@ -52,4 +76,16 @@ export function assertOwnsResource(sessionUserId: string, resourceUserId: string
   if (sessionUserId !== resourceUserId) {
     throw new AuthError("Forbidden");
   }
+}
+
+export async function signOutCurrentUser(): Promise<void> {
+  if (isMockAuthAllowed()) {
+    await clearMockSessionUser();
+    return;
+  }
+
+  const auth = getAuth();
+  await auth.api.signOut({
+    headers: await headers(),
+  });
 }
