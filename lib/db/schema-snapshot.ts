@@ -32,6 +32,53 @@ type SqlClient = {
   (strings: TemplateStringsArray, ...values: unknown[]): Promise<Record<string, unknown>[]>;
 };
 
+/** PostgreSQL pg_constraint.conf{up,del}type codes — exhaustive allowlist. */
+export const PG_FK_ACTION_CODES = {
+  a: "NO ACTION",
+  r: "RESTRICT",
+  c: "CASCADE",
+  n: "SET NULL",
+  d: "SET DEFAULT",
+} as const;
+
+export type PgFkActionCode = keyof typeof PG_FK_ACTION_CODES;
+export type PgFkActionLabel = (typeof PG_FK_ACTION_CODES)[PgFkActionCode];
+
+/**
+ * Decode a pg_constraint FK action character.
+ * Unknown codes throw — never invent a silent default.
+ */
+export function decodePgFkActionCode(code: string): PgFkActionLabel {
+  if (!(code in PG_FK_ACTION_CODES)) {
+    throw new Error(`unknown PostgreSQL FK action code: ${JSON.stringify(code)}`);
+  }
+  return PG_FK_ACTION_CODES[code as PgFkActionCode];
+}
+
+/**
+ * Pair local/referenced FK columns by shared ordinality (1-based),
+ * mirroring unnest(conkey, confkey) WITH ORDINALITY.
+ */
+export function pairFkColumnsByOrdinality(
+  localColumns: readonly string[],
+  foreignColumns: readonly string[],
+): Array<{
+  column_name: string;
+  foreign_column_name: string;
+  ordinal_position: number;
+}> {
+  if (localColumns.length !== foreignColumns.length) {
+    throw new Error(
+      `FK column arity mismatch: local=${localColumns.length} foreign=${foreignColumns.length}`,
+    );
+  }
+  return localColumns.map((column_name, index) => ({
+    column_name,
+    foreign_column_name: foreignColumns[index]!,
+    ordinal_position: index + 1,
+  }));
+}
+
 function scalar(value: unknown): SchemaScalar {
   if (value === null || value === undefined) return null;
   if (typeof value === "boolean" || typeof value === "number") return value;
@@ -259,33 +306,50 @@ async function gatherSchemaSnapshot(sql: SqlClient, schema: string): Promise<Can
       AND tc.constraint_type = 'UNIQUE'
   `;
 
-  const foreignKeys = await sql`
+  // PostgreSQL-valid composite FK mapping via pg_catalog.
+  // Do NOT join information_schema.constraint_column_usage.ordinal_position
+  // (that column does not exist).
+  const foreignKeyRows = await sql`
     SELECT
-      tc.table_name,
-      tc.constraint_name,
-      kcu.column_name,
-      kcu.ordinal_position,
-      ccu.table_name AS foreign_table_name,
-      ccu.column_name AS foreign_column_name,
-      rc.update_rule,
-      rc.delete_rule,
-      tc.is_deferrable,
-      tc.initially_deferred
-    FROM information_schema.table_constraints tc
-    JOIN information_schema.key_column_usage kcu
-      ON tc.constraint_schema = kcu.constraint_schema
-      AND tc.constraint_name = kcu.constraint_name
-      AND tc.table_name = kcu.table_name
-    JOIN information_schema.referential_constraints rc
-      ON tc.constraint_schema = rc.constraint_schema
-      AND tc.constraint_name = rc.constraint_name
-    JOIN information_schema.constraint_column_usage ccu
-      ON rc.unique_constraint_schema = ccu.constraint_schema
-      AND rc.unique_constraint_name = ccu.constraint_name
-      AND kcu.ordinal_position = ccu.ordinal_position
-    WHERE tc.table_schema = ${schema}
-      AND tc.constraint_type = 'FOREIGN KEY'
+      rel.relname AS table_name,
+      con.conname AS constraint_name,
+      local_att.attname AS column_name,
+      cols.ordinality AS ordinal_position,
+      frel.relname AS foreign_table_name,
+      foreign_att.attname AS foreign_column_name,
+      con.confupdtype AS update_rule_code,
+      con.confdeltype AS delete_rule_code,
+      CASE WHEN con.condeferrable THEN 'YES' ELSE 'NO' END AS is_deferrable,
+      CASE WHEN con.condeferred THEN 'YES' ELSE 'NO' END AS initially_deferred
+    FROM pg_constraint con
+    JOIN pg_class rel ON rel.oid = con.conrelid
+    JOIN pg_namespace nsp ON nsp.oid = rel.relnamespace
+    JOIN pg_class frel ON frel.oid = con.confrelid
+    JOIN LATERAL unnest(con.conkey, con.confkey)
+      WITH ORDINALITY AS cols(local_attnum, foreign_attnum, ordinality)
+      ON true
+    JOIN pg_attribute local_att
+      ON local_att.attrelid = con.conrelid
+      AND local_att.attnum = cols.local_attnum
+    JOIN pg_attribute foreign_att
+      ON foreign_att.attrelid = con.confrelid
+      AND foreign_att.attnum = cols.foreign_attnum
+    WHERE nsp.nspname = ${schema}
+      AND con.contype = 'f'
   `;
+
+  const foreignKeys = foreignKeyRows.map((row) => ({
+    table_name: row.table_name,
+    constraint_name: row.constraint_name,
+    column_name: row.column_name,
+    ordinal_position: row.ordinal_position,
+    foreign_table_name: row.foreign_table_name,
+    foreign_column_name: row.foreign_column_name,
+    update_rule: decodePgFkActionCode(String(row.update_rule_code)),
+    delete_rule: decodePgFkActionCode(String(row.delete_rule_code)),
+    is_deferrable: row.is_deferrable,
+    initially_deferred: row.initially_deferred,
+  }));
 
   const checkConstraints = await sql`
     SELECT
