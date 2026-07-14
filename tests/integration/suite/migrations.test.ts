@@ -5,6 +5,7 @@ import { runDrizzleMigrations } from "../../../lib/db/run-migrations";
 import { migrationSetChecksum } from "../../../lib/db/migration-guards";
 import { neon } from "@neondatabase/serverless";
 import { onboardingQuestion } from "../../../lib/data/mock-public";
+import { observeIntegrationCase } from "../../../lib/readiness/integration-case-log";
 
 async function runSeed(url: string): Promise<void> {
   const sql = neon(url);
@@ -32,31 +33,41 @@ async function runSeed(url: string): Promise<void> {
 }
 
 describe("integration: migrations and seed", () => {
-  it("applies migrations and second pass is a no-op", async () => {
+  it("migration_second_run_noop", async () => {
     const url = getIntegrationDatabaseUrl();
-    const checksumBefore = migrationSetChecksum();
 
-    await runDrizzleMigrations(url);
-    await runDrizzleMigrations(url);
+    await observeIntegrationCase("migration_second_run_noop", async () => {
+      const checksumBefore = migrationSetChecksum();
 
-    const sql = neon(url);
-    const tables = await sql`
-      SELECT tablename FROM pg_tables
-      WHERE schemaname = 'public' AND tablename = '__drizzle_migrations'
-    `;
-    assert.equal(tables.length, 1);
+      await runDrizzleMigrations(url);
+      await runDrizzleMigrations(url);
 
-    const checksumAfter = migrationSetChecksum();
-    assert.equal(checksumBefore, checksumAfter);
+      const sql = neon(url);
+      const tables = await sql`
+        SELECT tablename FROM pg_tables
+        WHERE schemaname = 'public' AND tablename = '__drizzle_migrations'
+      `;
+      assert.equal(tables.length, 1);
+
+      const checksumAfter = migrationSetChecksum();
+      assert.equal(checksumBefore, checksumAfter);
+    });
   });
 
-  it("seeds idempotently twice", async () => {
+  it("seed_idempotency", async () => {
     const url = getIntegrationDatabaseUrl();
-    await runSeed(url);
-    await runSeed(url);
 
-    const sql = neon(url);
-    const [question] = await sql`SELECT id FROM questions WHERE id = ${onboardingQuestion.id}`;
-    assert.ok(question);
+    await observeIntegrationCase("seed_idempotency", async () => {
+      await runSeed(url);
+      await runSeed(url);
+
+      const sql = neon(url);
+      const questions = await sql`SELECT id FROM questions WHERE id = ${onboardingQuestion.id}`;
+      assert.equal(questions.length, 1);
+      assert.ok(questions[0]);
+
+      const configs = await sql`SELECT key FROM app_config WHERE key = ${"alpha.closed"}`;
+      assert.equal(configs.length, 1);
+    });
   });
 });

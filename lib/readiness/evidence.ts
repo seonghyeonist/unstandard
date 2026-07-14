@@ -1,125 +1,257 @@
 import { createHash } from "node:crypto";
-import { readFileSync } from "node:fs";
 import { execSync } from "node:child_process";
+import {
+  buildCombinedReadinessArtifact,
+  loadJsonFile,
+  parseCombinedReadinessArtifact,
+  parseIntegrationProofArtifact,
+  parseSmokeProofArtifact,
+  type CombinedReadinessArtifact,
+  type IntegrationProofArtifact,
+  type SmokeProofArtifact,
+} from "./proof-artifact";
+import {
+  FUTURE_NOT_APPLICABLE_PRIVATE_PROFILE,
+  PROOF_CLOCK_SKEW_MS,
+  PROOF_MAX_AGE_MS,
+  REQUIRED_HTTP_SMOKE_CASES,
+  REQUIRED_INTEGRATION_CASES,
+} from "./proof-constants";
+import { hostnameFailureMessage, validateEvidenceHostname } from "./hostnames";
 
-export type ReadinessEvidence = {
-  gitSha: string;
-  previewHostname: string;
-  migrationChecksum: string;
-  timestamp: string;
-  integration: {
-    verdict: "PASS" | "FAIL" | "BLOCKED_EXTERNAL";
-    cases: Array<{ name: string; status: "PASS" | "FAIL" }>;
-  };
-  smoke: {
-    verdict: "PASS" | "FAIL" | "INCOMPLETE" | "BLOCKED_EXTERNAL";
-    cases: Array<{ name: string; status: "PASS" | "FAIL" | "SKIPPED" }>;
-  };
+export {
+  REQUIRED_HTTP_SMOKE_CASES,
+  REQUIRED_INTEGRATION_CASES,
+  FUTURE_NOT_APPLICABLE_PRIVATE_PROFILE,
+  PROOF_MAX_AGE_MS,
+  PROOF_CLOCK_SKEW_MS,
 };
 
-export const REQUIRED_HTTP_SMOKE_CASES = [
-  "anonymous_denied",
-  "user_a_login",
-  "user_b_login",
-  "user_a_session",
-  "user_b_session",
-  "user_a_owns_session",
-  "user_b_owns_session",
-  "user_a_cannot_read_user_b_private_profile",
-  "forged_reporter_id_rejected",
-  "self_report_rejected",
-  "duplicate_open_report_is_idempotent",
-  "session_response_redacted",
-  "logout_invalidates_session",
-  "revoked_session_rejected",
-] as const;
+/** Combined readiness evidence (machine-built Artifact Version 1). */
+export type ReadinessEvidence = CombinedReadinessArtifact;
 
-export const REQUIRED_INTEGRATION_CASES = [
-  "report_user_fk",
-  "invite_consumed_by_user_fk",
-  "lowercase_report_target_type",
-  "duplicate_report_idempotency",
-  "no_duplicate_report_row",
-  "block_uniqueness",
-  "unlock_uniqueness",
-  "invite_concurrency",
-  "invite_finalization_success",
-  "invite_finalization_rollback",
-] as const;
-
-export function loadReadinessEvidence(path: string): ReadinessEvidence {
-  const raw = readFileSync(path, "utf8");
-  return JSON.parse(raw) as ReadinessEvidence;
+export function loadReadinessEvidence(path: string): CombinedReadinessArtifact {
+  const raw = loadJsonFile(path);
+  const parsed = parseCombinedReadinessArtifact(raw);
+  if (!parsed.ok) {
+    throw new Error(parsed.failures.join("; "));
+  }
+  return parsed.artifact;
 }
 
-export function validateReadinessEvidence(
-  evidence: ReadinessEvidence,
-  options: {
-    currentGitSha: string;
-    currentMigrationChecksum: string;
-    maxAgeMinutes?: number;
-  },
+function requireExactPassCases(
+  cases: Array<{ name: string; status: string }>,
+  required: readonly string[],
+  label: string,
 ): string[] {
   const failures: string[] = [];
-  const maxAgeMinutes = options.maxAgeMinutes ?? 24 * 60;
-
-  if (evidence.gitSha !== options.currentGitSha) {
-    failures.push("evidence git SHA does not match current HEAD");
+  const counts = new Map<string, number>();
+  for (const item of cases) {
+    counts.set(item.name, (counts.get(item.name) ?? 0) + 1);
   }
 
-  if (evidence.migrationChecksum !== options.currentMigrationChecksum) {
-    failures.push("evidence migration checksum does not match repository");
-  }
-
-  if (!evidence.previewHostname || evidence.previewHostname.includes("localhost")) {
-    failures.push("evidence preview hostname is missing or invalid");
-  }
-
-  const ageMs = Date.now() - Date.parse(evidence.timestamp);
-  if (!Number.isFinite(ageMs) || ageMs < 0 || ageMs > maxAgeMinutes * 60 * 1000) {
-    failures.push("evidence timestamp is stale or invalid");
-  }
-
-  if (evidence.integration.verdict !== "PASS") {
-    failures.push("integration evidence is not PASS");
-  }
-
-  if (evidence.smoke.verdict !== "PASS") {
-    failures.push("smoke evidence is not PASS");
-  }
-
-  const smokeNames = new Set(evidence.smoke.cases.map((item) => item.name));
-  for (const required of REQUIRED_HTTP_SMOKE_CASES) {
-    if (!smokeNames.has(required)) {
-      failures.push(`smoke evidence missing required HTTP case: ${required}`);
+  for (const name of required) {
+    const count = counts.get(name) ?? 0;
+    if (count === 0) {
+      failures.push(`${label} missing required case: ${name}`);
+      continue;
+    }
+    if (count !== 1) {
+      failures.push(`${label} duplicate required case: ${name}`);
+    }
+    const match = cases.find((item) => item.name === name);
+    if (!match || match.status !== "PASS") {
+      failures.push(`${label} required case is not PASS: ${name}`);
     }
   }
 
-  const integrationNames = new Set(evidence.integration.cases.map((item) => item.name));
-  for (const required of REQUIRED_INTEGRATION_CASES) {
-    if (!integrationNames.has(required)) {
-      failures.push(`integration evidence missing required DB case: ${required}`);
+  for (const [name, count] of counts) {
+    if (count > 1) {
+      failures.push(`${label} duplicate case name: ${name}`);
     }
   }
 
   return failures;
 }
 
-export function sanitizeEvidenceForOutput(evidence: ReadinessEvidence): Record<string, unknown> {
-  const hash = createHash("sha256").update(JSON.stringify(evidence)).digest("hex").slice(0, 16);
+export function validateReadinessEvidence(
+  evidence: CombinedReadinessArtifact,
+  options: {
+    currentGitSha: string;
+    currentMigrationChecksum: string;
+    expectedPreviewHostname?: string;
+    maxAgeMs?: number;
+    clockSkewMs?: number;
+    nowMs?: number;
+  },
+): string[] {
+  const failures: string[] = [];
+  const parsed = parseCombinedReadinessArtifact(evidence, {
+    nowMs: options.nowMs,
+    maxAgeMs: options.maxAgeMs ?? PROOF_MAX_AGE_MS,
+    clockSkewMs: options.clockSkewMs ?? PROOF_CLOCK_SKEW_MS,
+    expectedPreviewHostname: options.expectedPreviewHostname,
+  });
+  if (!parsed.ok) {
+    failures.push(...parsed.failures);
+    return failures;
+  }
+
+  if (evidence.gitSha !== options.currentGitSha) {
+    failures.push("evidence git SHA does not match current HEAD");
+  }
+
+  if (!/^[a-f0-9]{40}$/.test(options.currentGitSha)) {
+    failures.push("current git SHA is not a full 40-character lowercase hex SHA");
+  }
+
+  if (evidence.migrationChecksum !== options.currentMigrationChecksum) {
+    failures.push("evidence migration checksum does not match repository");
+  }
+
+  const hostFailure = validateEvidenceHostname(evidence.previewHostname, {
+    expectedPreviewHostname: options.expectedPreviewHostname,
+  });
+  if (hostFailure) {
+    failures.push(hostnameFailureMessage(hostFailure));
+  }
+
+  if (evidence.verdict !== "PASS") {
+    failures.push("readiness verdict is not PASS");
+  }
+
+  failures.push(
+    ...requireExactPassCases(evidence.integrationCases, REQUIRED_INTEGRATION_CASES, "integration"),
+  );
+  failures.push(...requireExactPassCases(evidence.smokeCases, REQUIRED_HTTP_SMOKE_CASES, "smoke"));
+
+  return failures;
+}
+
+/**
+ * contentDigest is not a signature / not tamper-proof / not attestation.
+ * sanitizeEvidenceForOutput exposes provenance summaries only.
+ */
+export function sanitizeEvidenceForOutput(evidence: CombinedReadinessArtifact): Record<string, unknown> {
   return {
-    evidenceHash: hash,
-    gitSha: evidence.gitSha.slice(0, 12),
+    contentDigest: evidence.contentDigest,
+    contentDigestNote:
+      "contentDigest identifies serialized content only; it is not a signature, not tamper-proof, and not an independent attestation",
+    gitSha: evidence.gitSha,
     previewHostname: evidence.previewHostname,
     migrationChecksum: evidence.migrationChecksum,
     timestamp: evidence.timestamp,
-    integrationVerdict: evidence.integration.verdict,
-    smokeVerdict: evidence.smoke.verdict,
-    requiredHttpSmokeCases: evidence.smoke.cases.map((item) => item.name),
-    requiredIntegrationCases: evidence.integration.cases.map((item) => item.name),
+    sourceTimestamps: evidence.sourceTimestamps,
+    integrationCaseCount: evidence.integrationCases.length,
+    smokeCaseCount: evidence.smokeCases.length,
+    requiredHttpSmokeCases: evidence.smokeCases.map((item) => item.name),
+    requiredIntegrationCases: evidence.integrationCases.map((item) => item.name),
   };
 }
 
 export function getCurrentGitSha(): string {
   return execSync("git rev-parse HEAD", { encoding: "utf8" }).trim();
+}
+
+export function combineSourceArtifacts(input: {
+  integration: IntegrationProofArtifact;
+  smoke: SmokeProofArtifact;
+  expectedPreviewHostname: string;
+  nowMs?: number;
+  maxAgeMs?: number;
+  clockSkewMs?: number;
+}): { ok: true; artifact: CombinedReadinessArtifact } | { ok: false; failures: string[] } {
+  const failures: string[] = [];
+  const nowMs = input.nowMs ?? Date.now();
+  const maxAgeMs = input.maxAgeMs ?? PROOF_MAX_AGE_MS;
+  const clockSkewMs = input.clockSkewMs ?? PROOF_CLOCK_SKEW_MS;
+
+  const integrationParsed = parseIntegrationProofArtifact(input.integration, {
+    nowMs,
+    maxAgeMs,
+    clockSkewMs,
+  });
+  if (!integrationParsed.ok) {
+    failures.push(...integrationParsed.failures.map((f) => `integration: ${f}`));
+  }
+
+  const smokeParsed = parseSmokeProofArtifact(input.smoke, {
+    nowMs,
+    maxAgeMs,
+    clockSkewMs,
+    expectedPreviewHostname: input.expectedPreviewHostname,
+  });
+  if (!smokeParsed.ok) {
+    failures.push(...smokeParsed.failures.map((f) => `smoke: ${f}`));
+  }
+
+  if (failures.length > 0) {
+    return { ok: false, failures };
+  }
+
+  const integration = integrationParsed.ok ? integrationParsed.artifact : null;
+  const smoke = smokeParsed.ok ? smokeParsed.artifact : null;
+  if (!integration || !smoke) {
+    return { ok: false, failures: ["unable to parse source artifacts"] };
+  }
+
+  if (integration.verdict !== "PASS") {
+    failures.push("integration source verdict is not PASS");
+  }
+  if (smoke.verdict !== "PASS") {
+    failures.push("smoke source verdict is not PASS");
+  }
+
+  if (integration.gitSha !== smoke.gitSha) {
+    failures.push("integration/smoke git SHA mismatch");
+  }
+  if (integration.migrationChecksum !== smoke.migrationChecksum) {
+    failures.push("integration/smoke migration checksum mismatch");
+  }
+
+  const expected = input.expectedPreviewHostname.trim().toLowerCase();
+  if (smoke.previewHostname !== expected) {
+    failures.push("smoke previewHostname does not equal UNSTANDARD_EXPECTED_PREVIEW_HOSTNAME");
+  }
+
+  failures.push(
+    ...requireExactPassCases(integration.cases, REQUIRED_INTEGRATION_CASES, "integration source"),
+  );
+  failures.push(...requireExactPassCases(smoke.cases, REQUIRED_HTTP_SMOKE_CASES, "smoke source"));
+
+  for (const future of smoke.futureNotApplicable ?? []) {
+    if ((REQUIRED_HTTP_SMOKE_CASES as readonly string[]).includes(future.name)) {
+      failures.push(`required smoke case listed as futureNotApplicable: ${future.name}`);
+    }
+  }
+
+  if (failures.length > 0) {
+    return { ok: false, failures };
+  }
+
+  return buildCombinedReadinessArtifact({ integration, smoke });
+}
+
+/** @deprecated Prefer contentDigest naming; kept only to avoid silent accidental imports. */
+export function legacyEvidenceHash(value: unknown): string {
+  return createHash("sha256").update(JSON.stringify(value)).digest("hex").slice(0, 16);
+}
+
+export function loadSourceArtifactFromPath(
+  path: string,
+  kind: "integration" | "smoke",
+): IntegrationProofArtifact | SmokeProofArtifact {
+  const raw = loadJsonFile(path);
+  if (kind === "integration") {
+    const parsed = parseIntegrationProofArtifact(raw);
+    if (!parsed.ok) {
+      throw new Error(parsed.failures.join("; "));
+    }
+    return parsed.artifact;
+  }
+  const parsed = parseSmokeProofArtifact(raw);
+  if (!parsed.ok) {
+    throw new Error(parsed.failures.join("; "));
+  }
+  return parsed.artifact;
 }

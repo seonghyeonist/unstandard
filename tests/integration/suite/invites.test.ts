@@ -22,6 +22,7 @@ import {
   normalizeEmail,
 } from "../../../lib/auth/invite-crypto";
 import { createRegistrationTicket, verifyRegistrationTicket } from "../../../lib/auth/invite-ticket";
+import { observeIntegrationCase } from "../../../lib/readiness/integration-case-log";
 
 const PEPPER = "integration-test-pepper";
 const AUTH_SECRET = "integration-test-auth-secret-32chars";
@@ -38,7 +39,7 @@ async function insertAuthUser(db: ReturnType<typeof createIntegrationDb>, suffix
 }
 
 describe("integration: invite reservation lifecycle", () => {
-  it("allows exactly one concurrent reservation", async () => {
+  it("invite_concurrency", async () => {
     process.env.ALPHA_INVITE_PEPPER = PEPPER;
     const url = getIntegrationDatabaseUrl();
     await runDrizzleMigrations(url);
@@ -55,16 +56,18 @@ describe("integration: invite reservation lifecycle", () => {
       expiresAt: new Date(Date.now() + 60 * 60 * 1000),
     });
 
-    const [first, second] = await Promise.all([
-      reserveInviteForEmail(rawCode, email),
-      reserveInviteForEmail(rawCode, email),
-    ]);
+    await observeIntegrationCase("invite_concurrency", async () => {
+      const [first, second] = await Promise.all([
+        reserveInviteForEmail(rawCode, email),
+        reserveInviteForEmail(rawCode, email),
+      ]);
 
-    const successes = [first, second].filter((result) => result.ok);
-    assert.equal(successes.length, 1);
+      const successes = [first, second].filter((result) => result.ok);
+      assert.equal(successes.length, 1);
+    });
   });
 
-  it("consumes invite with valid users FK and rejects replay", async () => {
+  it("invite_consumed_by_user_fk", async () => {
     process.env.ALPHA_INVITE_PEPPER = PEPPER;
     process.env.BETTER_AUTH_SECRET = AUTH_SECRET;
     const url = getIntegrationDatabaseUrl();
@@ -96,29 +99,32 @@ describe("integration: invite reservation lifecycle", () => {
     assert.equal(await verifyInviteReservation(parsed!), true);
 
     const userId = await insertAuthUser(db, suffix);
-    const firstConsume = await consumeReservedInvite(
-      reserved.inviteId,
-      userId,
-      reserved.reservationCapability,
-      db,
-    );
-    assert.equal(firstConsume.ok, true);
 
-    const [consumedRow] = await db
-      .select({ consumedByUserId: alphaInvites.consumedByUserId, status: alphaInvites.status })
-      .from(alphaInvites)
-      .where(eq(alphaInvites.id, reserved.inviteId))
-      .limit(1);
-    assert.equal(consumedRow?.status, "consumed");
-    assert.equal(consumedRow?.consumedByUserId, userId);
+    await observeIntegrationCase("invite_consumed_by_user_fk", async () => {
+      const firstConsume = await consumeReservedInvite(
+        reserved.inviteId,
+        userId,
+        reserved.reservationCapability,
+        db,
+      );
+      assert.equal(firstConsume.ok, true);
 
-    const replay = await consumeReservedInvite(
-      reserved.inviteId,
-      `other-${userId}`,
-      reserved.reservationCapability,
-      db,
-    );
-    assert.equal(replay.ok, false);
+      const [consumedRow] = await db
+        .select({ consumedByUserId: alphaInvites.consumedByUserId, status: alphaInvites.status })
+        .from(alphaInvites)
+        .where(eq(alphaInvites.id, reserved.inviteId))
+        .limit(1);
+      assert.equal(consumedRow?.status, "consumed");
+      assert.equal(consumedRow?.consumedByUserId, userId);
+
+      const replay = await consumeReservedInvite(
+        reserved.inviteId,
+        `other-${userId}`,
+        reserved.reservationCapability,
+        db,
+      );
+      assert.equal(replay.ok, false);
+    });
   });
 
   it("releases stale reservations", async () => {
@@ -153,7 +159,7 @@ describe("integration: invite reservation lifecycle", () => {
 });
 
 describe("integration: invite finalization transaction", () => {
-  it("finalizes invite, user, and profile atomically", async () => {
+  it("invite_finalization_success", async () => {
     process.env.ALPHA_INVITE_PEPPER = PEPPER;
     delete process.env.UNSTANDARD_TEST_INJECT_FINALIZE_FAILURE;
 
@@ -176,31 +182,34 @@ describe("integration: invite finalization transaction", () => {
     if (!reserved.ok) return;
 
     const userId = await insertAuthUser(db, suffix);
-    await finalizeInviteRegistration({
-      inviteId: reserved.inviteId,
-      userId,
-      reservationCapability: reserved.reservationCapability,
-      email,
+
+    await observeIntegrationCase("invite_finalization_success", async () => {
+      await finalizeInviteRegistration({
+        inviteId: reserved.inviteId,
+        userId,
+        reservationCapability: reserved.reservationCapability,
+        email,
+      });
+
+      assert.equal(await isUserInviteFinalized(userId, db), true);
+      const [profile] = await db
+        .select({ id: profiles.id })
+        .from(profiles)
+        .where(eq(profiles.userId, userId))
+        .limit(1);
+      assert.ok(profile?.id);
+
+      const [invite] = await db
+        .select({ status: alphaInvites.status, consumedByUserId: alphaInvites.consumedByUserId })
+        .from(alphaInvites)
+        .where(eq(alphaInvites.id, reserved.inviteId))
+        .limit(1);
+      assert.equal(invite?.status, "consumed");
+      assert.equal(invite?.consumedByUserId, userId);
     });
-
-    assert.equal(await isUserInviteFinalized(userId, db), true);
-    const [profile] = await db
-      .select({ id: profiles.id })
-      .from(profiles)
-      .where(eq(profiles.userId, userId))
-      .limit(1);
-    assert.ok(profile?.id);
-
-    const [invite] = await db
-      .select({ status: alphaInvites.status, consumedByUserId: alphaInvites.consumedByUserId })
-      .from(alphaInvites)
-      .where(eq(alphaInvites.id, reserved.inviteId))
-      .limit(1);
-    assert.equal(invite?.status, "consumed");
-    assert.equal(invite?.consumedByUserId, userId);
   });
 
-  it("compensates user when consume is injected to fail", async () => {
+  it("invite_finalization_rollback (consume inject)", async () => {
     process.env.ALPHA_INVITE_PEPPER = PEPPER;
     process.env.UNSTANDARD_TEST_INJECT_FINALIZE_FAILURE = "consume";
 
@@ -222,17 +231,20 @@ describe("integration: invite finalization transaction", () => {
     if (!reserved.ok) return;
 
     const userId = await insertAuthUser(db, suffix);
-    await assert.rejects(() =>
-      finalizeInviteRegistration({
-        inviteId: reserved.inviteId,
-        userId,
-        reservationCapability: reserved.reservationCapability,
-        email,
-      }),
-    );
 
-    const [user] = await db.select({ id: users.id }).from(users).where(eq(users.id, userId)).limit(1);
-    assert.equal(user, undefined);
+    await observeIntegrationCase("invite_finalization_rollback", async () => {
+      await assert.rejects(() =>
+        finalizeInviteRegistration({
+          inviteId: reserved.inviteId,
+          userId,
+          reservationCapability: reserved.reservationCapability,
+          email,
+        }),
+      );
+
+      const [user] = await db.select({ id: users.id }).from(users).where(eq(users.id, userId)).limit(1);
+      assert.equal(user, undefined);
+    });
   });
 
   it("rolls back consumed invite when finalize update is injected to fail", async () => {

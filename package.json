@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "engines": {
-    "node": ">=24"
+    "node": "24.x"
   },
   "scripts": {
     "dev": "next dev",
@@ -23,6 +23,7 @@
     "alpha:invite:revoke": "tsx scripts/alpha/invite.ts revoke",
     "alpha:invite:list": "tsx scripts/alpha/invite.ts list",
     "smoke:authorization": "tsx scripts/smoke/authorization-adversarial.ts",
+    "readiness:evidence:build": "tsx scripts/readiness/build-evidence.ts",
     "readiness:alpha": "tsx scripts/readiness/alpha.ts",
     "guard:no-legacy-backend": "tsx scripts/guard/no-legacy-backend.ts",
     "guard:boundaries": "tsx scripts/guard/boundaries.ts"

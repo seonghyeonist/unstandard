@@ -9,6 +9,7 @@ import { createDrizzleReportsRepository } from "../../../lib/db/repositories/rep
 import { reports } from "../../../lib/db/schema/reports";
 import { profiles } from "../../../lib/db/schema/profiles";
 import { users } from "../../../lib/db/schema/auth";
+import { observeIntegrationCase } from "../../../lib/readiness/integration-case-log";
 
 async function insertUserWithProfile(db: ReturnType<typeof createIntegrationDb>, suffix: string) {
   const userId = `user-${suffix}`;
@@ -32,7 +33,7 @@ async function insertUserWithProfile(db: ReturnType<typeof createIntegrationDb>,
 }
 
 describe("integration: persistence invariants", () => {
-  it("uses Better Auth user id as reporter_user_id and idempotent open reports", async () => {
+  it("report_user_fk + duplicate_report_idempotency + no_duplicate_report_row", async () => {
     const url = getIntegrationDatabaseUrl();
     await runDrizzleMigrations(url);
     const db = createIntegrationDb(url);
@@ -54,86 +55,107 @@ describe("integration: persistence invariants", () => {
       reason: "spam again",
     });
 
-    assert.equal(firstReport.ok, true);
-    assert.equal(duplicateReport.ok, true);
-    if (firstReport.ok && duplicateReport.ok) {
-      assert.equal(firstReport.inserted, true);
-      assert.equal(duplicateReport.inserted, false);
-      assert.equal(duplicateReport.reportId, firstReport.reportId);
-    }
+    await observeIntegrationCase("report_user_fk", async () => {
+      assert.equal(firstReport.ok, true);
+      if (firstReport.ok) {
+        const rows = await db
+          .select({
+            reporterUserId: reports.reporterUserId,
+          })
+          .from(reports)
+          .where(sql`${reports.id} = ${firstReport.reportId}`);
+        assert.equal(rows[0]?.reporterUserId, reporter.userId);
+        assert.notEqual(rows[0]?.reporterUserId, reporter.profileId);
+      }
+    });
 
-    const rows = await db
-      .select({
-        id: reports.id,
-        reporterUserId: reports.reporterUserId,
-        targetType: reports.targetType,
-      })
-      .from(reports)
-      .where(
-        sql`${reports.reporterUserId} = ${reporter.userId} AND ${reports.targetType} = ${"profile"} AND ${reports.targetId} = ${target.profileId}`,
-      );
+    await observeIntegrationCase("duplicate_report_idempotency", async () => {
+      assert.equal(firstReport.ok, true);
+      assert.equal(duplicateReport.ok, true);
+      if (firstReport.ok && duplicateReport.ok) {
+        assert.equal(firstReport.inserted, true);
+        assert.equal(duplicateReport.inserted, false);
+        assert.equal(duplicateReport.reportId, firstReport.reportId);
+      }
+    });
 
-    assert.equal(rows.length, 1);
-    assert.equal(rows[0]?.reporterUserId, reporter.userId);
-    assert.notEqual(rows[0]?.reporterUserId, reporter.profileId);
-    assert.equal(rows[0]?.targetType, "profile");
+    await observeIntegrationCase("no_duplicate_report_row", async () => {
+      const rows = await db
+        .select({
+          id: reports.id,
+          reporterUserId: reports.reporterUserId,
+          targetType: reports.targetType,
+        })
+        .from(reports)
+        .where(
+          sql`${reports.reporterUserId} = ${reporter.userId} AND ${reports.targetType} = ${"profile"} AND ${reports.targetId} = ${target.profileId}`,
+        );
+      assert.equal(rows.length, 1);
+      assert.equal(rows[0]?.targetType, "profile");
+    });
   });
 
-  it("rejects uppercase report target types at the database layer", async () => {
+  it("lowercase_report_target_type", async () => {
     const url = getIntegrationDatabaseUrl();
     const db = createIntegrationDb(url);
     const reporter = await insertUserWithProfile(db, `uppercase-${Date.now()}`);
     const target = await insertUserWithProfile(db, `uppercase-target-${Date.now()}`);
 
-    await assert.rejects(
-      () =>
-        db.insert(reports).values({
-          reporterUserId: reporter.userId,
-          targetType: "PROFILE",
-          targetId: target.profileId,
-          reason: "invalid type",
-          status: "OPEN",
-        }),
-      (error: unknown) => {
-        const pgCode = (error as { code?: string })?.code;
-        return pgCode === "23514";
-      },
-    );
+    await observeIntegrationCase("lowercase_report_target_type", async () => {
+      await assert.rejects(
+        () =>
+          db.insert(reports).values({
+            reporterUserId: reporter.userId,
+            targetType: "PROFILE",
+            targetId: target.profileId,
+            reason: "invalid type",
+            status: "OPEN",
+          }),
+        (error: unknown) => {
+          const pgCode = (error as { code?: string })?.code;
+          return pgCode === "23514";
+        },
+      );
+    });
   });
 
-  it("enforces block and unlock uniqueness", async () => {
+  it("block_uniqueness + unlock_uniqueness", async () => {
     const url = getIntegrationDatabaseUrl();
     const db = createIntegrationDb(url);
 
     const reporter = await insertUserWithProfile(db, `block-${Date.now()}`);
     const target = await insertUserWithProfile(db, `block-target-${Date.now()}`);
 
-    const firstBlock = await createBlock({
-      blockerUserId: reporter.userId,
-      blockedUserId: target.userId,
+    await observeIntegrationCase("block_uniqueness", async () => {
+      const firstBlock = await createBlock({
+        blockerUserId: reporter.userId,
+        blockedUserId: target.userId,
+      });
+      const duplicateBlock = await createBlock({
+        blockerUserId: reporter.userId,
+        blockedUserId: target.userId,
+      });
+      assert.equal(firstBlock.ok, true);
+      assert.equal(duplicateBlock.ok, true);
+      if (firstBlock.ok && duplicateBlock.ok) {
+        assert.equal(duplicateBlock.inserted, false);
+      }
     });
-    const duplicateBlock = await createBlock({
-      blockerUserId: reporter.userId,
-      blockedUserId: target.userId,
-    });
-    assert.equal(firstBlock.ok, true);
-    assert.equal(duplicateBlock.ok, true);
-    if (firstBlock.ok && duplicateBlock.ok) {
-      assert.equal(duplicateBlock.inserted, false);
-    }
 
-    const firstUnlock = await createUnlock({
-      viewerUserId: reporter.userId,
-      profileId: target.profileId,
+    await observeIntegrationCase("unlock_uniqueness", async () => {
+      const firstUnlock = await createUnlock({
+        viewerUserId: reporter.userId,
+        profileId: target.profileId,
+      });
+      const duplicateUnlock = await createUnlock({
+        viewerUserId: reporter.userId,
+        profileId: target.profileId,
+      });
+      assert.equal(firstUnlock.ok, true);
+      assert.equal(duplicateUnlock.ok, true);
+      if (firstUnlock.ok && duplicateUnlock.ok) {
+        assert.equal(duplicateUnlock.inserted, false);
+      }
     });
-    const duplicateUnlock = await createUnlock({
-      viewerUserId: reporter.userId,
-      profileId: target.profileId,
-    });
-    assert.equal(firstUnlock.ok, true);
-    assert.equal(duplicateUnlock.ok, true);
-    if (firstUnlock.ok && duplicateUnlock.ok) {
-      assert.equal(duplicateUnlock.inserted, false);
-    }
   });
 });

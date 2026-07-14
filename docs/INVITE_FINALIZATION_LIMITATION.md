@@ -20,3 +20,12 @@ Better Auth user creation and application invite consumption cannot share a sing
 - A crash between user insert and finalize attempt still requires compensation on the next failed finalize/session read.
 - Replay of a consumed ticket is blocked by conditional consume and finalized-user checks.
 - Migrations still use the Neon HTTP driver (no migrator transactions); runtime finalization uses Pool/WebSocket transactions.
+
+## Proof harness note (P0.2)
+
+Invite finalization success/rollback are proven by **real PostgreSQL integration** cases
+(`invite_finalization_success`, `invite_finalization_rollback`) via `npm run test:integration`,
+not by deployed HTTP smoke and not by hand-authored PASS JSON.
+
+Artifacts and readiness validation use Artifact Version 1 (`lib/readiness/proof-artifact.ts`).
+Node runtime pin: **24.x**.

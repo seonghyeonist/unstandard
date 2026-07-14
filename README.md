@@ -2,6 +2,8 @@
 
 Next.js frontend with a **server-only** backend on Neon PostgreSQL, Drizzle ORM, and Better Auth.
 
+**Node.js: 24.x** (`engines` + CI).
+
 ## Local development (mock mode)
 
 ```bash
@@ -42,6 +44,21 @@ npm run guard:no-legacy-backend
 npm run guard:boundaries
 ```
 
+## Proof pipeline (external)
+
+| Command | Role | Without credentials |
+|---------|------|---------------------|
+| `npm run test` | Unit / static proof | PASS locally |
+| `npm run test:integration` | Real PostgreSQL integration artifact | `BLOCKED_EXTERNAL` (exit 2) |
+| `npm run smoke:authorization` | Deployed Preview HTTP artifact | `BLOCKED_EXTERNAL` (exit 2) |
+| `npm run readiness:evidence:build` | Combine machine artifacts | `BLOCKED_EXTERNAL` (exit 2) |
+| `npm run readiness:alpha` | Validate combined readiness | `BLOCKED_EXTERNAL` (exit 2) |
+
+See `docs/AUTHORIZATION_ADVERSARIAL_SMOKE.md` and `docs/ALPHA_READINESS_CHECKLIST.md`.
+
+Do not treat mock private-profile HTTP 404 as cross-user authz proof.
+Do not treat a cleared CookieJar as server-side session revocation.
+
 ## Architecture
 
 | Layer | Stack |
@@ -51,7 +68,8 @@ npm run guard:boundaries
 | Auth | Self-hosted Better Auth |
 | Authorization | Server session validation + domain checks + SQL constraints |
 | Registration | Invite-only closed alpha |
+| Node | 24.x |
 
 See `docs/NEON_BOOTSTRAP_RUNBOOK.md`, `docs/BETTER_AUTH_SECURITY_MODEL.md`, and `docs/AUTHORIZATION_ADVERSARIAL_SMOKE.md`.
 
-**Alpha verdict: BLOCKED** until Neon staging credentials, migration apply, integration tests, and deployed adversarial smoke are evidenced.
+**Alpha verdict: BLOCKED_EXTERNAL** until Neon test DB, Preview A/B smoke, combined readiness evidence, and Vercel Preview SHA mapping are evidenced for project `unstandard-m9qj`.

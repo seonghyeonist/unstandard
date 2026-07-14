@@ -4,6 +4,13 @@ import { getPrivateProfileContent } from "@/lib/data/mock-private.server";
 import { publicProfiles } from "@/lib/data/mock-public";
 import { hasUnlockCookie } from "@/lib/server/unlock-cookies";
 
+/**
+ * Mock-backed private profile content.
+ * - Existence is checked against mock `publicProfiles` IDs, not Neon profile ownership.
+ * - Unlock is an unlock cookie check, not a DB unlock row.
+ * - HTTP 404 for unknown mock IDs is not Neon cross-user authorization denial.
+ * DB-backed A/B private-profile proof remains future/not-applicable until a Neon route exists.
+ */
 export async function GET(_request: Request, context: { params: Promise<{ id: string }> }) {
   const user = await getAuthenticatedUser();
   if (!user) {

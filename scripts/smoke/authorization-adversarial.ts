@@ -1,7 +1,30 @@
 /**
  * Deployed Preview adversarial authorization smoke (HTTP boundary).
  * Required HTTP Alpha surface only — DB-only proofs belong in test:integration.
+ *
+ * Artifact gitSha is the local runner checkout provenance only.
+ * It does not cryptographically attest the remote Vercel deployment SHA;
+ * operators must verify deployment metadata separately.
  */
+
+import { migrationSetChecksum } from "../../lib/db/migration-guards";
+import { getCurrentGitSha } from "../../lib/readiness/evidence";
+import {
+  FUTURE_NOT_APPLICABLE_PRIVATE_PROFILE,
+  REQUIRED_HTTP_SMOKE_CASES,
+} from "../../lib/readiness/proof-constants";
+import {
+  buildSmokeArtifact,
+  writeProofArtifactAtomically,
+  type ProofCase,
+} from "../../lib/readiness/proof-artifact";
+import { extractHostname, validateEvidenceHostname, hostnameFailureMessage } from "../../lib/readiness/hostnames";
+import { CookieJar, collectSetCookieHeaders } from "../../lib/smoke/cookie-jar";
+import {
+  proveClearedCookieDenied,
+  proveLogoutInvalidatesSession,
+  proveRevokedSessionRejected,
+} from "../../lib/smoke/session-revocation";
 
 const baseUrl = process.env.SMOKE_BASE_URL?.trim();
 const userAEmail = process.env.SMOKE_USER_A_EMAIL?.trim();
@@ -11,11 +34,6 @@ const userBPassword = process.env.SMOKE_USER_B_PASSWORD;
 const previewBypass = process.env.SMOKE_VERCEL_PROTECTION_BYPASS?.trim();
 const profileAId = process.env.SMOKE_USER_A_PROFILE_ID?.trim();
 const profileBId = process.env.SMOKE_USER_B_PROFILE_ID?.trim();
-
-type SmokeCase = {
-  name: string;
-  pass: boolean;
-};
 
 type FutureCase = {
   name: string;
@@ -33,27 +51,13 @@ function redact(value: string): string {
     .replace(/Bearer\s+[A-Za-z0-9._-]+/gi, "[authorization]");
 }
 
-class CookieJar {
-  private readonly cookies = new Map<string, string>();
-
-  ingest(setCookie: string | null): void {
-    if (!setCookie) return;
-    for (const part of setCookie.split(/,(?=\s*[^;]+=)/)) {
-      const [pair] = part.split(";");
-      const [name, ...rest] = pair.split("=");
-      if (!name || rest.length === 0) continue;
-      this.cookies.set(name.trim(), rest.join("=").trim());
-    }
+function blocked(message: string): never {
+  console.error(`BLOCKED_EXTERNAL: ${message}`);
+  const out = process.env.UNSTANDARD_SMOKE_EVIDENCE_OUT?.trim();
+  if (out) {
+    console.error("BLOCKED_EXTERNAL: no smoke PASS artifact written");
   }
-
-  header(): string | undefined {
-    if (this.cookies.size === 0) return undefined;
-    return [...this.cookies.entries()].map(([name, value]) => `${name}=${value}`).join("; ");
-  }
-
-  clear(): void {
-    this.cookies.clear();
-  }
+  process.exit(2);
 }
 
 async function fetchJson(
@@ -75,7 +79,7 @@ async function fetchJson(
     headers,
   });
 
-  jar?.ingest(response.headers.get("set-cookie"));
+  jar?.ingestAll(collectSetCookieHeaders(response.headers));
 
   const text = await response.text();
   let body: unknown = null;
@@ -116,9 +120,19 @@ function sessionHasSensitiveFields(body: unknown): boolean {
   );
 }
 
+function pushCase(cases: ProofCase[], name: string, pass: boolean): void {
+  cases.push({ name, status: pass ? "PASS" : "FAIL" });
+}
+
 async function main(): Promise<void> {
-  const requiredCases: SmokeCase[] = [];
+  const cases: ProofCase[] = [];
   const futureNotApplicable: FutureCase[] = [
+    { ...FUTURE_NOT_APPLICABLE_PRIVATE_PROFILE },
+    {
+      name: "private_mock_profile_requires_unlock_cookie",
+      reason:
+        "Informational mock-contract only: /api/profile/[id]/private uses mock publicProfiles IDs and unlock cookies; it does not establish Neon A/B ownership isolation. HTTP 404 is not authorization denial.",
+    },
     {
       name: "duplicate_block_rejected",
       reason: "No HTTP block endpoint in alpha rebuild",
@@ -138,18 +152,25 @@ async function main(): Promise<void> {
   ];
 
   if (!baseUrl) {
-    console.error("BLOCKED_EXTERNAL: SMOKE_BASE_URL missing");
-    process.exit(2);
+    blocked("SMOKE_BASE_URL missing");
   }
 
   if (!userAEmail || !userAPassword || !userBEmail || !userBPassword) {
-    console.error("BLOCKED_EXTERNAL: SMOKE_USER_A_* and SMOKE_USER_B_* credentials are required");
-    process.exit(2);
+    blocked("SMOKE_USER_A_* and SMOKE_USER_B_* credentials are required");
   }
 
   if (!profileAId || !profileBId) {
-    console.error("BLOCKED_EXTERNAL: SMOKE_USER_A_PROFILE_ID and SMOKE_USER_B_PROFILE_ID are required");
-    process.exit(2);
+    blocked("SMOKE_USER_A_PROFILE_ID and SMOKE_USER_B_PROFILE_ID are required");
+  }
+
+  const previewHostname = extractHostname(baseUrl);
+  if (!previewHostname) {
+    blocked("SMOKE_BASE_URL must yield a Preview hostname");
+  }
+
+  const hostFailure = validateEvidenceHostname(previewHostname);
+  if (hostFailure) {
+    blocked(hostnameFailureMessage(hostFailure));
   }
 
   const reachability = await fetch(`${baseUrl}/api/auth/session`, {
@@ -157,48 +178,53 @@ async function main(): Promise<void> {
   }).catch(() => null);
 
   if (!reachability) {
-    console.error("BLOCKED_EXTERNAL: Preview base URL is not reachable");
-    process.exit(2);
+    blocked("Preview base URL is not reachable");
   }
 
   if (reachability.status === 403 && !previewBypass) {
-    console.error("BLOCKED_EXTERNAL: Preview protection requires SMOKE_VERCEL_PROTECTION_BYPASS");
-    process.exit(2);
+    blocked("Preview protection requires SMOKE_VERCEL_PROTECTION_BYPASS");
   }
 
   const anonSession = await fetchJson("/api/auth/session");
-  requiredCases.push({ name: "anonymous_denied", pass: anonSession.status === 401 });
+  pushCase(cases, "anonymous_denied", anonSession.status === 401);
 
   const jarA = new CookieJar();
   const loginA = await signIn(userAEmail, userAPassword, jarA);
-  requiredCases.push({ name: "user_a_login", pass: loginA.ok });
+  pushCase(cases, "user_a_login", loginA.ok);
+  if (!loginA.ok) {
+    console.error(redact("FAIL: user A login failed — aborting later session proofs"));
+    process.exit(1);
+  }
+
   const sessionA = await fetchJson("/api/auth/session", {}, jarA);
-  requiredCases.push({ name: "user_a_session", pass: sessionA.status === 200 });
+  pushCase(cases, "user_a_session", sessionA.status === 200);
 
   const jarB = new CookieJar();
   const loginB = await signIn(userBEmail, userBPassword, jarB);
-  requiredCases.push({ name: "user_b_login", pass: loginB.ok });
+  pushCase(cases, "user_b_login", loginB.ok);
+  if (!loginB.ok) {
+    console.error(redact("FAIL: user B login failed — aborting later session proofs"));
+    process.exit(1);
+  }
+
   const sessionB = await fetchJson("/api/auth/session", {}, jarB);
-  requiredCases.push({ name: "user_b_session", pass: sessionB.status === 200 });
+  pushCase(cases, "user_b_session", sessionB.status === 200);
 
-  requiredCases.push({
-    name: "user_a_owns_session",
-    pass:
-      sessionA.status === 200 &&
+  pushCase(
+    cases,
+    "user_a_owns_session",
+    sessionA.status === 200 &&
       typeof (sessionA.body as { user?: { nickname?: string } })?.user?.nickname === "string",
-  });
-  requiredCases.push({
-    name: "user_b_owns_session",
-    pass:
-      sessionB.status === 200 &&
+  );
+  pushCase(
+    cases,
+    "user_b_owns_session",
+    sessionB.status === 200 &&
       typeof (sessionB.body as { user?: { nickname?: string } })?.user?.nickname === "string",
-  });
+  );
 
-  const crossRead = await fetchJson(`/api/profile/${profileBId}/private`, {}, jarA);
-  requiredCases.push({
-    name: "user_a_cannot_read_user_b_private_profile",
-    pass: crossRead.status === 401 || crossRead.status === 403,
-  });
+  // Mock private-profile route is NOT exercised as DB ownership proof.
+  // See futureNotApplicable: db_backed_cross_user_private_profile_denial.
 
   const forgedReport = await fetchJson(
     "/api/reports",
@@ -214,10 +240,7 @@ async function main(): Promise<void> {
     },
     jarA,
   );
-  requiredCases.push({
-    name: "forged_reporter_id_rejected",
-    pass: forgedReport.status === 400,
-  });
+  pushCase(cases, "forged_reporter_id_rejected", forgedReport.status === 400);
 
   const selfReport = await fetchJson(
     "/api/reports",
@@ -232,10 +255,7 @@ async function main(): Promise<void> {
     },
     jarA,
   );
-  requiredCases.push({
-    name: "self_report_rejected",
-    pass: selfReport.status === 400,
-  });
+  pushCase(cases, "self_report_rejected", selfReport.status === 400);
 
   const firstReport = await fetchJson(
     "/api/reports",
@@ -265,49 +285,96 @@ async function main(): Promise<void> {
   );
   const firstId = (firstReport.body as { id?: string })?.id;
   const duplicateId = (duplicateReport.body as { id?: string })?.id;
-  requiredCases.push({
-    name: "duplicate_open_report_is_idempotent",
-    pass:
-      firstReport.status === 201 &&
+  pushCase(
+    cases,
+    "duplicate_open_report_is_idempotent",
+    firstReport.status === 201 &&
       duplicateReport.status === 200 &&
       Boolean(firstId) &&
       firstId === duplicateId,
-  });
+  );
 
   const redactionCheck = await fetchJson("/api/auth/session", {}, jarA);
-  requiredCases.push({
-    name: "session_response_redacted",
-    pass: redactionCheck.status === 200 && !sessionHasSensitiveFields(redactionCheck.body),
-  });
+  pushCase(
+    cases,
+    "session_response_redacted",
+    redactionCheck.status === 200 && !sessionHasSensitiveFields(redactionCheck.body),
+  );
 
-  const logout = await fetchJson("/api/auth/logout", { method: "POST" }, jarA);
-  const afterLogout = await fetchJson("/api/auth/session", {}, jarA);
-  requiredCases.push({
-    name: "logout_invalidates_session",
-    pass: logout.status >= 200 && logout.status < 300 && afterLogout.status === 401,
-  });
+  const getSession = async (jar: CookieJar) => {
+    const result = await fetchJson("/api/auth/session", {}, jar);
+    return { status: result.status };
+  };
+  const logout = async (jar: CookieJar) => {
+    const result = await fetchJson("/api/auth/logout", { method: "POST" }, jar);
+    return { status: result.status };
+  };
 
+  const logoutPass = await proveLogoutInvalidatesSession({ jar: jarA, getSession, logout });
+  pushCase(cases, "logout_invalidates_session", logoutPass);
+
+  // cleared_cookie_denied — distinct from revocation
+  const clearedJar = new CookieJar();
+  const clearedLogin = await signIn(userAEmail, userAPassword, clearedJar);
+  if (!clearedLogin.ok) {
+    pushCase(cases, "cleared_cookie_denied", false);
+  } else {
+    const clearedPass = await proveClearedCookieDenied({ jar: clearedJar, getSession });
+    pushCase(cases, "cleared_cookie_denied", clearedPass);
+  }
+
+  // revoked_session_rejected — stale pre-logout CookieJar replay only
   const revokedJar = new CookieJar();
-  await signIn(userAEmail, userAPassword, revokedJar);
-  revokedJar.clear();
-  const revokedSession = await fetchJson("/api/auth/session", {}, revokedJar);
-  requiredCases.push({
-    name: "revoked_session_rejected",
-    pass: revokedSession.status === 401,
+  const revokedLogin = await signIn(userAEmail, userAPassword, revokedJar);
+  if (!revokedLogin.ok) {
+    pushCase(cases, "revoked_session_rejected", false);
+  } else {
+    const revoked = await proveRevokedSessionRejected({ jar: revokedJar, getSession, logout });
+    pushCase(cases, "revoked_session_rejected", revoked.pass && revoked.usedStaleClone);
+  }
+
+  const requiredSet = new Set<string>(REQUIRED_HTTP_SMOKE_CASES);
+  for (const name of REQUIRED_HTTP_SMOKE_CASES) {
+    if (!cases.some((item) => item.name === name)) {
+      pushCase(cases, name, false);
+    }
+  }
+
+  // Drop any accidental non-required extras from pass aggregation (keep observed)
+  const activeRequired = cases.filter((item) => requiredSet.has(item.name));
+  const allRequiredPass =
+    activeRequired.length === REQUIRED_HTTP_SMOKE_CASES.length &&
+    activeRequired.every((item) => item.status === "PASS") &&
+    new Set(activeRequired.map((item) => item.name)).size === REQUIRED_HTTP_SMOKE_CASES.length;
+
+  const verdict = allRequiredPass ? "PASS" : "FAIL";
+
+  const built = buildSmokeArtifact({
+    verdict,
+    gitSha: getCurrentGitSha(),
+    migrationChecksum: migrationSetChecksum(),
+    previewHostname,
+    cases: activeRequired,
+    futureNotApplicable,
   });
 
-  const allRequiredPass = requiredCases.every((item) => item.pass);
-  const verdict = allRequiredPass ? "PASS" : "FAIL";
+  if (!built.ok) {
+    console.error(redact(`FAIL: smoke artifact validation failed: ${built.failures.join("; ")}`));
+    process.exit(1);
+  }
 
   console.log(
     JSON.stringify(
       {
         verdict,
+        kind: "smoke",
         matrix: "deployed_http_alpha_surface",
-        baseUrl: redact(baseUrl),
-        requiredCases,
-        futureNotApplicable,
-        timestamp: new Date().toISOString(),
+        previewHostname,
+        runnerGitShaNote:
+          "gitSha is local runner checkout provenance only — not signed remote deployment attestation",
+        caseNames: activeRequired.map((item) => item.name),
+        futureNotApplicable: futureNotApplicable.map((item) => item.name),
+        timestamp: built.artifact.timestamp,
       },
       null,
       2,
@@ -315,7 +382,20 @@ async function main(): Promise<void> {
   );
 
   if (!allRequiredPass) {
+    console.error("FAIL: one or more required smoke cases failed");
     process.exit(1);
+  }
+
+  const out = process.env.UNSTANDARD_SMOKE_EVIDENCE_OUT?.trim();
+  if (out) {
+    writeProofArtifactAtomically({
+      outputPath: out,
+      artifact: built.artifact,
+      allowOverwriteDifferentSha: process.env.UNSTANDARD_PROOF_OVERWRITE_DIFFERENT_SHA === "yes",
+    });
+    console.log(`smoke:authorization PASS artifact written`);
+  } else {
+    console.log("smoke:authorization PASS (no UNSTANDARD_SMOKE_EVIDENCE_OUT — artifact not written)");
   }
 }
 

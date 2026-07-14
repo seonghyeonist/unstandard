@@ -5,6 +5,7 @@ import {
   validateReadinessEvidence,
 } from "../../lib/readiness/evidence";
 import { migrationSetChecksum } from "../../lib/db/migration-guards";
+import { extractHostname } from "../../lib/readiness/hostnames";
 
 async function main(): Promise<void> {
   const evidencePath = process.env.UNSTANDARD_READINESS_EVIDENCE_PATH?.trim();
@@ -18,15 +19,21 @@ async function main(): Promise<void> {
     evidence = loadReadinessEvidence(evidencePath);
   } catch (error) {
     console.error(
-      "readiness:alpha FAIL — unable to read evidence:",
+      "readiness:alpha FAIL — unable to read or parse evidence:",
       error instanceof Error ? error.message : "unknown error",
     );
     process.exit(1);
   }
 
+  const expectedHostRaw = process.env.UNSTANDARD_EXPECTED_PREVIEW_HOSTNAME?.trim();
+  const expectedPreviewHostname = expectedHostRaw
+    ? (extractHostname(expectedHostRaw) ?? expectedHostRaw.toLowerCase())
+    : evidence.previewHostname;
+
   const failures = validateReadinessEvidence(evidence, {
     currentGitSha: getCurrentGitSha(),
     currentMigrationChecksum: migrationSetChecksum(),
+    expectedPreviewHostname,
   });
 
   if (failures.length > 0) {
