@@ -115,18 +115,13 @@ describe("integration observation log", () => {
     }
   });
 
-  it("cleanup removes observation log after failure path", () => {
+  it("clearIntegrationCaseLog deletes a path when called (helper unit only)", () => {
     const dir = join(tmpdir(), `obs-cleanup-${process.pid}`);
     const path = writeLog(dir, [JSON.stringify({ name: "report_user_fk", status: "PASS" })]);
     assert.equal(existsSync(path), true);
-    try {
-      const result = aggregateIntegrationObservations(path, REQUIRED);
-      assert.equal(result.ok, false);
-    } finally {
-      clearIntegrationCaseLog(path);
-      assert.equal(existsSync(path), false);
-      rmSync(dir, { recursive: true, force: true });
-    }
+    clearIntegrationCaseLog(path);
+    assert.equal(existsSync(path), false);
+    rmSync(dir, { recursive: true, force: true });
   });
 
   it("accepts exact single PASS observations", () => {

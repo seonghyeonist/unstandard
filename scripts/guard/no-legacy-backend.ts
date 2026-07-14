@@ -1,15 +1,19 @@
-import { auditWorkspaceForLegacyBackend } from "../../lib/guard/no-legacy-backend-audit";
+import {
+  auditWorkspaceForLegacyBackend,
+  formatLegacyGuardPassMessage,
+} from "../../lib/guard/no-legacy-backend-audit";
 
 const result = auditWorkspaceForLegacyBackend();
 
 if (!result.ok) {
-  console.error("guard:no-legacy-backend FAIL — active runtime/deployment path still depends on retired platform");
+  console.error(
+    "guard:no-legacy-backend FAIL — active runtime/deployment path still depends on retired platform",
+  );
   for (const failure of result.failures) {
     console.error(`- ${failure}`);
   }
-  process.exit(1);
+  process.exitCode = 1;
+} else {
+  console.log(formatLegacyGuardPassMessage(result));
+  process.exitCode = 0;
 }
-
-console.log(
-  "guard:no-legacy-backend PASS — no active runtime or current deployment path depends on the retired platform",
-);

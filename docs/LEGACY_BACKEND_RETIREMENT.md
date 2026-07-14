@@ -1,7 +1,10 @@
 # Legacy Backend Retirement
 
+status: HISTORICAL_AUDIT_NOT_EXECUTABLE
+
 The previous hosted BaaS-backed backend (**Supabase** Auth + client/server SDK paths on `main`)
 has been retired from the active runtime working tree on the rebuild branch.
+This file is a reviewed historical audit only — not executable operator instructions.
 
 Historical PRs (#53 and stacked branches) remain unmodified git records only.
 
@@ -42,4 +45,7 @@ see the reviewed allowlisted cutover audit document
 6. Run `npm run smoke:authorization` on Preview
 7. Build combined readiness evidence
 
-`npm run guard:no-legacy-backend` PASS means active runtime/deployment paths do not depend on the retired platform — not that historical documentation cannot name it.
+`npm run guard:no-legacy-backend` PASS means active runtime/deployment paths in the
+**printed inspected inventory** do not depend on the retired platform — not that
+historical documentation cannot name it. Historical allowlisted audits must include
+`status: HISTORICAL_AUDIT_NOT_EXECUTABLE` and must not be treated as executable runbooks.

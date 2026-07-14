@@ -446,6 +446,7 @@ describe("session revocation proofs", () => {
     assert.ok(REQUIRED_HTTP_SMOKE_CASES.includes("cleared_cookie_denied"));
     assert.ok(REQUIRED_HTTP_SMOKE_CASES.includes("revoked_session_rejected"));
     assert.ok(REQUIRED_HTTP_SMOKE_CASES.includes("logout_invalidates_session"));
+    assert.ok(REQUIRED_HTTP_SMOKE_CASES.includes("session_response_no_store"));
   });
 
   it("revoked_session_rejected uses stale pre-logout CookieJar replay", async () => {

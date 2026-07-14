@@ -58,6 +58,8 @@ See `docs/AUTHORIZATION_ADVERSARIAL_SMOKE.md` and `docs/ALPHA_READINESS_CHECKLIS
 
 Do not treat mock private-profile HTTP 404 as cross-user authz proof.
 Do not treat a cleared CookieJar as server-side session revocation.
+Do not treat redacted session JSON as publicly cacheable — session/private-profile responses are `private, no-store`.
+Integration proof suites run serially against one DB + one observation log; observation cleanup uses try/finally (no `process.exit` bypass after log allocation).
 
 ## Architecture
 
@@ -73,3 +75,5 @@ Do not treat a cleared CookieJar as server-side session revocation.
 See `docs/NEON_BOOTSTRAP_RUNBOOK.md`, `docs/BETTER_AUTH_SECURITY_MODEL.md`, and `docs/AUTHORIZATION_ADVERSARIAL_SMOKE.md`.
 
 **Alpha verdict: BLOCKED_EXTERNAL** until Neon test DB, Preview A/B smoke, combined readiness evidence, and Vercel Preview SHA mapping are evidenced for project `unstandard-m9qj`.
+
+**Internal proof contradictions:** closed by P0.2.2 unit/static gates. External PostgreSQL + authenticated Preview A/B remain blocked without credentials.

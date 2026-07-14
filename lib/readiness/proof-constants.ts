@@ -45,6 +45,7 @@ export const REQUIRED_HTTP_SMOKE_CASES = [
   "self_report_rejected",
   "duplicate_open_report_is_idempotent",
   "session_response_redacted",
+  "session_response_no_store",
   "logout_invalidates_session",
   "cleared_cookie_denied",
   "revoked_session_rejected",

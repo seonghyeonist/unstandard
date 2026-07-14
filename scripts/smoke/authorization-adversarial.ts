@@ -64,7 +64,7 @@ async function fetchJson(
   path: string,
   init: RequestInit = {},
   jar?: CookieJar,
-): Promise<{ status: number; body: unknown }> {
+): Promise<{ status: number; body: unknown; headers: Headers }> {
   const headers = new Headers(init.headers ?? {});
   if (previewBypass) {
     headers.set("x-vercel-protection-bypass", previewBypass);
@@ -89,7 +89,16 @@ async function fetchJson(
     body = { raw: text.slice(0, 120) };
   }
 
-  return { status: response.status, body };
+  return { status: response.status, body, headers: response.headers };
+}
+
+function isPrivateNoStore(headers: Headers): boolean {
+  const cacheControl = headers.get("cache-control") ?? "";
+  return (
+    /\bprivate\b/i.test(cacheControl) &&
+    /\bno-store\b/i.test(cacheControl) &&
+    !/\bpublic\b/i.test(cacheControl)
+  );
 }
 
 async function signIn(
@@ -186,7 +195,11 @@ async function main(): Promise<void> {
   }
 
   const anonSession = await fetchJson("/api/auth/session");
-  pushCase(cases, "anonymous_denied", anonSession.status === 401);
+  pushCase(
+    cases,
+    "anonymous_denied",
+    anonSession.status === 401 && isPrivateNoStore(anonSession.headers),
+  );
 
   const jarA = new CookieJar();
   const loginA = await signIn(userAEmail, userAPassword, jarA);
@@ -299,6 +312,11 @@ async function main(): Promise<void> {
     cases,
     "session_response_redacted",
     redactionCheck.status === 200 && !sessionHasSensitiveFields(redactionCheck.body),
+  );
+  pushCase(
+    cases,
+    "session_response_no_store",
+    redactionCheck.status === 200 && isPrivateNoStore(redactionCheck.headers),
   );
 
   const getSession = async (jar: CookieJar) => {

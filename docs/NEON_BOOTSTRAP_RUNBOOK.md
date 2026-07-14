@@ -41,6 +41,10 @@ npm run alpha:invite:create -- --email tester@example.com
 ## 5. Real PostgreSQL integration evidence
 
 Uses a disposable `TEST_DATABASE_URL` (not Production). Machine-writes Artifact Version 1.
+The integration runner executes an explicit sorted suite inventory with `--test-concurrency=1`
+(no shell glob). Proof suites share one DB and one observation JSONL, so they are serialized
+even when ordinary unit tests remain parallel. Observation logs are always deleted in `finally`
+(no `process.exit` after log allocation).
 
 ```bash
 export TEST_DATABASE_URL=<placeholder-disposable>

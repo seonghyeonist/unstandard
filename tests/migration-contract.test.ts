@@ -10,6 +10,10 @@ import {
   normalizeMigrationLedger,
 } from "../lib/db/migration-contract";
 import { getDrizzleMigrationConfig as getConfigFromRunner } from "../lib/db/run-migrations";
+import {
+  canonicalizeSchemaSnapshot,
+  schemaContentDigest,
+} from "../lib/db/schema-snapshot";
 
 describe("migration ledger contract", () => {
   it("shares ledger schema/table with migrator configuration", () => {
@@ -56,15 +60,33 @@ describe("migration ledger contract", () => {
     assert.ok(failures.some((f) => f.includes("empty")));
   });
 
-  it("treats schema fingerprint inequality as drift", () => {
-    const before = JSON.stringify({ tables: ["users"] });
-    const after = JSON.stringify({ tables: ["users", "extra"] });
-    assert.notEqual(before, after);
+  it("treats schemaContentDigest inequality as structural drift", () => {
+    const before = canonicalizeSchemaSnapshot({
+      schema: "public",
+      tables: [{ table_name: "users" }],
+      columns: [],
+      primaryKeys: [],
+      uniqueConstraints: [],
+      foreignKeys: [],
+      checkConstraints: [],
+      indexes: [],
+      enums: [],
+      sequences: [],
+      rowLevelSecurity: [],
+      policies: [],
+      triggers: [],
+    });
+    const after = canonicalizeSchemaSnapshot({
+      ...before,
+      tables: [{ table_name: "users" }, { table_name: "extra" }],
+    });
+    assert.notEqual(schemaContentDigest(before), schemaContentDigest(after));
   });
 
   it("run-migrations imports shared config (source contract)", () => {
     const source = readFileSync(join(process.cwd(), "lib/db/run-migrations.ts"), "utf8");
     assert.match(source, /getDrizzleMigrationConfig/);
     assert.match(source, /migrate\(db, getDrizzleMigrationConfig\(\)\)/);
+    assert.match(source, /computeApplicationSchemaSnapshot/);
   });
 });

@@ -30,7 +30,10 @@ Rules:
 - pgvector may remain a PoC option; **no permanent vector provider is selected here**.
 
 Platform cutover (active code vs external data/identity) is recorded in the
-P0.3A platform cutover audit document under `docs/` (exact reviewed allowlist
-filename only — see `docs/LEGACY_BACKEND_RETIREMENT.md`).
+P0.3A historical audit documents listed by `docs/LEGACY_BACKEND_RETIREMENT.md`
+(exact reviewed allowlist filenames only; not executable cutover commands).
+
+Canonical schema snapshots / `schemaContentDigest` detect structural drift within
+inspected metadata only — they are not Production signatures.
 
 See `docs/DRIZZLE_MIGRATION_POLICY.md`.

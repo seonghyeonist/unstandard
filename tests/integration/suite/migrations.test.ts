@@ -4,7 +4,7 @@ import { neon } from "@neondatabase/serverless";
 import { getIntegrationDatabaseUrl } from "../helpers";
 import {
   assertRequiredApplicationTables,
-  computeApplicationSchemaFingerprint,
+  computeApplicationSchemaSnapshot,
   readMigrationLedger,
   runDrizzleMigrations,
 } from "../../../lib/db/run-migrations";
@@ -15,9 +15,9 @@ import {
   getDrizzleMigrationConfig,
 } from "../../../lib/db/migration-contract";
 import {
-  SEED_APP_CONFIG_KEY,
+  DEFAULT_CLOSED_ALPHA_SEED,
+  type SeedDataset,
   seedClosedAlphaData,
-  seedOnboardingQuestion,
 } from "../../../lib/db/seed-data";
 import { observeIntegrationCase } from "../../../lib/readiness/integration-case-log";
 
@@ -34,22 +34,27 @@ describe("integration: migrations and seed", () => {
 
       const ledgerBefore = await readMigrationLedger(url);
       assert.ok(ledgerBefore.length > 0, "migration ledger must be non-empty after first run");
-      const fingerprintBefore = await computeApplicationSchemaFingerprint(url);
+      const beforeSnap = await computeApplicationSchemaSnapshot(url);
       const requiredBefore = await assertRequiredApplicationTables(url);
       assert.deepEqual(requiredBefore, []);
 
       await runDrizzleMigrations(url);
 
       const ledgerAfter = await readMigrationLedger(url);
-      const fingerprintAfter = await computeApplicationSchemaFingerprint(url);
+      const afterSnap = await computeApplicationSchemaSnapshot(url);
       const requiredAfter = await assertRequiredApplicationTables(url);
 
       const ledgerFailures = compareMigrationLedgers(ledgerBefore, ledgerAfter);
       assert.deepEqual(ledgerFailures, [], ledgerFailures.join("; "));
       assert.equal(
-        fingerprintBefore,
-        fingerprintAfter,
-        "application schema fingerprint changed after second migration run",
+        beforeSnap.canonicalJson,
+        afterSnap.canonicalJson,
+        "canonical schema snapshot changed after second migration run",
+      );
+      assert.equal(
+        beforeSnap.schemaContentDigest,
+        afterSnap.schemaContentDigest,
+        "schemaContentDigest changed after second migration run",
       );
       assert.deepEqual(requiredAfter, []);
     });
@@ -60,55 +65,97 @@ describe("integration: migrations and seed", () => {
 
     await observeIntegrationCase("seed_idempotency", async () => {
       await runDrizzleMigrations(url);
-      await seedClosedAlphaData(url);
+
+      const uniqueSuffix = `${process.pid}-${Date.now()}`;
+      const dataset: SeedDataset = {
+        question: {
+          id: `integration-seed-q-${uniqueSuffix}`,
+          prompt: `integration seed prompt ${uniqueSuffix}`,
+          helper: `helper-${uniqueSuffix}`,
+          active: true,
+        },
+        appConfig: {
+          key: `alpha.integration.seed.${uniqueSuffix}`,
+          value: { marker: uniqueSuffix, enabled: true },
+        },
+      };
 
       const sql = neon(url);
-      const [questionBefore] = await sql`
-        SELECT id, prompt, helper, active, created_at
-        FROM questions
-        WHERE id = ${seedOnboardingQuestion.id}
-      `;
-      const [configBefore] = await sql`
-        SELECT key, value, updated_at
-        FROM app_config
-        WHERE key = ${SEED_APP_CONFIG_KEY}
-      `;
+      try {
+        const first = await seedClosedAlphaData(url, dataset);
+        assert.equal(first.questionChanged, true);
+        assert.equal(first.appConfigChanged, true);
 
-      assert.ok(questionBefore);
-      assert.ok(configBefore);
+        const [questionBefore] = await sql`
+          SELECT id, prompt, helper, active, created_at
+          FROM questions
+          WHERE id = ${dataset.question.id}
+        `;
+        const [configBefore] = await sql`
+          SELECT key, value, updated_at
+          FROM app_config
+          WHERE key = ${dataset.appConfig.key}
+        `;
+        assert.ok(questionBefore);
+        assert.ok(configBefore);
 
-      await seedClosedAlphaData(url);
+        const second = await seedClosedAlphaData(url, dataset);
+        assert.equal(second.questionChanged, false);
+        assert.equal(second.appConfigChanged, false);
 
-      const questions = await sql`
-        SELECT id, prompt, helper, active, created_at
-        FROM questions
-        WHERE id = ${seedOnboardingQuestion.id}
-      `;
-      const configs = await sql`
-        SELECT key, value, updated_at
-        FROM app_config
-        WHERE key = ${SEED_APP_CONFIG_KEY}
-      `;
+        const changedDataset: SeedDataset = {
+          question: {
+            ...dataset.question,
+            prompt: `${dataset.question.prompt}::changed`,
+          },
+          appConfig: {
+            ...dataset.appConfig,
+            value: { ...dataset.appConfig.value, enabled: false, changed: true },
+          },
+        };
 
-      assert.equal(questions.length, 1);
-      assert.equal(configs.length, 1);
+        const third = await seedClosedAlphaData(url, changedDataset);
+        assert.equal(third.questionChanged, true);
+        assert.equal(third.appConfigChanged, true);
 
-      const questionAfter = questions[0];
-      const configAfter = configs[0];
+        const [configMid] = await sql`
+          SELECT key, value, updated_at
+          FROM app_config
+          WHERE key = ${dataset.appConfig.key}
+        `;
+        assert.notEqual(
+          String(configMid?.updated_at),
+          String(configBefore?.updated_at),
+          "updated_at must change on real config mutation",
+        );
 
-      assert.equal(String(questionAfter?.id), String(questionBefore?.id));
-      assert.equal(questionAfter?.prompt, questionBefore?.prompt);
-      assert.equal(questionAfter?.helper, questionBefore?.helper);
-      assert.equal(questionAfter?.active, questionBefore?.active);
-      assert.equal(String(questionAfter?.created_at), String(questionBefore?.created_at));
+        const fourth = await seedClosedAlphaData(url, changedDataset);
+        assert.equal(fourth.questionChanged, false);
+        assert.equal(fourth.appConfigChanged, false);
 
-      assert.equal(configAfter?.key, configBefore?.key);
-      assert.deepEqual(configAfter?.value, configBefore?.value);
-      assert.equal(
-        String(configAfter?.updated_at),
-        String(configBefore?.updated_at),
-        "identical seed must not bump app_config.updated_at",
-      );
+        const questions = await sql`
+          SELECT id, prompt, helper, active, created_at
+          FROM questions
+          WHERE id = ${dataset.question.id}
+        `;
+        const configs = await sql`
+          SELECT key, value, updated_at
+          FROM app_config
+          WHERE key = ${dataset.appConfig.key}
+        `;
+        assert.equal(questions.length, 1);
+        assert.equal(configs.length, 1);
+        assert.equal(String(questions[0]?.created_at), String(questionBefore?.created_at));
+        assert.equal(questions[0]?.prompt, changedDataset.question.prompt);
+        assert.deepEqual(configs[0]?.value, changedDataset.appConfig.value);
+        assert.equal(String(configs[0]?.updated_at), String(configMid?.updated_at));
+
+        // Default closed-alpha seed remains independently seedable and unused for mutation.
+        assert.ok(DEFAULT_CLOSED_ALPHA_SEED.question.id);
+      } finally {
+        await sql`DELETE FROM questions WHERE id = ${dataset.question.id}`;
+        await sql`DELETE FROM app_config WHERE key = ${dataset.appConfig.key}`;
+      }
     });
   });
 });

@@ -18,6 +18,14 @@ export {
   getDrizzleMigrationConfig,
 } from "./migration-contract";
 
+export {
+  computeApplicationSchemaFingerprint,
+  computeApplicationSchemaSnapshot,
+  schemaContentDigest,
+  canonicalizeSchemaSnapshot,
+  schemaSnapshotJson,
+} from "./schema-snapshot";
+
 export async function runDrizzleMigrations(databaseUrl: string): Promise<void> {
   const sql = neon(databaseUrl);
   const db = drizzle(sql);
@@ -50,67 +58,6 @@ export async function readMigrationLedger(databaseUrl: string): Promise<Migratio
     hash: String(row.hash),
     created_at: String(row.created_at),
   }));
-}
-
-/**
- * Structural fingerprint of application-owned schema metadata.
- * Excludes ordinary row contents and migration-ledger tables.
- */
-export async function computeApplicationSchemaFingerprint(databaseUrl: string): Promise<string> {
-  const sql = neon(databaseUrl);
-  const schema = APPLICATION_SCHEMA;
-
-  const tables = await sql`
-    SELECT table_name
-    FROM information_schema.tables
-    WHERE table_schema = ${schema}
-      AND table_type = 'BASE TABLE'
-    ORDER BY table_name
-  `;
-
-  const columns = await sql`
-    SELECT table_name, column_name, data_type, udt_name, is_nullable, column_default
-    FROM information_schema.columns
-    WHERE table_schema = ${schema}
-    ORDER BY table_name, ordinal_position
-  `;
-
-  const constraints = await sql`
-    SELECT
-      tc.table_name,
-      tc.constraint_name,
-      tc.constraint_type,
-      kcu.column_name,
-      ccu.table_name AS foreign_table_name,
-      ccu.column_name AS foreign_column_name
-    FROM information_schema.table_constraints tc
-    LEFT JOIN information_schema.key_column_usage kcu
-      ON tc.constraint_name = kcu.constraint_name
-      AND tc.table_schema = kcu.table_schema
-    LEFT JOIN information_schema.constraint_column_usage ccu
-      ON ccu.constraint_name = tc.constraint_name
-      AND ccu.table_schema = tc.table_schema
-    WHERE tc.table_schema = ${schema}
-    ORDER BY tc.table_name, tc.constraint_name, kcu.ordinal_position
-  `;
-
-  const indexes = await sql`
-    SELECT
-      tablename AS table_name,
-      indexname AS index_name,
-      indexdef
-    FROM pg_indexes
-    WHERE schemaname = ${schema}
-    ORDER BY tablename, indexname
-  `;
-
-  return JSON.stringify({
-    schema,
-    tables,
-    columns,
-    constraints,
-    indexes,
-  });
 }
 
 export async function assertRequiredApplicationTables(databaseUrl: string): Promise<string[]> {

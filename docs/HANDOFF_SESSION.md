@@ -63,8 +63,13 @@ Without external inputs, integration / smoke / readiness exit **2** (`BLOCKED_EX
 - Mock private-profile route ≠ Neon cross-user ownership proof (404 ≠ authz denial)
 - Cleared local cookie ≠ revoked session; stale pre-logout replay is a separate case
 - Runner `gitSha` is checkout provenance only — verify Vercel Preview deployment metadata separately
-- `contentDigest` is not a signature
+- `contentDigest` / `schemaContentDigest` are not signatures
+- Integration runner deletes observation logs via try/finally (no `process.exit` after log allocation); suites run serially without shell globs
+- Session-sensitive JSON (`/api/auth/session`, private-profile, unlock GET) uses `private, no-store` Cache-Control
+- Without external credentials: `INTERNAL` static gates may pass while integration/smoke/readiness remain `BLOCKED_EXTERNAL` (exit 2)
 
 ## Alpha
 
 **BLOCKED_EXTERNAL** — needs Neon test DB, Preview A/B credentials, machine-built readiness evidence, and Vercel SHA mapping for `unstandard-m9qj`.
+
+**Platform migration:** active code path implemented; data/identity cutover `DECISION_REQUIRED`; Production cutover `NOT_STARTED`.

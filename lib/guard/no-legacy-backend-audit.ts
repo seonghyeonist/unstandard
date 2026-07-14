@@ -2,19 +2,24 @@
  * Active-path legacy backend audit.
  *
  * PASS means: no active runtime or current deployment path depends on the
- * retired platform.
+ * retired platform, within the inspected inventory printed on PASS.
  * It does NOT mean the repository contains no historical mention of that platform.
+ *
+ * No active lib directory may be exempt by prefix. Exact historical allowlist only.
  */
 
 import { execSync } from "node:child_process";
 import { readFileSync, existsSync } from "node:fs";
-import { join } from "node:path";
+import { basename, join } from "node:path";
 
-/** Exact reviewed historical allowlist — no wildcards. */
+/** Exact reviewed historical allowlist — no wildcards, no directory prefixes. */
 export const HISTORICAL_LEGACY_ALLOWLIST = [
   "docs/SUPABASE_TO_NEON_CUTOVER.md",
   "docs/LEGACY_BACKEND_RETIREMENT.md",
 ] as const;
+
+/** Required marker inside every allowlisted historical document. */
+export const HISTORICAL_AUDIT_MARKER = "status: HISTORICAL_AUDIT_NOT_EXECUTABLE" as const;
 
 const GUARD_SELF = "scripts/guard/no-legacy-backend.ts";
 const GUARD_LIB = "lib/guard/no-legacy-backend-audit.ts";
@@ -22,15 +27,30 @@ const GUARD_TEST = "tests/no-legacy-backend-guard.test.ts";
 
 export const ACTIVE_LEGACY_PATTERNS = [
   "@supabase/",
+  "supabase.co",
+  "postgrest",
+  "gotrue",
+  "/auth/v1",
+  "/rest/v1",
   "createBrowserClient",
   "createServerClient",
-  "from \"@supabase",
+  'from "@supabase',
   "from '@supabase",
   "NEXT_PUBLIC_SUPABASE",
   "SUPABASE_SERVICE_ROLE_KEY",
   "SUPABASE_ANON_KEY",
   "UNSTANDARD_SUPABASE",
   "sb_publishable",
+  "service_role",
+  "SUPABASE_URL",
+  "sb-access-token",
+  "sb-refresh-token",
+  "sb-auth-token",
+  "supabase login",
+  "supabase db",
+  "supabase start",
+  "supabase link",
+  "npx supabase",
   "smoke:rls",
   "db:staging:push",
   "db:staging:dry-run",
@@ -38,6 +58,7 @@ export const ACTIVE_LEGACY_PATTERNS = [
   "dual-write",
   "dualRead",
   "dualWrite",
+  "hidden automatic fallback",
 ] as const;
 
 /** Broad platform-name patterns allowed only on the historical allowlist. */
@@ -50,20 +71,44 @@ const ACTIVE_PATH_PREFIXES = [
   ".github/workflows/",
 ] as const;
 
-const ACTIVE_FILES = [
+const ACTIVE_ROOT_FILES = [
   "middleware.ts",
+  "proxy.ts",
+  "instrumentation.ts",
   "package.json",
   ".env.example",
   "drizzle.config.ts",
+  "drizzle.config.js",
+  "drizzle.config.mjs",
   "next.config.ts",
   "next.config.js",
   "next.config.mjs",
+  "vercel.json",
+] as const;
+
+const ROOT_OPERATOR_EXTENSIONS = [
+  ".ts",
+  ".js",
+  ".mjs",
+  ".cjs",
+  ".cmd",
+  ".ps1",
+  ".sh",
 ] as const;
 
 export type LegacyGuardFinding = {
   path: string;
   pattern: string;
   line?: string;
+};
+
+export type LegacyGuardAuditResult = {
+  ok: boolean;
+  findings: LegacyGuardFinding[];
+  failures: string[];
+  trackedFileCount: number;
+  activeInspectedCount: number;
+  historicalExcluded: string[];
 };
 
 function isAllowlistedHistorical(path: string): boolean {
@@ -74,20 +119,37 @@ function isGuardInfrastructure(path: string): boolean {
   return path === GUARD_SELF || path === GUARD_LIB || path === GUARD_TEST;
 }
 
-function isActivePath(path: string): boolean {
-  if (ACTIVE_FILES.includes(path as (typeof ACTIVE_FILES)[number])) return true;
-  return ACTIVE_PATH_PREFIXES.some((prefix) => path.startsWith(prefix));
+function isRootOnly(path: string): boolean {
+  return !path.includes("/") && !path.includes("\\");
 }
 
-function isMigrationAuditModule(path: string): boolean {
-  return path.startsWith("lib/migration-audit/");
+function isRootOperatorFile(path: string): boolean {
+  if (!isRootOnly(path)) return false;
+  if ((ACTIVE_ROOT_FILES as readonly string[]).includes(path)) return true;
+  if (/^Dockerfile/i.test(path)) return true;
+  return ROOT_OPERATOR_EXTENSIONS.some((ext) => path.toLowerCase().endsWith(ext));
+}
+
+export function isActivePath(path: string): boolean {
+  if (isRootOperatorFile(path)) return true;
+  return ACTIVE_PATH_PREFIXES.some((prefix) => path.startsWith(prefix));
 }
 
 export function assertNoWildcardAllowlist(allowlist: readonly string[]): string[] {
   const failures: string[] = [];
   for (const entry of allowlist) {
-    if (entry.includes("*") || entry.includes("?") || entry.endsWith("/")) {
+    if (
+      entry.includes("*") ||
+      entry.includes("?") ||
+      entry.endsWith("/") ||
+      entry.includes("/**") ||
+      entry.endsWith("/**")
+    ) {
       failures.push(`wildcard allowlist entry forbidden: ${entry}`);
+    }
+    // Directory-prefix style (e.g. lib/migration-audit/) is forbidden.
+    if (entry.endsWith("/") || /\/\*\*$/.test(entry)) {
+      failures.push(`directory-prefix allowlist entry forbidden: ${entry}`);
     }
   }
   return failures;
@@ -99,9 +161,6 @@ export function scanTextForActivePatterns(
 ): LegacyGuardFinding[] {
   const findings: LegacyGuardFinding[] = [];
   if (isGuardInfrastructure(path) || isAllowlistedHistorical(path)) {
-    return findings;
-  }
-  if (isMigrationAuditModule(path)) {
     return findings;
   }
   if (!isActivePath(path)) {
@@ -118,7 +177,6 @@ export function scanTextForActivePatterns(
     });
   }
 
-  // Platform name in active code is still banned outside allowlist.
   for (const pattern of PLATFORM_NAME_PATTERNS) {
     const re = new RegExp(pattern.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "i");
     lines.forEach((line, index) => {
@@ -169,45 +227,88 @@ export function scanEnvExampleForLegacy(envExample: string): LegacyGuardFinding[
 }
 
 /**
- * Fail if an allowlisted historical document is imported/required by runtime.
+ * Fail if an allowlisted historical document is imported/required by runtime
+ * or presented as executable current instructions from an active path/runbook.
  */
 export function findRuntimeImportsOfHistoricalDocs(
   filePath: string,
   content: string,
 ): LegacyGuardFinding[] {
-  if (!isActivePath(filePath) || isGuardInfrastructure(filePath) || isAllowlistedHistorical(filePath)) {
+  if (isGuardInfrastructure(filePath) || isAllowlistedHistorical(filePath)) {
     return [];
   }
-  // Documentation imports into app/lib/scripts are forbidden.
-  if (!(filePath.startsWith("app/") || filePath.startsWith("lib/") || filePath.startsWith("scripts/"))) {
+
+  const isRuntimeOrOperator =
+    filePath.startsWith("app/") ||
+    filePath.startsWith("lib/") ||
+    filePath.startsWith("scripts/") ||
+    isRootOperatorFile(filePath);
+
+  const isActiveRunbook =
+    filePath.startsWith("docs/") &&
+    /(RUNBOOK|CHECKLIST|README|HANDOFF|BOOTSTRAP|POLICY)/i.test(basename(filePath));
+
+  if (!isRuntimeOrOperator && !isActiveRunbook) {
     return [];
   }
 
   const findings: LegacyGuardFinding[] = [];
   for (const allowed of HISTORICAL_LEGACY_ALLOWLIST) {
-    if (content.includes(allowed) || content.includes(allowed.replace(/^docs\//, ""))) {
-      // Require explicit path-like reference, not mere platform name.
-      const pathRe = new RegExp(
-        allowed.replace(/[.*+?^${}()|[\]\\]/g, "\\$&").replace(/\//g, "[\\\\/]"),
-        "i",
-      );
-      if (pathRe.test(content)) {
+    const pathRe = new RegExp(
+      allowed.replace(/[.*+?^${}()|[\]\\]/g, "\\$&").replace(/\//g, "[\\\\/]"),
+      "i",
+    );
+    if (!pathRe.test(content)) continue;
+
+    if (isRuntimeOrOperator) {
+      findings.push({
+        path: filePath,
+        pattern: allowed,
+        line: `runtime/operator reference to historical allowlisted document ${allowed}`,
+      });
+      continue;
+    }
+
+    // Active runbook may mention the audit for reading, but must not frame it
+    // as executable current instructions.
+    const executableFraming =
+      /(?:run|execute|follow|apply|perform)\b[\s\S]{0,80}/i.test(content) &&
+      pathRe.test(content) &&
+      /(?:steps?|commands?|instructions?|migrate|bootstrap)/i.test(content);
+
+    // Narrower: same line or nearby line couples "run/execute" with the path
+    const lines = content.split("\n");
+    lines.forEach((line, index) => {
+      if (
+        pathRe.test(line) &&
+        /\b(run|execute|follow these|as commands? to execute|do the following)\b/i.test(line)
+      ) {
         findings.push({
           path: filePath,
           pattern: allowed,
-          line: `runtime reference to historical allowlisted document ${allowed}`,
+          line: `${index + 1}:active runbook treats historical doc as executable (${allowed})`,
         });
       }
+    });
+
+    if (executableFraming && findings.length === 0) {
+      // Conservatively allow mere citations without action verbs on the same line.
     }
   }
   return findings;
 }
 
-export function auditWorkspaceForLegacyBackend(cwd = process.cwd()): {
-  ok: boolean;
-  findings: LegacyGuardFinding[];
-  failures: string[];
-} {
+export function assertHistoricalMarkerPresent(path: string, content: string): string[] {
+  if (!isAllowlistedHistorical(path)) return [];
+  if (!content.includes(HISTORICAL_AUDIT_MARKER)) {
+    return [
+      `${path}: missing required marker ${HISTORICAL_AUDIT_MARKER}`,
+    ];
+  }
+  return [];
+}
+
+export function auditWorkspaceForLegacyBackend(cwd = process.cwd()): LegacyGuardAuditResult {
   const findings: LegacyGuardFinding[] = [];
   const failures: string[] = [];
 
@@ -218,13 +319,14 @@ export function auditWorkspaceForLegacyBackend(cwd = process.cwd()): {
     .map((line) => line.trim())
     .filter(Boolean);
 
+  const historicalExcluded = [...HISTORICAL_LEGACY_ALLOWLIST];
+  let activeInspectedCount = 0;
+
   for (const path of tracked) {
     if (path.startsWith("node_modules/") || path.endsWith(".lock")) {
-      // package-lock handled separately for direct deps only via package.json.
       continue;
     }
     if (!existsSync(join(cwd, path))) continue;
-    // Skip binary-ish / lock noise
     if (path === "package-lock.json") continue;
 
     let content: string;
@@ -232,6 +334,13 @@ export function auditWorkspaceForLegacyBackend(cwd = process.cwd()): {
       content = readFileSync(join(cwd, path), "utf8");
     } catch {
       continue;
+    }
+
+    failures.push(...assertHistoricalMarkerPresent(path, content));
+
+    const active = isActivePath(path) && !isAllowlistedHistorical(path) && !isGuardInfrastructure(path);
+    if (active) {
+      activeInspectedCount += 1;
     }
 
     if (path === "package.json") {
@@ -255,7 +364,6 @@ export function auditWorkspaceForLegacyBackend(cwd = process.cwd()): {
     } catch {
       continue;
     }
-    // Non-active docs mentioning the platform outside allowlist fail.
     if (path.startsWith("docs/") && !isActivePath(path)) {
       for (const pattern of PLATFORM_NAME_PATTERNS) {
         if (new RegExp(pattern, "i").test(content)) {
@@ -271,9 +379,28 @@ export function auditWorkspaceForLegacyBackend(cwd = process.cwd()): {
 
   if (findings.length > 0) {
     for (const finding of findings) {
-      failures.push(`${finding.path}: ${finding.pattern}${finding.line ? ` (${finding.line})` : ""}`);
+      failures.push(
+        `${finding.path}: ${finding.pattern}${finding.line ? ` (${finding.line})` : ""}`,
+      );
     }
   }
 
-  return { ok: failures.length === 0, findings, failures };
+  return {
+    ok: failures.length === 0,
+    findings,
+    failures,
+    trackedFileCount: tracked.length,
+    activeInspectedCount,
+    historicalExcluded,
+  };
+}
+
+export function formatLegacyGuardPassMessage(result: LegacyGuardAuditResult): string {
+  return [
+    "guard:no-legacy-backend PASS — inspected inventory only (not a claim of zero historical mentions)",
+    `tracked_files=${result.trackedFileCount}`,
+    `active_files_inspected=${result.activeInspectedCount}`,
+    `historical_files_excluded=${result.historicalExcluded.join(",")}`,
+    "findings=0",
+  ].join("\n");
 }

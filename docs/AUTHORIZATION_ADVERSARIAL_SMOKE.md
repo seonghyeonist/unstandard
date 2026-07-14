@@ -100,6 +100,7 @@ npm run readiness:alpha
 - `self_report_rejected`
 - `duplicate_open_report_is_idempotent`
 - `session_response_redacted`
+- `session_response_no_store` (authenticated session Cache-Control must include `private` + `no-store` and must not include `public`; anonymous 401 is checked under `anonymous_denied` with the same no-store contract)
 - `logout_invalidates_session`
 - `cleared_cookie_denied`
 - `revoked_session_rejected`

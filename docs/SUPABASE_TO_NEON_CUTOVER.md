@@ -1,6 +1,9 @@
 # Supabase → Neon Cutover Record (P0.3A)
 
+status: HISTORICAL_AUDIT_NOT_EXECUTABLE
+
 Honest historical and operational migration record for PR #55.
+This file is a reviewed historical audit only — not executable operator instructions.
 
 Baselines inspected (read-only):
 
@@ -146,7 +149,7 @@ Neon is the relational closed-alpha database. Neon/pgvector is **not** automatic
 | Code-path | `IMPLEMENTED` |
 | Schema | `IMPLEMENTED` |
 | External apply on Neon | `BLOCKED_EXTERNAL` |
-| Validation | second-run no-op via ledger + schema fingerprint (code); needs `TEST_DATABASE_URL` |
+| Validation | second-run no-op via ledger + canonical schema snapshot + schemaContentDigest (code); needs `TEST_DATABASE_URL` |
 | Rollback | do not apply drizzle migrations to Production without confirmation gates |
 
 ### Deployment workflows
@@ -240,7 +243,13 @@ Status: `NOT_STARTED` · Decision: `DECISION_REQUIRED`
 
 `npm run guard:no-legacy-backend` PASS means:
 
-> No active runtime or current deployment path depends on the retired platform.
+> Within the printed inspected inventory (tracked file count, active files inspected,
+> exact historical files excluded), no active runtime or current deployment path
+> depends on the retired platform.
 
 It does **not** mean the repository contains no historical mention of that platform.
-Historical mentions are limited to this file and `docs/LEGACY_BACKEND_RETIREMENT.md`.
+Historical mentions are limited to the exact allowlisted audit documents
+(`docs/SUPABASE_TO_NEON_CUTOVER.md`, `docs/LEGACY_BACKEND_RETIREMENT.md`), each of which
+must carry `status: HISTORICAL_AUDIT_NOT_EXECUTABLE`.
+There is no directory-prefix exemption under `lib/`. Root operator files
+(`vercel.json`, `Dockerfile*`, `*.cmd` / `*.ps1` / `*.sh`, etc.) are in scope.
