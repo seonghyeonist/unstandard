@@ -11,6 +11,7 @@ import {
 } from "./proof-constants";
 import { hostnameFailureMessage, validateEvidenceHostname } from "./hostnames";
 import { scanForSecrets } from "./secret-scan";
+import { isCanonicalProofTimestamp, nowCanonicalProofTimestamp } from "./canonical-timestamp";
 
 const fullGitShaSchema = z
   .string()
@@ -21,8 +22,10 @@ const migrationChecksumSchema = z
   .min(1)
   .regex(/^[a-f0-9]{16}$/, "migrationChecksum must be 16 lowercase hex chars");
 
-const isoTimestampSchema = z.string().refine((value) => Number.isFinite(Date.parse(value)), {
-  message: "timestamp must be valid ISO-8601",
+/** Canonical UTC timestamp: new Date().toISOString() only (Artifact Version 1, stricter validation). */
+const isoTimestampSchema = z.string().refine((value) => isCanonicalProofTimestamp(value), {
+  message:
+    "timestamp must be canonical UTC ISO-8601 from Date.toISOString() (YYYY-MM-DDTHH:mm:ss.sssZ)",
 });
 
 const caseStatusSchema = z.enum(["PASS", "FAIL"]);
@@ -148,12 +151,12 @@ function validateTimestampBounds(
   const nowMs = options.nowMs ?? Date.now();
   const maxAgeMs = options.maxAgeMs ?? PROOF_MAX_AGE_MS;
   const clockSkewMs = options.clockSkewMs ?? PROOF_CLOCK_SKEW_MS;
-  const parsed = Date.parse(timestamp);
-
-  if (!Number.isFinite(parsed)) {
+  if (!isCanonicalProofTimestamp(timestamp)) {
     failures.push(`${label} timestamp is invalid`);
     return failures;
   }
+
+  const parsed = Date.parse(timestamp);
 
   if (parsed > nowMs + clockSkewMs) {
     failures.push(`${label} timestamp is excessively in the future`);
@@ -392,7 +395,7 @@ export function buildIntegrationArtifact(
     verdict: input.verdict,
     gitSha: input.gitSha,
     migrationChecksum: input.migrationChecksum,
-    timestamp: input.timestamp ?? new Date().toISOString(),
+    timestamp: input.timestamp ?? nowCanonicalProofTimestamp(),
     matrix: INTEGRATION_MATRIX,
     cases: input.cases,
     ...(input.futureNotApplicable ? { futureNotApplicable: input.futureNotApplicable } : {}),
@@ -410,7 +413,7 @@ export function buildSmokeArtifact(
     verdict: input.verdict,
     gitSha: input.gitSha,
     migrationChecksum: input.migrationChecksum,
-    timestamp: input.timestamp ?? new Date().toISOString(),
+    timestamp: input.timestamp ?? nowCanonicalProofTimestamp(),
     matrix: SMOKE_MATRIX,
     previewHostname: input.previewHostname,
     cases: input.cases,
@@ -441,7 +444,7 @@ export function buildCombinedReadinessArtifact(input: {
     gitSha: input.integration.gitSha,
     migrationChecksum: input.integration.migrationChecksum,
     previewHostname: input.smoke.previewHostname,
-    timestamp: input.nowIso ?? new Date().toISOString(),
+    timestamp: input.nowIso ?? nowCanonicalProofTimestamp(),
     sourceTimestamps: {
       integration: input.integration.timestamp,
       smoke: input.smoke.timestamp,

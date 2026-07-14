@@ -20,8 +20,8 @@ import {
 } from "../../lib/readiness/proof-artifact";
 import { REQUIRED_INTEGRATION_CASES } from "../../lib/readiness/proof-constants";
 import {
+  aggregateIntegrationObservations,
   clearIntegrationCaseLog,
-  readObservedIntegrationCases,
 } from "../../lib/readiness/integration-case-log";
 
 function blocked(message: string): never {
@@ -35,7 +35,6 @@ function fail(message: string): never {
 }
 
 function maybeWriteBlockedNote(): void {
-  // Intentionally never writes a PASS artifact on blocked runs.
   const out = process.env.UNSTANDARD_INTEGRATION_EVIDENCE_OUT?.trim();
   if (out) {
     console.error(
@@ -81,74 +80,64 @@ async function main(): Promise<void> {
   };
 
   try {
-    execSync("tsx --test tests/integration/suite/*.test.ts", {
-      env,
-      stdio: "inherit",
-    });
-  } catch {
-    fail("integration suite failed");
-  }
-
-  const observed = readObservedIntegrationCases(caseLogPath);
-  const byName = new Map(observed.map((item) => [item.name, item.status]));
-  const cases = REQUIRED_INTEGRATION_CASES.map((name) => {
-    const status = byName.get(name);
-    if (!status) {
-      return { name, status: "FAIL" as const };
+    try {
+      execSync("tsx --test tests/integration/suite/*.test.ts", {
+        env,
+        stdio: "inherit",
+      });
+    } catch {
+      fail("integration suite failed");
     }
-    return { name, status };
-  });
 
-  const missing = cases.filter((item) => !byName.has(item.name));
-  if (missing.length > 0) {
-    fail(
-      `required integration assertions were not observed: ${missing.map((item) => item.name).join(", ")}`,
-    );
-  }
+    const aggregated = aggregateIntegrationObservations(caseLogPath, REQUIRED_INTEGRATION_CASES);
+    if (!aggregated.ok) {
+      fail(`integration observation log invalid: ${aggregated.failures.join("; ")}`);
+    }
 
-  const anyFail = cases.some((item) => item.status === "FAIL");
-  if (anyFail) {
-    fail("one or more required integration cases FAILED");
-  }
+    const anyFail = aggregated.cases.some((item) => item.status === "FAIL");
+    if (anyFail) {
+      fail("one or more required integration cases FAILED");
+    }
 
-  const built = buildIntegrationArtifact({
-    verdict: "PASS",
-    gitSha: getCurrentGitSha(),
-    migrationChecksum: migrationSetChecksum(),
-    cases,
-  });
-
-  if (!built.ok) {
-    fail(`integration artifact validation failed: ${built.failures.join("; ")}`);
-  }
-
-  const out = process.env.UNSTANDARD_INTEGRATION_EVIDENCE_OUT?.trim();
-  if (out) {
-    writeProofArtifactAtomically({
-      outputPath: out,
-      artifact: built.artifact,
-      allowOverwriteDifferentSha: process.env.UNSTANDARD_PROOF_OVERWRITE_DIFFERENT_SHA === "yes",
+    const built = buildIntegrationArtifact({
+      verdict: "PASS",
+      gitSha: getCurrentGitSha(),
+      migrationChecksum: migrationSetChecksum(),
+      cases: aggregated.cases,
     });
-    console.log(`test:integration PASS artifact written (${out})`);
-  } else {
-    console.log("test:integration PASS (no UNSTANDARD_INTEGRATION_EVIDENCE_OUT — artifact not written)");
+
+    if (!built.ok) {
+      fail(`integration artifact validation failed: ${built.failures.join("; ")}`);
+    }
+
+    const out = process.env.UNSTANDARD_INTEGRATION_EVIDENCE_OUT?.trim();
+    if (out) {
+      writeProofArtifactAtomically({
+        outputPath: out,
+        artifact: built.artifact,
+        allowOverwriteDifferentSha: process.env.UNSTANDARD_PROOF_OVERWRITE_DIFFERENT_SHA === "yes",
+      });
+      console.log(`test:integration PASS artifact written (${out})`);
+    } else {
+      console.log("test:integration PASS (no UNSTANDARD_INTEGRATION_EVIDENCE_OUT — artifact not written)");
+    }
+
+    console.log(
+      JSON.stringify(
+        {
+          verdict: "PASS",
+          kind: "integration",
+          matrix: "real_postgresql_integration",
+          note: "Real PostgreSQL integration evidence only — not Neon Production evidence",
+          caseNames: aggregated.cases.map((item) => item.name),
+        },
+        null,
+        2,
+      ),
+    );
+  } finally {
+    clearIntegrationCaseLog(caseLogPath);
   }
-
-  console.log(
-    JSON.stringify(
-      {
-        verdict: "PASS",
-        kind: "integration",
-        matrix: "real_postgresql_integration",
-        note: "Real PostgreSQL integration evidence only — not Neon Production evidence",
-        caseNames: cases.map((item) => item.name),
-      },
-      null,
-      2,
-    ),
-  );
-
-  clearIntegrationCaseLog(caseLogPath);
 }
 
 main().catch((error) => {
