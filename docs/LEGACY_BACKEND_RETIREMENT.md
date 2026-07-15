@@ -37,13 +37,14 @@ see the reviewed allowlisted cutover audit document
 
 ## Operator follow-up
 
-1. Founder `DECISION_REQUIRED`: Option A (controlled migrate) vs Option B (clean reset) — see cutover doc
-2. Provision Neon staging + production branches
-3. Set Vercel Preview env per `docs/NEON_BOOTSTRAP_RUNBOOK.md` (no env mutation by agents without approval)
-4. Run `npm run db:migrate` + `npm run db:seed` on staging
-5. Run `npm run test:integration` with `TEST_DATABASE_URL`
-6. Run `npm run smoke:authorization` on Preview
+1. Founder decision **OPTION B+ RECORDED** (clean reset + read-only archive) — see cutover doc; do not migrate legacy rows/identities
+2. Provision separate disposable integration DB + Preview application DB (never one DB for both)
+3. Set Vercel Preview env per `docs/NEON_BOOTSTRAP_RUNBOOK.md` (no Production env mutation)
+4. Run `npm run db:migrate` + `npm run db:seed` on Preview/staging only
+5. Run `npm run test:integration` with disposable `TEST_DATABASE_URL`
+6. Run `npm run smoke:authorization` on Preview (bypass required if protection enabled)
 7. Build combined readiness evidence
+8. Production cutover remains `NOT_STARTED` until explicitly authorized
 
 `npm run guard:no-legacy-backend` PASS means active runtime/deployment paths in the
 **printed inspected inventory** do not depend on the retired platform — not that

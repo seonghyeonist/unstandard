@@ -27,12 +27,15 @@ Statuses used below (only):
 | Active runtime code path away from retired BaaS | `IMPLEMENTED` |
 | Neon + Drizzle + Better Auth relational code | `IMPLEMENTED` |
 | External Neon staging/production bootstrap | `BLOCKED_EXTERNAL` |
-| External legacy data migration | `NOT_STARTED` / `DECISION_REQUIRED` |
-| External identity migration / remapping | `DECISION_REQUIRED` |
+| Founder data/identity cutover decision | **OPTION B+ RECORDED** (clean reset + read-only archive policy) |
+| External legacy data direct migrate into closed-alpha runtime | `NOT_APPLICABLE` under Option B+ (do not migrate) |
+| Legacy read-only export/archive | `NOT_STARTED` (do not claim complete until created and verified) |
+| External identity migration into Better Auth | `NOT_APPLICABLE` under Option B+ (do not migrate; new accounts) |
 | Preview runtime proof with credentials | `BLOCKED_EXTERNAL` |
 | Production cutover | `NOT_STARTED` |
 
 **Do not say “migration complete”.**
+**Do not say “alpha-ready”** from documentation alone, or from proof-harness PASS alone while other P0 gates remain open.
 
 Neon is the relational closed-alpha database. Neon/pgvector is **not** automatically the permanent vector database (see `docs/PERSISTENCE_BOUNDARY.md`).
 
@@ -48,8 +51,8 @@ Neon is the relational closed-alpha database. Neon/pgvector is **not** automatic
 | Current target | Better Auth (self-hosted) + Drizzle auth tables |
 | Code-path status | `IMPLEMENTED` (runtime Supabase auth routes `REMOVED`) |
 | Schema status | `IMPLEMENTED` (`users` / `sessions` / `accounts` / `verifications`) |
-| External migration status | `BLOCKED_EXTERNAL` / `DECISION_REQUIRED` |
-| Identity-mapping requirement | Old Supabase user IDs ≠ Better Auth user IDs unless an explicit map is built |
+| External migration status | `NOT_APPLICABLE` under **OPTION B+** (no identity migrate) |
+| Identity-mapping requirement | Old and new user IDs are **not** interchangeable; closed alpha starts with new Better Auth accounts |
 | Validation still required | Login/logout Preview smoke; invite finalize; session revocation proofs |
 | Rollback concern | Re-enabling retired Auth without env + identity map would orphan sessions |
 
@@ -75,7 +78,7 @@ Neon is the relational closed-alpha database. Neon/pgvector is **not** automatic
 | Code-path | `IMPLEMENTED` |
 | Schema | `IMPLEMENTED` |
 | External data | `NOT_STARTED` |
-| Identity map | `DECISION_REQUIRED` — do not assume UUID equality |
+| Identity map | **OPTION B+** — no UUID equality; new accounts only |
 | Validation | invite gate + finalize |
 | Rollback | wiping Production users without archive |
 
@@ -178,22 +181,55 @@ Neon is the relational closed-alpha database. Neon/pgvector is **not** automatic
 
 | Field | Value |
 |-------|-------|
-| Status | `DECISION_REQUIRED` |
-| Note | Legacy auth user IDs must not be copied blindly into Better Auth `users.id`. Profile IDs are a separate namespace. |
+| Status | **OPTION B+ RECORDED** |
+| Note | Do not migrate Supabase identities into Better Auth. Do not assume old and new user IDs are interchangeable. Profile IDs remain a separate application namespace. Closed alpha starts with new accounts and new invites. |
 
 ### External data / external user accounts
 
 | Field | Value |
 |-------|-------|
-| External data migration | `NOT_STARTED` |
-| External account activation | `DECISION_REQUIRED` |
-| Validation | row counts / FK / duplicates — not executed |
+| Direct legacy → Neon application-row migrate | `NOT_APPLICABLE` (Option B+) |
+| Legacy read-only export/archive | `NOT_STARTED` (separate process; not claimed complete) |
+| External account activation | New Better Auth accounts + new invites only; issuance still `BLOCKED_EXTERNAL` until Preview bootstrap |
+| Validation | row counts / FK / duplicates for a migrate path — not executed (path rejected) |
 
 ---
 
 ## Data and identity cutover options
 
-### Option A — Controlled data and identity migration
+### OPTION B+ — Clean reset with read-only archive (FOUNDER DECISION — RECORDED)
+
+**Decision status:** `RECORDED` (founder-directed for PR #55 / closed-alpha path).
+
+#### DATA CUTOVER
+
+- Do **not** directly migrate legacy Supabase application rows into the new closed-alpha runtime.
+- Do **not** delete legacy data in this task.
+- If legacy data must be retained, preserve it through a **separate** read-only export/archive process.
+- Do **not** claim the archive is complete unless it has actually been created and verified.
+- Archive status today: `NOT_STARTED`.
+
+#### IDENTITY CUTOVER
+
+- Do **not** migrate Supabase identities into Better Auth.
+- Do **not** assume old and new user IDs are interchangeable.
+- Start the Neon + Better Auth closed alpha with **new accounts** and **new invites**.
+
+#### PRODUCTION
+
+- Production cutover remains `NOT_STARTED`.
+- No Production DB or Vercel Production change is authorized by this decision alone.
+
+#### Still blocked / incomplete (decision does not complete these)
+
+- Disposable integration PostgreSQL evidence (`TEST_DATABASE_URL`) — `BLOCKED_EXTERNAL` until run
+- Preview DB bootstrap + migrate/seed — `BLOCKED_EXTERNAL` until run
+- Authenticated Preview A/B smoke — `BLOCKED_EXTERNAL` until run
+- Combined readiness machine artifact — `BLOCKED_EXTERNAL` until run
+- Overall closed-alpha launch readiness — remains **BLOCKED** / `BLOCKED_EXTERNAL` while any P0 gate is open
+- Proof-harness `readiness:alpha` PASS ≠ overall product alpha-ready
+
+### Option A — Controlled data and identity migration (NOT SELECTED)
 
 Requires:
 
@@ -207,9 +243,9 @@ Requires:
 8. Account activation strategy
 9. Rollback plan
 
-Status: `NOT_STARTED` · Decision: `DECISION_REQUIRED`
+Status: `NOT_SELECTED` (superseded by Option B+)
 
-### Option B — Clean closed-alpha reset and re-invitation
+### Option B — Clean closed-alpha reset and re-invitation (superseded by B+)
 
 Requires:
 
@@ -221,9 +257,9 @@ Requires:
 6. Communication plan
 7. Production cutover window
 
-Status: `NOT_STARTED` · Decision: `DECISION_REQUIRED`
+Status: `SUPERSEDED` by **OPTION B+** (adds explicit read-only archive policy; still no silent destruction)
 
-**No silent data destruction.** Repository evidence does **not** conclusively prove that no meaningful external user data exists in previous environments; therefore the choice remains `DECISION_REQUIRED`.
+**No silent data destruction.** Option B+ forbids deleting legacy data in this task and forbids claiming an unverified archive.
 
 ---
 
