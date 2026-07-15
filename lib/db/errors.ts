@@ -19,12 +19,32 @@ export class DatabaseError extends Error {
 
 type PgErrorLike = {
   code?: string;
+  cause?: unknown;
   message?: string;
 };
 
+/**
+ * Drizzle wraps driver errors (`Failed query: ...`) so the PostgreSQL SQLSTATE
+ * often lives on `error.cause` (and sometimes deeper). Walk a short cause chain.
+ */
+export function extractPgErrorCode(error: unknown): string | undefined {
+  let current: unknown = error;
+  for (let depth = 0; depth < 6 && current; depth += 1) {
+    if (typeof current !== "object" || current === null) {
+      return undefined;
+    }
+    const candidate = (current as PgErrorLike).code;
+    // PostgreSQL SQLSTATE is a 5-char class+code (e.g. 23505, 23514).
+    if (typeof candidate === "string" && /^[0-9A-Z]{5}$/.test(candidate)) {
+      return candidate;
+    }
+    current = (current as PgErrorLike).cause;
+  }
+  return undefined;
+}
+
 export function translateDatabaseError(error: unknown): DatabaseError {
-  const pg = error as PgErrorLike;
-  const pgCode = pg?.code;
+  const pgCode = extractPgErrorCode(error);
 
   if (pgCode === "23505") {
     return new DatabaseError("UNIQUE_VIOLATION", "Unique constraint violated", pgCode);

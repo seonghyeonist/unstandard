@@ -52,6 +52,8 @@ describe("integration runner-core termination and serial execution", () => {
     );
     assert.match(source, /--test-concurrency=1/);
     assert.match(source, /shell:\s*false/);
+    assert.match(source, /--conditions=react-server/);
+    assert.match(source, /withReactServerExportCondition/);
     assert.doesNotMatch(source, /suite\/\*\.test\.ts/);
     assert.doesNotMatch(source, /execSync\(/);
     assert.doesNotMatch(source, /process\.exit\(/);

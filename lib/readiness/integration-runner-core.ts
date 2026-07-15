@@ -111,6 +111,25 @@ export function createUniqueObservationLogPath(pid = process.pid): string {
   return join(tmpdir(), `unstandard-integration-cases-${pid}-${suffix}.jsonl`);
 }
 
+/**
+ * Resolve `server-only` to its empty react-server export so integration suites
+ * can import server modules under plain Node/tsx (outside Next.js).
+ */
+export function withReactServerExportCondition(
+  env: NodeJS.ProcessEnv,
+): NodeJS.ProcessEnv {
+  const existing = env.NODE_OPTIONS?.trim() ?? "";
+  if (/(?:^|\s)--conditions(?:=|\s+)react-server(?:\s|$)/.test(existing)) {
+    return { ...env };
+  }
+  return {
+    ...env,
+    NODE_OPTIONS: existing
+      ? `${existing} --conditions=react-server`
+      : "--conditions=react-server",
+  };
+}
+
 export function defaultSuiteExecutor(args: {
   files: string[];
   env: NodeJS.ProcessEnv;
@@ -132,7 +151,7 @@ export function defaultSuiteExecutor(args: {
 
   const result: SpawnSyncReturns<Buffer> = spawnSync(command, commandArgs, {
     cwd: args.cwd,
-    env: args.env,
+    env: withReactServerExportCondition(args.env),
     stdio: "inherit",
     shell: false,
   });

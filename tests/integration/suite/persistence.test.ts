@@ -3,6 +3,7 @@ import { describe, it } from "node:test";
 import { sql } from "drizzle-orm";
 import { createIntegrationDb, getIntegrationDatabaseUrl } from "../helpers";
 import { runDrizzleMigrations } from "../../../lib/db/run-migrations";
+import { extractPgErrorCode } from "../../../lib/db/errors";
 import { createBlock } from "../../../lib/db/repositories/blocks.repository";
 import { createUnlock } from "../../../lib/db/repositories/unlocks.repository";
 import { createDrizzleReportsRepository } from "../../../lib/db/repositories/reports.repository";
@@ -111,10 +112,7 @@ describe("integration: persistence invariants", () => {
             reason: "invalid type",
             status: "OPEN",
           }),
-        (error: unknown) => {
-          const pgCode = (error as { code?: string })?.code;
-          return pgCode === "23514";
-        },
+        (error: unknown) => extractPgErrorCode(error) === "23514",
       );
     });
   });

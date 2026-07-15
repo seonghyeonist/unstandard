@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { randomUUID } from "node:crypto";
 import { describe, it } from "node:test";
 import { neon } from "@neondatabase/serverless";
 import { getIntegrationDatabaseUrl } from "../helpers";
@@ -66,10 +67,11 @@ describe("integration: migrations and seed", () => {
     await observeIntegrationCase("seed_idempotency", async () => {
       await runDrizzleMigrations(url);
 
+      // questions.id is uuid — non-UUID markers fail on real PostgreSQL.
       const uniqueSuffix = `${process.pid}-${Date.now()}`;
       const dataset: SeedDataset = {
         question: {
-          id: `integration-seed-q-${uniqueSuffix}`,
+          id: randomUUID(),
           prompt: `integration seed prompt ${uniqueSuffix}`,
           helper: `helper-${uniqueSuffix}`,
           active: true,
