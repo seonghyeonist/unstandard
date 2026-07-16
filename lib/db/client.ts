@@ -8,6 +8,7 @@ import { schema } from "@/lib/db/schema";
 import type { DbExecutor } from "@/lib/db/types";
 
 neonConfig.webSocketConstructor = ws;
+neonConfig.poolQueryViaFetch = true;
 
 export type AppDatabase = DbExecutor;
 
