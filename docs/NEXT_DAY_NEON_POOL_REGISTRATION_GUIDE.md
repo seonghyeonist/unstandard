@@ -338,7 +338,7 @@ git push -u origin cursor/neon-drizzle-better-auth-rebuild-909d
 2. URL/host = 새 Preview hostname
 3. Preview (not Production)
 4. Git commit SHA = 방금 push한 SHA
-5. (해당 시) Supabase redirect는 이 스택에서 쓰는지 — Better Auth면 `BETTER_AUTH_URL` / app URL이 Preview를 가리키는지 **이름만** 확인
+5. Better Auth 기준 `BETTER_AUTH_URL` / app URL이 Preview를 가리키는지 **이름만** 확인
 
 하나라도 불확실하면: `target not confirmed` 하고 smoke/가입 성공 주장 중단.
 
