@@ -89,26 +89,51 @@ describe("proof artifact schema", () => {
     assert.equal(integration.ok, true);
     assert.equal(smoke.ok, true);
     if (!integration.ok || !smoke.ok) return;
-    const combined = buildCombinedReadinessArtifact({
-      integration: integration.artifact,
-      smoke: smoke.artifact,
-      nowIso: "2026-07-14T05:10:00.000Z",
-    });
+    const combined = buildCombinedReadinessArtifact(
+      {
+        integration: integration.artifact,
+        smoke: smoke.artifact,
+        nowIso: "2026-07-14T05:10:00.000Z",
+      },
+      { nowMs: NOW },
+    );
     assert.equal(combined.ok, true);
     if (!combined.ok) return;
     const reparsed = parseCombinedReadinessArtifact(combined.artifact, { nowMs: NOW });
     assert.equal(reparsed.ok, true);
   });
 
+  it("propagates combineSourceArtifacts clock through the final combined builder", () => {
+    const integration = parseIntegrationProofArtifact(validIntegration(), { nowMs: NOW });
+    const smoke = parseSmokeProofArtifact(validSmoke(), { nowMs: NOW });
+    assert.equal(integration.ok && smoke.ok, true);
+    if (!integration.ok || !smoke.ok) return;
+    const combined = combineSourceArtifacts({
+      integration: integration.artifact,
+      smoke: smoke.artifact,
+      expectedPreviewHostname: PREVIEW_HOST,
+      nowMs: NOW,
+    });
+    // Only succeeds when nowMs reaches buildCombinedReadinessArtifact; otherwise the
+    // 2026-07-14 fixture timestamps are stale against the real clock.
+    assert.equal(combined.ok, true);
+    if (!combined.ok) return;
+    assert.equal(combined.artifact.sourceTimestamps.integration, "2026-07-14T05:00:00.000Z");
+    assert.equal(combined.artifact.sourceTimestamps.smoke, "2026-07-14T05:05:00.000Z");
+  });
+
   it("rejects missing required integration case", () => {
     const cases = allPassCases(REQUIRED_INTEGRATION_CASES).filter((c) => c.name !== "block_uniqueness");
-    const built = buildIntegrationArtifact({
-      verdict: "PASS",
-      gitSha: GIT_SHA,
-      migrationChecksum: CHECKSUM,
-      timestamp: "2026-07-14T05:00:00.000Z",
-      cases,
-    });
+    const built = buildIntegrationArtifact(
+      {
+        verdict: "PASS",
+        gitSha: GIT_SHA,
+        migrationChecksum: CHECKSUM,
+        timestamp: "2026-07-14T05:00:00.000Z",
+        cases,
+      },
+      { nowMs: NOW },
+    );
     assert.equal(built.ok, true);
     if (!built.ok) return;
     const smoke = parseSmokeProofArtifact(validSmoke(), { nowMs: NOW });
@@ -148,13 +173,16 @@ describe("proof artifact schema", () => {
     const cases = allPassCases(REQUIRED_INTEGRATION_CASES).map((c) =>
       c.name === "seed_idempotency" ? { ...c, status: "FAIL" as const } : c,
     );
-    const integration = buildIntegrationArtifact({
-      verdict: "FAIL",
-      gitSha: GIT_SHA,
-      migrationChecksum: CHECKSUM,
-      timestamp: "2026-07-14T05:00:00.000Z",
-      cases,
-    });
+    const integration = buildIntegrationArtifact(
+      {
+        verdict: "FAIL",
+        gitSha: GIT_SHA,
+        migrationChecksum: CHECKSUM,
+        timestamp: "2026-07-14T05:00:00.000Z",
+        cases,
+      },
+      { nowMs: NOW },
+    );
     assert.equal(integration.ok, true);
     if (!integration.ok) return;
     const smoke = parseSmokeProofArtifact(validSmoke(), { nowMs: NOW });
@@ -173,14 +201,17 @@ describe("proof artifact schema", () => {
     const cases = allPassCases(REQUIRED_HTTP_SMOKE_CASES).map((c) =>
       c.name === "revoked_session_rejected" ? { ...c, status: "FAIL" as const } : c,
     );
-    const smoke = buildSmokeArtifact({
-      verdict: "FAIL",
-      gitSha: GIT_SHA,
-      migrationChecksum: CHECKSUM,
-      timestamp: "2026-07-14T05:00:00.000Z",
-      previewHostname: PREVIEW_HOST,
-      cases,
-    });
+    const smoke = buildSmokeArtifact(
+      {
+        verdict: "FAIL",
+        gitSha: GIT_SHA,
+        migrationChecksum: CHECKSUM,
+        timestamp: "2026-07-14T05:00:00.000Z",
+        previewHostname: PREVIEW_HOST,
+        cases,
+      },
+      { nowMs: NOW },
+    );
     assert.equal(smoke.ok, true);
     if (!smoke.ok) return;
     const integration = parseIntegrationProofArtifact(validIntegration(), { nowMs: NOW });
@@ -284,11 +315,14 @@ describe("proof artifact schema", () => {
     const smoke = parseSmokeProofArtifact(validSmoke(), { nowMs: NOW });
     assert.equal(smoke.ok, true);
     if (!smoke.ok) return;
-    const combined = buildCombinedReadinessArtifact({
-      integration: integration.artifact,
-      smoke: smoke.artifact,
-      nowIso: "2026-07-14T05:10:00.000Z",
-    });
+    const combined = buildCombinedReadinessArtifact(
+      {
+        integration: integration.artifact,
+        smoke: smoke.artifact,
+        nowIso: "2026-07-14T05:10:00.000Z",
+      },
+      { nowMs: NOW },
+    );
     assert.equal(combined.ok, true);
     if (!combined.ok) return;
     const failures = validateReadinessEvidence(combined.artifact, {
@@ -312,11 +346,14 @@ describe("proof artifact schema", () => {
     const smoke = parseSmokeProofArtifact(validSmoke(), { nowMs: NOW });
     assert.equal(integration.ok && smoke.ok, true);
     if (!integration.ok || !smoke.ok) return;
-    const combined = buildCombinedReadinessArtifact({
-      integration: integration.artifact,
-      smoke: smoke.artifact,
-      nowIso: "2026-07-14T05:10:00.000Z",
-    });
+    const combined = buildCombinedReadinessArtifact(
+      {
+        integration: integration.artifact,
+        smoke: smoke.artifact,
+        nowIso: "2026-07-14T05:10:00.000Z",
+      },
+      { nowMs: NOW },
+    );
     assert.equal(combined.ok, true);
     if (!combined.ok) return;
     const failures = validateReadinessEvidence(combined.artifact, {
@@ -495,17 +532,20 @@ describe("session revocation proofs", () => {
 
 describe("artifact secret safety and atomic write", () => {
   it("refuses cookies/emails/passwords/tokens/database URLs in artifacts", () => {
-    const withCookie = buildSmokeArtifact({
-      verdict: "PASS",
-      gitSha: GIT_SHA,
-      migrationChecksum: CHECKSUM,
-      timestamp: "2026-07-14T05:00:00.000Z",
-      previewHostname: PREVIEW_HOST,
-      cases: allPassCases(REQUIRED_HTTP_SMOKE_CASES),
-      futureNotApplicable: [
-        { name: "leak", reason: "cookie=better-auth.session_token=abc" },
-      ],
-    });
+    const withCookie = buildSmokeArtifact(
+      {
+        verdict: "PASS",
+        gitSha: GIT_SHA,
+        migrationChecksum: CHECKSUM,
+        timestamp: "2026-07-14T05:00:00.000Z",
+        previewHostname: PREVIEW_HOST,
+        cases: allPassCases(REQUIRED_HTTP_SMOKE_CASES),
+        futureNotApplicable: [
+          { name: "leak", reason: "cookie=better-auth.session_token=abc" },
+        ],
+      },
+      { nowMs: NOW },
+    );
     assert.equal(withCookie.ok, false);
 
     const withEmail = parseSmokeProofArtifact(
@@ -563,13 +603,16 @@ describe("artifact secret safety and atomic write", () => {
     mkdirSync(dir, { recursive: true });
     const out = join(dir, "integration.json");
     try {
-      const built = buildIntegrationArtifact({
-        verdict: "PASS",
-        gitSha: GIT_SHA,
-        migrationChecksum: CHECKSUM,
-        timestamp: "2026-07-14T05:00:00.000Z",
-        cases: allPassCases(REQUIRED_INTEGRATION_CASES),
-      });
+      const built = buildIntegrationArtifact(
+        {
+          verdict: "PASS",
+          gitSha: GIT_SHA,
+          migrationChecksum: CHECKSUM,
+          timestamp: "2026-07-14T05:00:00.000Z",
+          cases: allPassCases(REQUIRED_INTEGRATION_CASES),
+        },
+        { nowMs: NOW },
+      );
       assert.equal(built.ok, true);
       if (!built.ok) return;
       writeProofArtifactAtomically({ outputPath: out, artifact: built.artifact });
@@ -582,23 +625,29 @@ describe("artifact secret safety and atomic write", () => {
 
   it("blocked integration/smoke runs must not create PASS artifacts (contract helpers)", () => {
     // Contract documented by builders: BLOCKED_EXTERNAL cannot carry PASS cases.
-    const blocked = buildIntegrationArtifact({
-      verdict: "BLOCKED_EXTERNAL",
-      gitSha: GIT_SHA,
-      migrationChecksum: CHECKSUM,
-      timestamp: "2026-07-14T05:00:00.000Z",
-      cases: [{ name: "report_user_fk", status: "PASS" }],
-    });
+    const blocked = buildIntegrationArtifact(
+      {
+        verdict: "BLOCKED_EXTERNAL",
+        gitSha: GIT_SHA,
+        migrationChecksum: CHECKSUM,
+        timestamp: "2026-07-14T05:00:00.000Z",
+        cases: [{ name: "report_user_fk", status: "PASS" }],
+      },
+      { nowMs: NOW },
+    );
     assert.equal(blocked.ok, false);
 
-    const blockedSmoke = buildSmokeArtifact({
-      verdict: "BLOCKED_EXTERNAL",
-      gitSha: GIT_SHA,
-      migrationChecksum: CHECKSUM,
-      timestamp: "2026-07-14T05:00:00.000Z",
-      previewHostname: PREVIEW_HOST,
-      cases: [{ name: "anonymous_denied", status: "PASS" }],
-    });
+    const blockedSmoke = buildSmokeArtifact(
+      {
+        verdict: "BLOCKED_EXTERNAL",
+        gitSha: GIT_SHA,
+        migrationChecksum: CHECKSUM,
+        timestamp: "2026-07-14T05:00:00.000Z",
+        previewHostname: PREVIEW_HOST,
+        cases: [{ name: "anonymous_denied", status: "PASS" }],
+      },
+      { nowMs: NOW },
+    );
     assert.equal(blockedSmoke.ok, false);
 
     // Simulate blocked path: no artifact file written

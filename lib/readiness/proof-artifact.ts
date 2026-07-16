@@ -388,6 +388,7 @@ export type BuildSmokeArtifactInput = BuildIntegrationArtifactInput & {
 
 export function buildIntegrationArtifact(
   input: BuildIntegrationArtifactInput,
+  options: ArtifactValidationOptions = {},
 ): { ok: true; artifact: IntegrationProofArtifact } | { ok: false; failures: string[] } {
   const candidate = {
     artifactVersion: ARTIFACT_VERSION,
@@ -395,17 +396,18 @@ export function buildIntegrationArtifact(
     verdict: input.verdict,
     gitSha: input.gitSha,
     migrationChecksum: input.migrationChecksum,
-    timestamp: input.timestamp ?? nowCanonicalProofTimestamp(),
+    timestamp: input.timestamp ?? nowCanonicalProofTimestamp(options.nowMs),
     matrix: INTEGRATION_MATRIX,
     cases: input.cases,
     ...(input.futureNotApplicable ? { futureNotApplicable: input.futureNotApplicable } : {}),
   };
 
-  return parseIntegrationProofArtifact(candidate);
+  return parseIntegrationProofArtifact(candidate, options);
 }
 
 export function buildSmokeArtifact(
   input: BuildSmokeArtifactInput,
+  options: ArtifactValidationOptions = {},
 ): { ok: true; artifact: SmokeProofArtifact } | { ok: false; failures: string[] } {
   const candidate = {
     artifactVersion: ARTIFACT_VERSION,
@@ -413,14 +415,14 @@ export function buildSmokeArtifact(
     verdict: input.verdict,
     gitSha: input.gitSha,
     migrationChecksum: input.migrationChecksum,
-    timestamp: input.timestamp ?? nowCanonicalProofTimestamp(),
+    timestamp: input.timestamp ?? nowCanonicalProofTimestamp(options.nowMs),
     matrix: SMOKE_MATRIX,
     previewHostname: input.previewHostname,
     cases: input.cases,
     ...(input.futureNotApplicable ? { futureNotApplicable: input.futureNotApplicable } : {}),
   };
 
-  return parseSmokeProofArtifact(candidate);
+  return parseSmokeProofArtifact(candidate, options);
 }
 
 /**
@@ -432,11 +434,14 @@ export function computeContentDigest(value: unknown): string {
   return createHash("sha256").update(normalized).digest("hex").slice(0, 16);
 }
 
-export function buildCombinedReadinessArtifact(input: {
-  integration: IntegrationProofArtifact;
-  smoke: SmokeProofArtifact;
-  nowIso?: string;
-}): { ok: true; artifact: CombinedReadinessArtifact } | { ok: false; failures: string[] } {
+export function buildCombinedReadinessArtifact(
+  input: {
+    integration: IntegrationProofArtifact;
+    smoke: SmokeProofArtifact;
+    nowIso?: string;
+  },
+  options: ArtifactValidationOptions = {},
+): { ok: true; artifact: CombinedReadinessArtifact } | { ok: false; failures: string[] } {
   const withoutDigest = {
     artifactVersion: ARTIFACT_VERSION,
     kind: "readiness" as const,
@@ -444,7 +449,7 @@ export function buildCombinedReadinessArtifact(input: {
     gitSha: input.integration.gitSha,
     migrationChecksum: input.integration.migrationChecksum,
     previewHostname: input.smoke.previewHostname,
-    timestamp: input.nowIso ?? nowCanonicalProofTimestamp(),
+    timestamp: input.nowIso ?? nowCanonicalProofTimestamp(options.nowMs),
     sourceTimestamps: {
       integration: input.integration.timestamp,
       smoke: input.smoke.timestamp,
@@ -464,7 +469,7 @@ export function buildCombinedReadinessArtifact(input: {
     contentDigest: computeContentDigest(withoutDigest),
   };
 
-  return parseCombinedReadinessArtifact(artifact);
+  return parseCombinedReadinessArtifact(artifact, options);
 }
 
 export type WriteArtifactOptions = {

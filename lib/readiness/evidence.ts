@@ -229,7 +229,15 @@ export function combineSourceArtifacts(input: {
     return { ok: false, failures };
   }
 
-  return buildCombinedReadinessArtifact({ integration, smoke });
+  return buildCombinedReadinessArtifact(
+    { integration, smoke },
+    {
+      nowMs,
+      maxAgeMs,
+      clockSkewMs,
+      expectedPreviewHostname: input.expectedPreviewHostname,
+    },
+  );
 }
 
 /** @deprecated Prefer contentDigest naming; kept only to avoid silent accidental imports. */
