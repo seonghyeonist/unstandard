@@ -59,5 +59,8 @@
     "tailwindcss": "^4.1.7",
     "tsx": "^4.22.4",
     "typescript": "^5.8.3"
+  },
+  "optionalDependencies": {
+    "bufferutil": "4.1.0"
   }
 }
