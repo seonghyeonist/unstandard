@@ -1,6 +1,7 @@
 import "server-only";
 
 import { betterAuth } from "better-auth";
+import { nextCookies } from "better-auth/next-js";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { APIError, createAuthMiddleware } from "better-auth/api";
 import { cookies } from "next/headers";
@@ -125,7 +126,7 @@ export function getAuth(): ReturnType<typeof betterAuth> {
       enabled: true,
       minPasswordLength: 10,
     },
-    plugins: [inviteGatePlugin()],
+    plugins: [inviteGatePlugin(), nextCookies()],
     databaseHooks: {
       user: {
         create: {
