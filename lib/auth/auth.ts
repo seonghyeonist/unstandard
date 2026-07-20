@@ -28,6 +28,20 @@ function getTrustedOrigins(): string[] {
   if (authUrl) origins.add(authUrl.replace(/\/$/, ""));
   const appUrl = process.env.UNSTANDARD_APP_URL?.trim();
   if (appUrl) origins.add(appUrl.replace(/\/$/, ""));
+  for (const hostname of [
+    process.env.VERCEL_URL,
+    process.env.VERCEL_BRANCH_URL,
+  ]) {
+    const value = hostname?.trim();
+    if (!value) continue;
+
+    const origin = value.startsWith("http://") || value.startsWith("https://")
+      ? value
+      : `https://${value}`;
+
+    origins.add(origin.replace(/\/$/, ""));
+  }
+
   if (process.env.NODE_ENV !== "production") {
     origins.add("http://localhost:3000");
   }
