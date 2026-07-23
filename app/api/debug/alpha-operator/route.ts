@@ -8,11 +8,14 @@ import {
   requireInvitePepper,
 } from "@/lib/auth/invite-crypto";
 import { getDb } from "@/lib/db/client";
-import { users } from "@/lib/db/schema/auth";
+import { accounts, sessions, users } from "@/lib/db/schema/auth";
+import { answers, depthEvaluations } from "@/lib/db/schema/answers";
 import { alphaInvites } from "@/lib/db/schema/invites";
+import { profiles } from "@/lib/db/schema/profiles";
 
 const TARGET_BRANCH = "cursor/neon-drizzle-better-auth-rebuild-909d";
 const RESET_CONFIRMATION = "RESET_ALPHA_TEST_ACCOUNT";
+const INSPECT_CONFIRMATION = "INSPECT_ALPHA_TEST_ACCOUNT";
 const ALLOWED_EMAILS = new Set([
   "stoprulker@gmail.com",
   "unstandardil@gmail.com",
@@ -60,14 +63,97 @@ export async function POST(request: Request) {
   const email = normalizeEmail(String(input.email ?? ""));
   const confirmation = String(input.confirmation ?? "");
 
-  if (!ALLOWED_EMAILS.has(email) || confirmation !== RESET_CONFIRMATION) {
+  if (!ALLOWED_EMAILS.has(email)) {
+    return notFound();
+  }
+
+  const db = getDb();
+
+  if (confirmation === INSPECT_CONFIRMATION) {
+    const userRows = await db
+      .select({
+        id: users.id,
+        inviteFinalizedAt: users.inviteFinalizedAt,
+      })
+      .from(users)
+      .where(eq(users.email, email));
+    const user = userRows[0] ?? null;
+
+    if (!user) {
+      return NextResponse.json(
+        {
+          ok: true,
+          email,
+          exists: false,
+        },
+        { headers: { "Cache-Control": "no-store" } },
+      );
+    }
+
+    const [profileRows, inviteRows, accountRows, sessionRows, answerRows, evaluationRows] =
+      await Promise.all([
+        db
+          .select({
+            id: profiles.id,
+            userId: profiles.userId,
+            nickname: profiles.nickname,
+            onboardedAt: profiles.onboardedAt,
+          })
+          .from(profiles)
+          .where(eq(profiles.userId, user.id)),
+        db
+          .select({
+            id: alphaInvites.id,
+            status: alphaInvites.status,
+            consumedAt: alphaInvites.consumedAt,
+            consumedByUserId: alphaInvites.consumedByUserId,
+          })
+          .from(alphaInvites)
+          .where(eq(alphaInvites.emailNormalized, email)),
+        db.select({ id: accounts.id }).from(accounts).where(eq(accounts.userId, user.id)),
+        db.select({ id: sessions.id }).from(sessions).where(eq(sessions.userId, user.id)),
+        db
+          .select({
+            id: answers.id,
+            questionId: answers.questionId,
+            targetProfileId: answers.targetProfileId,
+          })
+          .from(answers)
+          .where(eq(answers.userId, user.id)),
+        db
+          .select({
+            answerId: depthEvaluations.answerId,
+            verdict: depthEvaluations.verdict,
+            modelVersion: depthEvaluations.modelVersion,
+          })
+          .from(depthEvaluations)
+          .where(eq(depthEvaluations.userId, user.id)),
+      ]);
+
+    return NextResponse.json(
+      {
+        ok: true,
+        email,
+        exists: true,
+        user,
+        profiles: profileRows,
+        invites: inviteRows,
+        accountCount: accountRows.length,
+        sessionCount: sessionRows.length,
+        answers: answerRows,
+        evaluations: evaluationRows,
+      },
+      { headers: { "Cache-Control": "no-store" } },
+    );
+  }
+
+  if (confirmation !== RESET_CONFIRMATION) {
     return notFound();
   }
 
   const rawCode = generateInviteCode();
   const codeHash = hashInviteCode(rawCode, requireInvitePepper());
   const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
-  const db = getDb();
 
   const result = await db.transaction(async (tx) => {
     const deletedUsers = await tx
