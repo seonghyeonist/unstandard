@@ -1,14 +1,8 @@
 import { NextResponse } from "next/server";
 import { AuthError, getAuthenticatedUser } from "@/lib/auth/server";
-import { candidates, onboardingQuestion } from "@/lib/data/mock-public";
+import { candidates } from "@/lib/data/mock-public";
 import { evaluateDepthAnswer } from "@/lib/depth/evaluate-depth-answer";
 import { setUnlockCookie } from "@/lib/server/unlock-cookies";
-import { apiFetch, hasApiBaseUrl } from "@/lib/api/client";
-
-type DepthEvaluateResponse = {
-  verdict: "PASS" | "REVIEW" | "REJECT";
-  reason_codes?: string[];
-};
 
 function questionForProfile(profileId: string): string {
   return candidates.find((candidate) => candidate.id === profileId)?.question ?? "";
@@ -43,30 +37,15 @@ export async function POST(request: Request) {
   }
 
   try {
-    let verdict: "PASS" | "REVIEW" | "REJECT" | "ERROR";
-    let reasonCodes: string[] = [];
-
-    if (hasApiBaseUrl()) {
-      const response = await apiFetch<DepthEvaluateResponse>("/internal/depth/evaluate", {
-        method: "POST",
-        body: JSON.stringify({
-          user_id: user.id,
-          question_id: onboardingQuestion.id,
-          answer_id: crypto.randomUUID(),
-          question_text: questionForProfile(profileId),
-          answer_text: answer,
-        }),
-      });
-      verdict = response.verdict;
-      reasonCodes = response.reason_codes ?? [];
-    } else {
-      const evaluation = evaluateDepthAnswer({
-        questionText: questionForProfile(profileId),
-        answerText: answer,
-      });
-      verdict = evaluation.verdict;
-      reasonCodes = evaluation.reasonCodes;
-    }
+    // The live app scores answers with the deterministic local heuristic only
+    // (mock-local-heuristic-v0.0). There is no path here that can select or
+    // credential a remote Depth service — see docs/LOCAL_AI_POC_STATUS.md.
+    const evaluation = evaluateDepthAnswer({
+      questionText: questionForProfile(profileId),
+      answerText: answer,
+    });
+    const verdict: "PASS" | "REVIEW" | "REJECT" | "ERROR" = evaluation.verdict;
+    const reasonCodes: string[] = evaluation.reasonCodes;
 
     if (verdict === "PASS") {
       await setUnlockCookie(profileId, user.id);

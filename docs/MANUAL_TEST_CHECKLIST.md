@@ -25,7 +25,7 @@
 
 ## B. 온보딩 답변 영속화 (브라우저 수동)
 
-1. `NEXT_PUBLIC_API_BASE_URL= npm run dev` 로 standalone 실행 → `http://localhost:3000`.
+1. `npm run dev` 로 실행 → `http://localhost:3000`. (원격 Depth 서비스를 선택하는 public env var는 존재하지 않으며, 항상 결정론적 mock으로 채점됨 — `docs/LOCAL_AI_POC_STATUS.md` 참조.)
 2. `/login` → "세션 시작하기" → `/onboarding`.
 3. 닉네임 + 답변(20자 이상) 입력 후 "시작하기".
 4. DevTools → Application → Session Storage → `unstandard.alpha.onboarding` 키 확인.

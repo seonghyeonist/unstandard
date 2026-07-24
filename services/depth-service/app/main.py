@@ -1,9 +1,11 @@
 from __future__ import annotations
 
+import hmac
+import logging
 import time
 from contextlib import asynccontextmanager
 
-from fastapi import BackgroundTasks, FastAPI, HTTPException
+from fastapi import BackgroundTasks, FastAPI, Header, HTTPException
 
 from app.config import AppConfigProvider, Settings
 from app.db import create_pool, persist_evaluation
@@ -14,7 +16,31 @@ from app.models import DepthEvaluateRequest, DepthEvaluateResponse
 from app.qwen import maybe_request_qwen_review
 
 
+logger = logging.getLogger("unstandard.depth_service")
+
+# Generic, infra-detail-free error text for every public error response.
+# Real exception text, model dimensions, and internal URLs are logged
+# server-side only (see logger.* calls below), never returned to callers.
+GENERIC_UNAVAILABLE_DETAIL = "Local AI depth scoring is temporarily unavailable"
+GENERIC_UNAUTHORIZED_DETAIL = "Unauthorized"
+
 settings = Settings()
+
+
+def is_service_request_authorized(request_token: str | None) -> bool:
+    """Fail closed: every one of these must hold, or the request is denied.
+
+    - explicit server-only opt-in (env var, never app_config/DB)
+    - a configured service token (env var, never app_config/DB)
+    - a caller-supplied token that matches via constant-time comparison
+    """
+    if not settings.local_ai_poc_enabled:
+        return False
+    if not settings.local_ai_service_token:
+        return False
+    if not request_token:
+        return False
+    return hmac.compare_digest(request_token, settings.local_ai_service_token)
 
 
 @asynccontextmanager
@@ -42,24 +68,35 @@ async def health() -> dict[str, str]:
 async def evaluate_depth(
     request: DepthEvaluateRequest,
     background_tasks: BackgroundTasks,
+    x_unstandard_depth_service_token: str | None = Header(default=None),
 ) -> DepthEvaluateResponse:
+    # Authentication is checked before any config/DB/embedding work — an
+    # unauthenticated or missing-token caller triggers zero side effects.
+    if not is_service_request_authorized(x_unstandard_depth_service_token):
+        raise HTTPException(status_code=401, detail=GENERIC_UNAUTHORIZED_DETAIL)
+
     started = time.perf_counter()
     config = await app.state.config_provider.get()
+    # An app_config local_ai_enabled=true alone is not sufficient — the
+    # server-only opt-in + token check above already gated this line.
     if not config.local_ai_enabled:
-        raise HTTPException(status_code=503, detail="Local AI depth scoring is disabled")
+        raise HTTPException(status_code=503, detail=GENERIC_UNAVAILABLE_DETAIL)
 
     try:
         question_embedding, answer_embedding = await app.state.embedding_client.embed(
             [request.question_text, request.answer_text]
         )
-    except Exception as exc:
-        raise HTTPException(status_code=503, detail=f"Embedding service unavailable: {exc}") from exc
+    except Exception:
+        logger.exception("embedding service call failed")
+        raise HTTPException(status_code=503, detail=GENERIC_UNAVAILABLE_DETAIL) from None
 
     if len(answer_embedding) != config.embedding_dim:
-        raise HTTPException(
-            status_code=502,
-            detail=f"Embedding dimension mismatch: expected {config.embedding_dim}, got {len(answer_embedding)}",
+        logger.error(
+            "embedding dimension mismatch: expected=%s got=%s",
+            config.embedding_dim,
+            len(answer_embedding),
         )
+        raise HTTPException(status_code=502, detail=GENERIC_UNAVAILABLE_DETAIL)
 
     feature_result = extract_features(
         request.question_text,
