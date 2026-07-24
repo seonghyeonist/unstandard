@@ -27,6 +27,16 @@ export async function POST(request: Request) {
   const input = body as Record<string, unknown>;
 
   try {
+    let reporterProfileId: string | undefined;
+    if (isReportsPersistenceEnabled()) {
+      const reporterProfile = await ensureReporterProfile(user);
+      if (!reporterProfile.ok) {
+        const failure = mapReporterProfileFailure(reporterProfile);
+        return NextResponse.json(failure.body, { status: failure.status });
+      }
+      reporterProfileId = reporterProfile.profileId;
+    }
+
     const validated = validateReportForUser(
       {
         targetType: String(input.targetType ?? ""),
@@ -35,21 +45,12 @@ export async function POST(request: Request) {
         reporterUserId: input.reporterUserId as string | undefined,
       },
       user.id,
+      reporterProfileId,
     );
-
-    let reporterUserId = user.id;
-    if (isReportsPersistenceEnabled()) {
-      const reporterProfile = await ensureReporterProfile(user);
-      if (!reporterProfile.ok) {
-        const failure = mapReporterProfileFailure(reporterProfile);
-        return NextResponse.json(failure.body, { status: failure.status });
-      }
-      reporterUserId = reporterProfile.profileId;
-    }
 
     const repository = createReportsRepository();
     const result = await repository.createOrGetOpenReport({
-      reporterUserId,
+      reporterUserId: user.id,
       targetType: validated.targetType,
       targetId: validated.targetId,
       reason: validated.reason,

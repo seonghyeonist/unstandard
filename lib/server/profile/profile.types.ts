@@ -1,4 +1,4 @@
-/** Backend-agnostic reporter profile bootstrap result — no Supabase types. */
+/** Backend-agnostic reporter profile bootstrap result. */
 export type ReporterProfileResult =
   | { ok: true; profileId: string }
   | { ok: false; code: "SETUP_REQUIRED" };

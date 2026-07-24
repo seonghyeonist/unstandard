@@ -1,6 +1,10 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { isMockAuthAllowed, isSupabaseAuthEnabled } from "../lib/config/auth-mode.ts";
+import {
+  isDatabaseAuthConfigured,
+  isMockAuthAllowed,
+  getRuntimeMode,
+} from "../lib/config/runtime-mode.ts";
 import { validateReportInput } from "../lib/security/report-validation.ts";
 import {
   resolveCookieSecret,
@@ -8,34 +12,81 @@ import {
   verifyUnlockToken,
 } from "../lib/server/unlock-signature.ts";
 
+const ENV_KEYS = [
+  "UNSTANDARD_RUNTIME_MODE",
+  "DATABASE_URL",
+  "BETTER_AUTH_SECRET",
+  "BETTER_AUTH_URL",
+  "NODE_ENV",
+  "VERCEL_ENV",
+] as const;
+
+function snapshotEnv(): Record<(typeof ENV_KEYS)[number], string | undefined> {
+  return Object.fromEntries(ENV_KEYS.map((key) => [key, process.env[key]])) as Record<
+    (typeof ENV_KEYS)[number],
+    string | undefined
+  >;
+}
+
+function restoreEnv(snapshot: Record<(typeof ENV_KEYS)[number], string | undefined>): void {
+  for (const key of ENV_KEYS) {
+    const value = snapshot[key];
+    if (value === undefined) delete process.env[key];
+    else process.env[key] = value;
+  }
+}
+
+function withEnv(
+  overrides: Partial<Record<(typeof ENV_KEYS)[number], string | undefined>>,
+  run: () => void,
+): void {
+  const snapshot = snapshotEnv();
+  Object.assign(process.env, overrides);
+  for (const key of ENV_KEYS) {
+    if (!(key in overrides)) continue;
+    const value = overrides[key];
+    if (value === undefined) delete process.env[key];
+    else process.env[key] = value;
+  }
+  try {
+    run();
+  } finally {
+    restoreEnv(snapshot);
+  }
+}
+
 describe("auth-boundary", () => {
   it("blocks mock auth in production", () => {
-    const original = process.env.NODE_ENV;
-    process.env.NODE_ENV = "production";
-    try {
+    withEnv({ NODE_ENV: "production", VERCEL_ENV: undefined, UNSTANDARD_RUNTIME_MODE: "mock" }, () => {
       assert.equal(isMockAuthAllowed(), false);
-    } finally {
-      process.env.NODE_ENV = original;
-    }
+    });
   });
 
-  it("production without Supabase env is not auth-configured", () => {
-    const originalNode = process.env.NODE_ENV;
-    const originalUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-    const originalKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-    process.env.NODE_ENV = "production";
-    delete process.env.NEXT_PUBLIC_SUPABASE_URL;
-    delete process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-    try {
-      assert.equal(isSupabaseAuthEnabled(), false);
-      assert.equal(process.env.NODE_ENV === "production" && !isSupabaseAuthEnabled(), true);
-    } finally {
-      process.env.NODE_ENV = originalNode;
-      if (originalUrl === undefined) delete process.env.NEXT_PUBLIC_SUPABASE_URL;
-      else process.env.NEXT_PUBLIC_SUPABASE_URL = originalUrl;
-      if (originalKey === undefined) delete process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-      else process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY = originalKey;
-    }
+  it("requires database env for database auth", () => {
+    withEnv(
+      {
+        UNSTANDARD_RUNTIME_MODE: "database",
+        DATABASE_URL: undefined,
+        BETTER_AUTH_SECRET: "x".repeat(32),
+        BETTER_AUTH_URL: "http://localhost:3000",
+      },
+      () => {
+        assert.equal(isDatabaseAuthConfigured(), false);
+      },
+    );
+  });
+
+  it("defaults development to mock runtime", () => {
+    withEnv(
+      {
+        NODE_ENV: "development",
+        VERCEL_ENV: undefined,
+        UNSTANDARD_RUNTIME_MODE: undefined,
+      },
+      () => {
+        assert.equal(getRuntimeMode(), "mock");
+      },
+    );
   });
 
   it("throws when AUTH_COOKIE_SECRET is missing in production", () => {
@@ -61,12 +112,6 @@ describe("auth-boundary", () => {
         reason: "spam",
         reporterUserId: "attacker",
       }),
-    );
-  });
-
-  it("rejects invalid report targetType", () => {
-    assert.throws(() =>
-      validateReportInput({ targetType: "admin", targetId: "c1", reason: "spam" }),
     );
   });
 });

@@ -1,121 +1,23 @@
-# Security Checklist — Unstandard Closed Alpha
+# Security Checklist
 
-> **현재 상태:** mock/sessionStorage MVP. 이 문서는 50인 클로즈드 알파 전 보안 게이트입니다.
-> mock 모드는 **데모용**이며, 실사용자 투입 전 Supabase Auth + 서버 검증 + RLS가 **필수**입니다.
+## Auth
 
-## A. Executive gate (알파 투입 전)
+- [x] Better Auth server sessions (HttpOnly cookie)
+- [x] Mock auth blocked in Preview/Production
+- [x] Invite-only registration gate
+- [x] Session API redacts email / full user id / tokens
+- [ ] Deployed adversarial smoke PASS
 
-| 게이트 | 현재 | 알파 전 필수 |
-|--------|------|--------------|
-| 실제 인증 (Supabase Auth) | ⚠️ minimal staging login (`/login` server routes); live smoke pending | ✅ |
-| 서버 측 unlock 판정 | ⚠️ signed HttpOnly cookie (not DB) | ✅ DB-backed |
-| 프로필 비공개 필드 서버 분리 | ⚠️ server-only module + API (mock) | ✅ Supabase RLS |
-| 신고 서버 영속 + 중재 파이프라인 | ⚠️ `ReportsRepository` + Supabase alpha adapter (migration/RLS pending) | ✅ |
-| 차단(block) 기능 | ❌ 미구현 | ✅ |
-| RLS on all private tables | ❌ 마이그레이션 초안만 | ✅ |
-| depth-service 브라우저 직접 호출 차단 | ⚠️ `NEXT_PUBLIC_API_BASE_URL` 시 노출 | ✅ BFF/Route Handler |
-| Service role key 클라이언트 미사용 | ✅ (아직 미연동) | ✅ |
+## Data
 
-**판정:** mock 단독으로 실사용자 50인 투입 → **차단(Blocked)**.  
-mock + 문서화된 한계 인지 + Supabase/RLS 착수 → **다음 단계 진행 가능(High risk)**.
+- [x] Server-only `DATABASE_URL`
+- [x] SQL uniqueness for reports/blocks/unlocks
+- [ ] Integration tests on real Postgres
+- [ ] Rate limiting / abuse guards (backlog)
 
----
+## Authorization
 
-## B. Mock-only trust boundaries (절대 잊지 말 것)
-
-1. **Mock auth** — dev-only HttpOnly cookie (`unstandard_mock_session`). `production`에서 mock 불가. Supabase env 없이 production 배포 시 middleware가 `/app` 차단.
-2. **Supabase staging login** — server routes only (`/api/auth/supabase/oauth`, magic link server action, `/auth/callback`). Uses `UNSTANDARD_SUPABASE_URL` + `UNSTANDARD_SUPABASE_PUBLISHABLE_KEY` (server-only). **No service role** for user auth. Legacy `NEXT_PUBLIC_SUPABASE_*` is fallback only — do not expand. Session API returns `idPrefix` only (no full user id, email, or tokens). **Staging shortcut:** Supabase users get `onboarded: true` in session view to bypass mock-only onboarding gate — **not final product behavior**; alpha remains BLOCKED until DB-backed onboarding/answers and RLS smoke exist.
-3. **Unlock** — signed HttpOnly cookie (`AUTH_COOKIE_SECRET` 필수 in production). DB 영속 아님. cookie 탈취 시 해당 profile unlock 노출.
-4. **Private profile** — `lib/data/mock-private.server.ts` (server-only). 클라이언트 번들에 letter 없음. API는 unlock cookie 검증.
-5. **Reports** — `POST /api/reports` uses `ReportsRepository` + `ensureReporterProfile` (Supabase alpha adapters). Explicit `REPORTS_PERSISTENCE_ADAPTER=supabase-alpha` required. Fail-closed 503 when disabled. Reporter bootstrap nicknames must not be derived from email local-parts. **Still needs migration apply + RLS/staging smoke before alpha.**
-6. **`middleware.ts`** — Supabase env 있을 때만 세션 검증. Edge 번들에 `@supabase/supabase-js` 경고 — Vercel preview에서 runtime 검증 필요.
-7. **`AuthGuard`** — 클라이언트 UX 리다이렉트. 서버 경계는 API + middleware.
-
----
-
-## C. Environment & secrets
-
-- [ ] `.env.local` / `.env` 커밋 금지 (`.gitignore` 확인)
-- [ ] `UNSTANDARD_SUPABASE_URL` / `UNSTANDARD_SUPABASE_PUBLISHABLE_KEY`는 서버 전용 (Vercel encrypted)
-- [ ] `SUPABASE_SERVICE_ROLE_KEY`는 서버 전용 — **절대** `NEXT_PUBLIC_` 접두어 금지 — **not used by login/reports user paths**
-- [ ] Vercel Production / Preview env 분리 설정 (`docs/SUPABASE_SETUP.md` 참고)
-- [ ] `NEXT_PUBLIC_API_BASE_URL`은 공개 URL — internal depth 경로를 브라우저에서 직접 호출하지 말 것
-- [ ] docker-compose 기본 `localdev` 비밀번호를 운영에 사용 금지
-
----
-
-## D. Client/server boundary
-
-- [ ] `dangerouslySetInnerHTML` / `innerHTML` / `eval` 사용 없음 유지
-- [ ] 사용자 입력(답변, 메시지, 닉네임)은 React 기본 이스케이프로 렌더
-- [ ] `process.env`는 `NEXT_PUBLIC_*`만 클라이언트 번들에 포함되는지 확인
-- [ ] 에러 UI에 stack trace / env 값 노출 금지
-
----
-
-## E. Data & privacy
-
-- [ ] `console.log`로 답변/이메일/토큰 로깅 금지
-- [ ] 온보딩 답변(`answerText`)은 sessionStorage에 저장됨 — 공유 PC/XSS 시 노출
-- [ ] depth 평가 `score`/`path`/`modelVersion`은 UI 미노출, sessionStorage에는 존재
-- [ ] 알파 종료 후 사용자 데이터 삭제/보내기 절차 문서화 (백로그)
-
----
-
-## F. Reports & safety (P1 before alpha)
-
-- [ ] `reportTarget` 서버 API + DB 영속
-- [ ] `targetType` / `targetId` 서버 검증
-- [ ] 신고 rate limit (서버)
-- [ ] **block** 기능 구현 — 현재 없음
-- [ ] 신고자는 자신의 신고만 조회 가능 (RLS)
-
----
-
-## G. RLS minimum (Supabase 도입 시)
-
-`supabase/migrations/0002_rls_policies.sql` 초안 기준:
-
-| Table | Normal user SELECT | INSERT | UPDATE own | DELETE |
-|-------|-------------------|--------|------------|--------|
-| profiles | public fields only | own | own | — |
-| answers | own only | own | own | — |
-| depth_evaluations | own only | system | — | — |
-| reports | own reports only | own | — | — |
-| blocks | own blocks | own | — | own |
-| app_config | safe keys only | — | — | — |
-| events | own only | own | — | — |
-| messages | conversation member | own | — | — |
-
----
-
-## H. Verification commands
-
-```bash
-npm ci
-npm run lint
-npm run typecheck
-npm run test
-npm run build
-npm run check
-npm audit --audit-level=moderate || true
-```
-
-Mock E2E (백엔드 없이):
-
-```bash
-NEXT_PUBLIC_API_BASE_URL= npm run dev
-```
-
-수동 확인: 약한 답 잠금 유지, 구체적 답 unlock, 신고 sessionStorage 기록, UI에 score/Depth Score/path 미노출.
-
----
-
-## I. P1 before 50-person alpha (구현 순서)
-
-1. Supabase Auth + `middleware.ts` 세션 검증
-2. RLS 마이그레이션 적용 + adapter 교체
-3. Unlock/depth 판정 서버 이전 (BFF)
-4. 프로필 비공개 필드 서버 분리
-5. 신고/차단 서버 영속
-6. depth-service 내부 네트워크 격리 + 인증
+- [x] `requireAuthenticatedUser()` on protected mutations
+- [x] `assertOwnsResource()` helper
+- [x] Reject body-supplied actor IDs in report validation
+- [ ] Full A/B HTTP smoke on Preview

@@ -1,20 +1,29 @@
-import { NextResponse } from "next/server";
-import { getAuthenticatedUser } from "@/lib/auth/server";
+import { AuthError, getAuthenticatedUser, ServiceUnavailableError } from "@/lib/auth/server";
 import { toPublicSessionUser } from "@/lib/auth/session-view";
-import { isSupabaseAuthEnabled } from "@/lib/config/auth-mode";
+import { privateJson } from "@/lib/http/private-json";
 
 export async function GET() {
-  const user = await getAuthenticatedUser();
-  if (!user) {
-    return NextResponse.json({ user: null }, { status: 401 });
-  }
+  try {
+    const user = await getAuthenticatedUser();
+    if (!user) {
+      return privateJson({ user: null }, { status: 401 });
+    }
 
-  const publicUser = toPublicSessionUser(user, { supabaseAuth: isSupabaseAuthEnabled() });
-  return NextResponse.json({
-    user: {
-      nickname: publicUser.nickname,
-      onboarded: publicUser.onboarded,
-      idPrefix: publicUser.idPrefix,
-    },
-  });
+    const publicUser = toPublicSessionUser(user);
+    return privateJson({
+      user: {
+        nickname: publicUser.nickname,
+        onboarded: publicUser.onboarded,
+        idPrefix: publicUser.idPrefix,
+      },
+    });
+  } catch (error) {
+    if (error instanceof ServiceUnavailableError) {
+      return privateJson({ error: error.message }, { status: 503 });
+    }
+    if (error instanceof AuthError) {
+      return privateJson({ error: error.message }, { status: 401 });
+    }
+    return privateJson({ error: "Internal server error" }, { status: 500 });
+  }
 }

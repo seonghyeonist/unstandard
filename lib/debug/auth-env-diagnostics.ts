@@ -1,4 +1,4 @@
-import { isServerSupabaseConfigured } from "@/lib/config/supabase-config";
+import { isDatabaseAuthConfigured } from "@/lib/config/runtime-mode";
 import { getReportsPersistenceAdapter } from "@/lib/config/persistence-mode";
 
 export type AuthEnvDiagnostics = {
@@ -6,6 +6,8 @@ export type AuthEnvDiagnostics = {
   env: {
     nodeEnv: string | undefined;
     vercelEnv: string | null;
+    runtimeMode: string | undefined;
+    databaseEnv: string | undefined;
   };
   request: {
     host: string | null;
@@ -13,44 +15,41 @@ export type AuthEnvDiagnostics = {
     forwardedProto: string | null;
   };
   auth: {
-    hasUnstandardSupabaseUrl: boolean;
-    hasUnstandardSupabasePublishableKey: boolean;
+    hasDatabaseUrl: boolean;
+    hasBetterAuthSecret: boolean;
+    hasBetterAuthUrl: boolean;
     hasAuthCookieSecret: boolean;
     hasUnstandardAppUrl: boolean;
-    isServerSupabaseConfigured: boolean;
+    isDatabaseAuthConfigured: boolean;
   };
   reports: {
-    hasReportsPersistenceAdapter: boolean;
-    reportsPersistenceAdapterIsDisabled: boolean;
+    reportsPersistenceAdapter: string;
   };
 };
 
 export function buildAuthEnvDiagnostics(request: Request): AuthEnvDiagnostics {
-  const hasUnstandardSupabaseUrl = Boolean(process.env.UNSTANDARD_SUPABASE_URL?.trim());
-  const hasUnstandardSupabasePublishableKey = Boolean(
-    process.env.UNSTANDARD_SUPABASE_PUBLISHABLE_KEY?.trim(),
-  );
+  const hasDatabaseUrl = Boolean(process.env.DATABASE_URL?.trim());
+  const hasBetterAuthSecret = Boolean(process.env.BETTER_AUTH_SECRET?.trim());
+  const hasBetterAuthUrl = Boolean(process.env.BETTER_AUTH_URL?.trim());
   const hasAuthCookieSecret = Boolean(process.env.AUTH_COOKIE_SECRET?.trim());
   const hasUnstandardAppUrl = Boolean(process.env.UNSTANDARD_APP_URL?.trim());
-  const serverSupabaseConfigured = isServerSupabaseConfigured();
-
-  const reportsAdapter = getReportsPersistenceAdapter();
-  const hasReportsPersistenceAdapter = Boolean(process.env.REPORTS_PERSISTENCE_ADAPTER?.trim());
-  const reportsPersistenceAdapterIsDisabled = reportsAdapter === "disabled";
+  const databaseAuthConfigured = isDatabaseAuthConfigured();
 
   const ok =
-    hasUnstandardSupabaseUrl &&
-    hasUnstandardSupabasePublishableKey &&
+    hasDatabaseUrl &&
+    hasBetterAuthSecret &&
+    hasBetterAuthUrl &&
     hasAuthCookieSecret &&
     hasUnstandardAppUrl &&
-    reportsPersistenceAdapterIsDisabled &&
-    serverSupabaseConfigured;
+    databaseAuthConfigured;
 
   return {
     ok,
     env: {
       nodeEnv: process.env.NODE_ENV,
       vercelEnv: process.env.VERCEL_ENV ?? null,
+      runtimeMode: process.env.UNSTANDARD_RUNTIME_MODE,
+      databaseEnv: process.env.DATABASE_ENV,
     },
     request: {
       host: request.headers.get("host"),
@@ -58,15 +57,15 @@ export function buildAuthEnvDiagnostics(request: Request): AuthEnvDiagnostics {
       forwardedProto: request.headers.get("x-forwarded-proto"),
     },
     auth: {
-      hasUnstandardSupabaseUrl,
-      hasUnstandardSupabasePublishableKey,
+      hasDatabaseUrl,
+      hasBetterAuthSecret,
+      hasBetterAuthUrl,
       hasAuthCookieSecret,
       hasUnstandardAppUrl,
-      isServerSupabaseConfigured: serverSupabaseConfigured,
+      isDatabaseAuthConfigured: databaseAuthConfigured,
     },
     reports: {
-      hasReportsPersistenceAdapter,
-      reportsPersistenceAdapterIsDisabled,
+      reportsPersistenceAdapter: getReportsPersistenceAdapter(),
     },
   };
 }

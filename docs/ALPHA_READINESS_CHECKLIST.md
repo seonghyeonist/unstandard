@@ -1,111 +1,83 @@
-# Alpha Readiness Checklist — Unstandard
+# Alpha Readiness Checklist
 
-> **현재 판정: BLOCKED** — 50인 클로즈드 알파 투입 불가.  
-> 제품 전략: [`PRODUCT_DIRECTION.md`](./PRODUCT_DIRECTION.md)  
-> 보안 상세: [`SECURITY_CHECKLIST.md`](./SECURITY_CHECKLIST.md)
+## Verdict: BLOCKED_EXTERNAL
 
-체크리스트는 “완료”가 아니라 **증거**(테스트 로그, Vercel preview URL, migration 적용 스크린샷 등)와 함께 기록한다.
+Alpha is **not** ready. Static quality gates alone never equal Alpha readiness.
+A proof-harness combined readiness PASS (if/when obtained) is **not** the same as
+overall closed-alpha launch readiness while other checklist gates remain open.
 
----
+## Founder data/identity decision
 
-## Canonical P0-5 Vercel target
+**OPTION B+ RECORDED** — clean reset with read-only archive policy.
 
-| Field | Value |
-|-------|-------|
-| Vercel project | `unstandard-m9qj` |
-| Production host | `https://unstandard-m9qj.vercel.app` |
-| Required `UNSTANDARD_APP_URL` | `https://unstandard-m9qj.vercel.app` |
-| Required Supabase Redirect URL | `https://unstandard-m9qj.vercel.app/auth/callback` |
+- Do not migrate legacy hosted-BaaS application rows into the closed-alpha runtime.
+- Do not delete legacy data in this workstream; archive separately if retention is required.
+- Do not migrate legacy identities into Better Auth; new accounts + new invites only.
+- Production cutover remains `NOT_STARTED`.
+- See `docs/LEGACY_BACKEND_RETIREMENT.md` (points to the allowlisted P0.3A cutover audit).
 
-`unstandard`, `unstandard-f3nf`, `unstandard-fabi` 등 **다른 Vercel 프로젝트 증거**는 P0-5 auth/deployment 주장에 **무효** (founder가 서면으로 canonical target을 바꾸기 전까지). Magic-link smoke는 rate-limit cooldown 확인 전까지 **중단**.
+This decision does **not** mark export, Preview bootstrap, smoke, or Production complete.
 
----
+## Proof tiers
 
-## P0 — 50인 알파 전 필수
+1. **Static / unit / build** — lint, typecheck, unit tests, build, import/legacy guards
+2. **Real PostgreSQL integration** — `npm run test:integration` + machine-generated artifact (`UNSTANDARD_INTEGRATION_EVIDENCE_OUT`)
+3. **Deployed Preview HTTP smoke** — `npm run smoke:authorization` + machine-generated artifact (`UNSTANDARD_SMOKE_EVIDENCE_OUT`)
+4. **Combined readiness** — `npm run readiness:evidence:build` → `npm run readiness:alpha`
+5. **Future / not applicable** — e.g. DB-backed cross-user private-profile denial (mock route today); DB-backed unlock HTTP authz
+6. **External unexecuted gates** — disposable test DB, separate Preview DB, real A/B Preview users, Vercel deployment SHA mapping
 
-### 인증·세션
+## P0 gates
 
-- [x] Supabase login UI 연결 및 실제 로그인 플로우 테스트 (OAuth 또는 magic link) — 코드: `/login` + `/api/auth/supabase/oauth` + magic link; **canonical staging (`unstandard-m9qj`) login/logout smoke 수동 통과** → [`docs/STAGING_LOGIN_SMOKE.md`](./STAGING_LOGIN_SMOKE.md) (P0-5)
-- [ ] 서버 측 세션 검증 (`middleware.ts` + API route `requireAuthenticatedUser`)
-- [ ] Production에서 mock auth 비활성 (`isMockAuthAllowed() === false`)
-- [ ] Vercel preview/prod env 검증 (`UNSTANDARD_SUPABASE_URL`, `UNSTANDARD_SUPABASE_PUBLISHABLE_KEY`, `AUTH_COOKIE_SECRET`)
-- [ ] Vercel Edge middleware runtime smoke (`docs/VERCEL_PREVIEW_SMOKE.md`)
-- [ ] Service role key가 클라이언트 번들에 없음 (`SUPABASE_SERVICE_ROLE_KEY` server-only)
+- [x] Founder Option B+ data/identity decision recorded (docs only; does not unblock external proofs)
+- [ ] Neon staging (Preview) + production branches provisioned separately
+- [ ] Disposable integration DB ≠ Preview application DB
+- [ ] `npm run db:migrate` + `npm run db:seed` on Preview/staging only
+- [ ] `npm run test:integration` with real `TEST_DATABASE_URL` → PASS artifact
+- [ ] `npm run smoke:authorization` on Preview with A/B users → PASS artifact
+- [ ] `npm run readiness:evidence:build` for the exact HEAD under test
+- [ ] `npm run readiness:alpha` PASS against that combined artifact
+- [ ] Operator confirms Vercel Preview deployment SHA maps to that HEAD (`unstandard-m9qj`)
+- [ ] Invite-only registration verified end-to-end (new accounts under Option B+)
+- [ ] DB-backed reports, blocks, unlocks verified with authorization tests
+- [ ] Legacy read-only archive created and verified **only if** retention is required (otherwise N/A; do not claim complete)
+- [ ] `npm run guard:no-legacy-backend` PASS
+- [ ] Production cutover — `NOT_STARTED` (must remain so until explicitly authorized)
 
-### 데이터·RLS
+## Honest limitations (P0.2 / P0.2.1 / P0.2.2 / P0.2.3 / P0.3A)
 
-- [ ] Supabase migration 적용 (`supabase/migrations/`)
-- [ ] RLS 정책 활성화 및 테스트 (`0002_rls_policies.sql`)
-- [ ] Reporter profile bootstrap staging smoke (`ensureReporterProfile` + reports insert; nickname not email-derived)
-- [ ] DB-backed answers (온보딩·unlock 답변 영속)
-- [ ] DB-backed reports via `ReportsRepository` (alpha adapter wired; migration + RLS smoke pending)
-- [ ] Block 기능 (`GET/POST/DELETE /api/blocks` + DB + RLS)
-- [ ] Unlock state: DB가 source of truth, HttpOnly cookie는 cache만
+- Mock `GET /api/profile/[id]/private` is **not** Neon A/B ownership proof; HTTP 404 ≠ authz denial
+- Current deployed HTTP smoke matrix does **not** prove Neon-backed private-profile A-to-B denial, DB-backed unlock HTTP authz, profile mutation authz, or block HTTP authz
+- Local CookieJar clear ≠ server-side session revocation
+- Case-name presence without `status: "PASS"` is not proof
+- Manually edited PASS JSON is rejected
+- `contentDigest` / `schemaContentDigest` are not cryptographic signatures and do not attest Production
+- Combined readiness artifact does **not** cryptographically bind Option B+; decision is repository/PR documentation at the same HEAD
+- Runner git SHA alone does not attest the remote Vercel deployment SHA
+- `migration_second_run_noop` requires DB ledger + canonical schema snapshot + `schemaContentDigest` (not repo file checksum); real run executes the repaired `pg_catalog` FK snapshot query
+- `seed_idempotency` proves insert/update/no-op outcomes via `RETURNING` on a unique test-only dataset (default closed-alpha seed is not mutated for change proofs)
+- Integration observation cleanup is guaranteed by try/finally without `process.exit` after log allocation; suites run serially (`--test-concurrency=1`, no shell glob)
+- Session / private-profile / unlock JSON responses use private `no-store` Cache-Control (Artifact Version 1 wire shape unchanged; semantic expansion for `session_response_no_store`)
+- Legacy guard PASS covers the printed inspected inventory only (exact historical allowlist + marker); not “zero historical mentions”
 
-### 안전·남용 방지
+## Node
 
-- [ ] 신고·unlock 시도 rate limiting 또는 abuse guard
-- [ ] `targetType` / `targetId` 서버 검증 (기존 `report-validation.ts` 유지·확장)
-- [ ] XSS: 사용자 입력 React 기본 이스케이프 유지, `dangerouslySetInnerHTML` 없음
-- [ ] 로그에 이메일/토큰/원문 답변 미기록
+Pinned to **Node 24.x** (`package.json` `engines`, CI `node-version: 24.x`).
 
-### 품질 게이트
+## Completed in rebuild PR (code / docs)
 
-- [ ] `npm ci` 통과
-- [ ] `npm run lint` 통과
-- [ ] `npm run typecheck` 통과
-- [ ] `npm run build` 통과
-- [ ] `npm run check` 통과
-- [ ] `npm run test` 통과 (현재 45 tests, `tsx --test`)
-- [ ] 모바일 뷰포트 수동 smoke (`docs/MANUAL_TEST_CHECKLIST.md` + 핵심 플로우)
+- [x] Server-only Neon + Drizzle foundation
+- [x] Better Auth sessions
+- [x] Invite gate + profile bootstrap
+- [x] Drizzle repositories for answers/reports/blocks/unlocks
+- [x] Application authorization helpers
+- [x] P0.2 truthful proof harness (artifacts + session revocation distinction)
+- [x] P0.2.1 migration ledger/schema second-run proof + shared seed idempotency + active-path legacy guard
+- [x] P0.2.2 proof termination integrity, private no-store HTTP, serial integration, canonical schema snapshot, seed mutation outcomes, legacy-guard escape-hatch closure
+- [x] P0.2.3 PostgreSQL FK schema snapshot query repair (`pg_constraint` + `unnest(conkey, confkey) WITH ORDINALITY`)
+- [x] P0.3A cutover audit + **Option B+** founder decision recorded + proof env contract aligned
 
-### npm audit (알파 전 결정 기록)
+Do not claim alpha-ready until external DB + Preview smoke + combined readiness + Vercel SHA mapping exist,
+and remaining P0 gates above are satisfied.
 
-- [ ] PostCSS moderate advisory (Next transitive) — **`npm audit fix --force` 금지** (Next 9로 다운그레이드)
-- [ ] 인간 승인: 수용 / Next 업그레이드 대기 / 별도 dependency PR
-
----
-
-## P1 — 베타(25–39 타깃) 전 권장
-
-### 제품·운영
-
-- [ ] Staged reveal 설정 (질문·답변 단계 vs 사진·기본 사실 단계 분리)
-- [ ] 타깃 코호트 분석 (알파 쐐기 vs 베타 25–39 분리)
-- [ ] D1/D7 retention instrumentation
-- [ ] 채널·유입 source tracking
-- [ ] 사용자 피드백 export
-- [ ] Admin/moderation review queue
-- [ ] 기본 observability (에러·latency)
-
-### 기술 부채
-
-- [ ] Depth BFF: `DEPTH_SERVICE_URL` server-only, `NEXT_PUBLIC_API_BASE_URL` 브라우저 직접 호출 제거
-- [ ] Dead code 정리: `lib/api/report-store.ts` (sessionStorage, 미사용)
-- [ ] `README.md` / `AGENTS.md`와 실제 auth·report 경로 동기화
-- [ ] Invite / allowlist gate
-
----
-
-## 현재 알려진 갭 (2026-06-28, main @ 4a5153e)
-
-| 항목 | 현재 상태 |
-|------|-----------|
-| Login UI | Supabase login UI 연결됨; **P0-5 canonical staging (`unstandard-m9qj`) login/logout smoke 수동 통과** — [`STAGING_LOGIN_SMOKE.md`](./STAGING_LOGIN_SMOKE.md). 알파 전체는 여전히 BLOCKED. |
-| Reports | `ReportsRepository` + explicit adapter gate; `ensureReporterProfile` before insert when enabled |
-| Blocks | 미구현 |
-| Unlock | HMAC HttpOnly cookie only (DB 없음) |
-| Onboarding answers | `sessionStorage` (`onboarding-store.ts`) — 알파-safe 아님 |
-| RLS | Migration 초안만, 미적용 |
-| Vercel Edge | Build warning, preview 미실측 |
-| PR #9 | Draft maintenance — 별도 판단 필요 |
-
----
-
-## 판정 규칙
-
-- P0 항목 **하나라도** 미충족 → **BLOCKED**
-- P0 전부 충족 + P1 일부 미충족 → **CONDITIONALLY PROCEED** (베타 확장 전 P1 마무리)
-- P0 + 필수 P1 + 실측 smoke → **ALPHA-READY** (50인 투입 가능)
-
-> Supabase login UI, DB-backed reports/block/unlock, RLS 검증, Vercel env 검증이 없는데 “알파 준비 완료”라고 말하지 말 것.
+**INTERNAL PROOF CONTRADICTIONS:** repaired by P0.2.2 / P0.2.3 internal gates (unit/static). External proof remains `BLOCKED_EXTERNAL`.
