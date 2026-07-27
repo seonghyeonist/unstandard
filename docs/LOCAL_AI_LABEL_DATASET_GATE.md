@@ -4,14 +4,14 @@
 
 | Gate | Verdict |
 |---|---|
-| `DATASET_INTEGRITY` | **`UNVERIFIED_IN_THIS_RUN`** — the audit could not be executed here (see "Audit execution status"). Not yet `STRUCTURALLY_PASS`. |
+| `DATASET_INTEGRITY` | **`STRUCTURALLY_FAIL`** — the hash-verified aggregate audit completed, but two pre-audit expected diagnostics do not reproduce (see section 4). This is a documented expectation mismatch, not permission to substitute a favorable result. |
 | `CALIBRATION_READINESS` | **`NOT_READY`** |
 | `HUMAN_LABEL_GATE` | **`BLOCKED`** |
 
-`CALIBRATION_READINESS` and `HUMAN_LABEL_GATE` do **not** depend on the outcome of
-the structural audit. They are blocked by the absence of human ground truth, which
-is an independent and stronger condition. A `STRUCTURALLY_PASS` integrity result
-would not unblock either of them.
+`CALIBRATION_READINESS` and `HUMAN_LABEL_GATE` do **not** become ready merely
+because a structural audit runs. They remain blocked by the absence of human
+ground truth, which is an independent condition. A future `STRUCTURALLY_PASS`
+integrity result would not unblock either of them.
 
 ## 1. Purpose and confidentiality boundary
 
@@ -53,90 +53,89 @@ interchangeable with results recorded here.
 
 ## 3. Audit execution status
 
-> **The aggregate audit has NOT been executed against the real workbook.**
+The real workbook was audited on **2026-07-27** after its SHA-256 matched the
+value in section 2. The audit was read-only and aggregate-only: it printed no
+question text, answer text, reviewer text, row IDs, pair digests, or matched
+PII strings. The workbook was not copied into the Git worktree, modified,
+exported, uploaded, or tracked.
 
-The workbook was not reachable from the environment in which this gate was
-written: `UNSTANDARD_LABELING_WORKBOOK_PATH` was unset, no file of that name
-existed on the filesystem, and no file anywhere on disk matched the expected
-SHA-256. The correct outcome is `BLOCKED_INPUT`, not a transcribed result.
+Historical context: the original P0.4B documentation run could not access the
+workbook and correctly left its observations as `_pending_`. That is no longer
+the current audit state. The observations in section 4 are measurements from
+the hash-verified workbook, not fixture output and not transcribed expectations.
 
-Consequently the figures in section 4 are recorded as **operator-asserted
-expectations, not reproduced measurements**. They are written down so that a
-later run has something falsifiable to check against. Nobody may cite them as
-audit evidence until the "observed" column is filled in by an actual run.
-
-What *was* done instead: the auditor described in section 5 was written and
-validated end-to-end against a **synthetic, shape-only fixture** containing no
-real data. On that fixture the auditor reproduced every expected aggregate in
-section 4 exactly. This establishes that the audit procedure is correct and
-runnable; it establishes **nothing whatsoever** about the real workbook.
+The outcome is deliberately fail-closed: two diagnostic expectations do not
+match the observed aggregates. The audit therefore does **not** promote
+`DATASET_INTEGRITY` to `STRUCTURALLY_PASS`, even though the core container,
+row, ID, distribution, duplicate, and human-label-completion checks match.
 
 ## 4. Aggregate audit results
 
-`expected` = operator-asserted, unverified. `observed` = to be filled in by a run
-against the hash-verified workbook. Do not delete the `expected` column when
-filling in `observed`; a divergence is a finding, not something to overwrite.
+`expected` = the pre-audit assertion retained for traceability. `observed` = the
+2026-07-27 measurement against the hash-verified workbook. A divergence is a
+finding, not something to overwrite or explain away.
 
 ### Container and structure
 
 | Metric | Expected | Observed |
 |---|---|---|
-| Sheet count | 5 | _pending_ |
-| Hidden / very-hidden sheets | 0 (all visible) | _pending_ |
-| Macro parts (`vbaProject.bin`) | 0 | _pending_ |
-| External-link parts (`xl/externalLinks/`) | 0 | _pending_ |
-| Formula cells | 0 | _pending_ |
+| Sheet count | 5 | 5 |
+| Sheet names / visibility | 5, all visible | `📋 라벨링 세트`, `📊 분포 요약`, `🏷️ 레이블 가이드`, `⚙️ app_config 기준값`, `📈 KPI 트래킹`; all `visible` |
+| Hidden / very-hidden sheets | 0 (all visible) | 0 (all visible) |
+| Macro parts (`vbaProject.bin`) | 0 | 0 |
+| External-link parts (`xl/externalLinks/`) | 0 | 0 |
+| Formula cells | 0 | 0 |
 
 ### Rows and identifiers
 
 | Metric | Expected | Observed |
 |---|---|---|
-| Populated labeling rows | 1000 | _pending_ |
-| ID range | 1..1000 | _pending_ |
-| IDs unique | yes | _pending_ |
-| Unique question–answer pairs | 260 | _pending_ |
-| Duplicate rows beyond unique pairs | 740 | _pending_ |
+| Populated labeling rows | 1000 | 1000 |
+| ID range | 1..1000 | 1..1000 |
+| IDs unique | yes | yes (1000 unique; 0 non-integer) |
+| Unique question–answer pairs | 260 | 260 |
+| Duplicate rows beyond unique pairs | 740 | 740 |
 
 ### Category distribution
 
 | Category | Expected rows | Observed |
 |---|---|---|
-| `L1_PASS` | 100 | _pending_ |
-| `L2_PASS` | 100 | _pending_ |
-| `L3_PASS` | 150 | _pending_ |
-| `L4_PASS` | 150 | _pending_ |
-| `L5_PASS` | 150 | _pending_ |
-| `GRAY_BAND` | 100 | _pending_ |
-| `SPAM_ABUSE` | 100 | _pending_ |
-| `AI_STYLED` | 50 | _pending_ |
-| `ONBOARDING` | 100 | _pending_ |
-| **Total** | **1000** | _pending_ |
+| `L1_PASS` | 100 | 100 |
+| `L2_PASS` | 100 | 100 |
+| `L3_PASS` | 150 | 150 |
+| `L4_PASS` | 150 | 150 |
+| `L5_PASS` | 150 | 150 |
+| `GRAY_BAND` | 100 | 100 |
+| `SPAM_ABUSE` | 100 | 100 |
+| `AI_STYLED` | 50 | 50 |
+| `ONBOARDING` | 100 | 100 |
+| **Total** | **1000** | **1000** |
 
 ### Recommended label distribution (synthetic prior — see section 7)
 
 | Recommended label | Expected rows | Observed |
 |---|---|---|
-| `PASS` | 750 | _pending_ |
-| `REVIEW` | 150 | _pending_ |
-| `REJECT` | 100 | _pending_ |
+| `PASS` | 750 | 750 |
+| `REVIEW` | 150 | 150 |
+| `REJECT` | 100 | 100 |
 
 ### Recommended path distribution (synthetic prior — see section 7)
 
 | Recommended path | Expected rows | Observed |
 |---|---|---|
-| `BASIC` | 449 | _pending_ |
-| `FAST_TRACK` | 201 | _pending_ |
-| `GRAY_BAND` | 150 | _pending_ |
-| `SPAM_REJECT` | 100 | _pending_ |
-| `ONBOARDING_PASS` | 100 | _pending_ |
+| `BASIC` | 449 | 449 |
+| `FAST_TRACK` | 201 | 201 |
+| `GRAY_BAND` | 150 | 150 |
+| `SPAM_REJECT` | 100 | 100 |
+| `ONBOARDING_PASS` | 100 | 100 |
 
 ### Human-label completion
 
 | Metric | Expected | Observed |
 |---|---|---|
-| Reviewer-1 labels completed | 0 | _pending_ |
-| Reviewer-2 labels completed | 0 | _pending_ |
-| Final labels completed | 0 | _pending_ |
+| Reviewer-1 labels completed | 0 | 0 |
+| Reviewer-2 labels completed | 0 | 0 |
+| Final labels completed | 0 | 0 |
 
 ### PII-shaped patterns
 
@@ -144,14 +143,44 @@ Counts and classification only. The matched strings must never be recorded.
 
 | Metric | Expected | Observed |
 |---|---|---|
-| Phone-shaped rows | 5 | _pending_ |
-| Their category | all `SPAM_ABUSE` | _pending_ |
-| Their recommended label | all `REJECT` | _pending_ |
-| Their recommended path | all `SPAM_REJECT` | _pending_ |
+| Phone-shaped physical rows | 5 | **10** — expectation mismatch |
+| Their category | all `SPAM_ABUSE` | all `SPAM_ABUSE` |
+| Their recommended label | all `REJECT` | all `REJECT` |
+| Their recommended path | all `SPAM_REJECT` | all `SPAM_REJECT` |
 
-If any phone-shaped row is found **outside** `SPAM_ABUSE` / `REJECT` /
-`SPAM_REJECT`, that is a containment finding and this gate must be re-opened
-rather than annotated.
+All observed phone-shaped rows are classified as `SPAM_ABUSE` / `REJECT` /
+`SPAM_REJECT`; no classification-containment exception was observed. The count
+still differs from the published physical-row expectation, so the mismatch is a
+gate finding. It must not be silently redefined as a five-row result.
+
+### Answer-length validation
+
+The stored value is validated using **ASCII space U+0020 only**:
+
+```python
+len(answer.replace(" ", ""))
+```
+
+It is not raw Unicode length, `strip()` length, normalized-text length, or a
+calculation with all Unicode whitespace removed.
+
+| Metric | Expected | Observed |
+|---|---:|---:|
+| `stored == len(answer)` | 0 / 1000 | **145 / 1000** — expectation mismatch |
+| `stored == len(answer.replace(" ", ""))` | 1000 / 1000 | 1000 / 1000 |
+| Non-integer stored values | 0 | 0 |
+
+The governing answer-length invariant passes for every physical row. The raw
+length comparison is retained as a separate diagnostic and does not authorize
+rewriting its observed value to zero.
+
+### Duplicate structure
+
+The largest observed repetition count for one normalized question–answer pair,
+reported only by category, is: `L1_PASS` 5, `L2_PASS` 4, `L3_PASS` 5,
+`L4_PASS` 5, `L5_PASS` 5, `GRAY_BAND` 2, `SPAM_ABUSE` 5, `AI_STYLED` 2, and
+`ONBOARDING` 10. Pair grouping uses NFKC plus whitespace-insensitive text only
+inside the ephemeral auditor; raw text, salts, and digests are not retained.
 
 ## 5. Reproducing the audit
 
@@ -190,8 +219,8 @@ requirements:
 
 ## 6. Physical rows vs. unique pairs
 
-**The workbook is expected to contain 1,000 physical rows representing only 260
-unique question–answer pairs — roughly 3.85 physical rows per unique pair.**
+**The audited workbook contains 1,000 physical rows representing only 260 unique
+question–answer pairs — roughly 3.85 physical rows per unique pair.**
 
 This distinction is the single most important thing in this document.
 
@@ -206,21 +235,22 @@ This distinction is the single most important thing in this document.
 
 ## 7. Answer-length counting semantics
 
-The stored answer-length column is expected to equal the **character count after
-all whitespace is removed** — not the raw Unicode string length, and not a byte
-length.
+The stored answer-length column equals the **character count after ASCII space
+U+0020 only is removed**. The exact calculation is:
 
-Any audit must check both interpretations and report them separately:
+```python
+len(answer.replace(" ", ""))
+```
 
-- `stored == len(answer)` — raw string length: expected **0** of 1000 matches.
-- `stored == len("".join(answer.split()))` — whitespace-stripped: expected
-  **1000** of 1000 matches.
+It is not raw Unicode string length, byte length, `strip()` length, normalized
+text length, or a calculation that removes every Unicode whitespace character.
+The audit checks raw length and the ASCII-space-only calculation separately in
+section 4. The observed raw equality is 145/1000, not the prior asserted 0/1000;
+the ASCII-space-only invariant is 1000/1000.
 
 Do not silently reinterpret this column as raw string length. If a future
-consumer of the workbook applies a minimum-length rule, it must use the same
-whitespace-stripped definition, or the rule will not mean what the workbook's
-authors meant. Record which definition is in force wherever such a rule is
-implemented.
+consumer applies a minimum-length rule, it must use this same ASCII-space-only
+definition and record that definition beside the rule.
 
 ## 8. Synthetic recommended labels vs. human final labels
 
@@ -320,9 +350,20 @@ git diff --name-status
 git ls-files | rg -i 'LabelingDataset|label.*xlsx|project_sources'   # expect: no output
 ```
 
-## 12. Next gate
+## 12. Gate resolution and next gate
 
-**The next action is human double-labeling of at least 200 unique question–answer
+Before this dataset can be called `STRUCTURALLY_PASS`, the owner must reconcile
+the two published pre-audit expectations with the observed workbook aggregates:
+
+- raw answer-length equality: expected 0/1000; observed 145/1000;
+- phone-shaped physical rows: expected 5; observed 10, all in the required
+  `SPAM_ABUSE` / `REJECT` / `SPAM_REJECT` classification.
+
+This reconciliation must not alter the observed values, inspect or publish raw
+content, or trigger model work.
+
+Once that documentation finding is resolved, the next minimum operational gate
+is **blind double-labeling of at least 200 deduplicated unique question–answer
 pairs, per section 9. It is not model execution.**
 
 Explicitly *not* next: TEI/BGE-M3/Qwen download or execution, Docker Compose
@@ -330,8 +371,5 @@ startup, embedding generation, threshold simulation, calibration, wiring the
 depth service into the live app, or any deployment. Those remain gated behind
 both this document and `docs/LOCAL_AI_POC_STATUS.md`.
 
-The immediately preceding blocking item is smaller: run the section-5 audit
-against the hash-verified workbook and fill in the `observed` column of section 4,
-so that `DATASET_INTEGRITY` can move off `UNVERIFIED_IN_THIS_RUN`. That is a
-prerequisite for trusting the sampling frame in section 9, but it does not by
-itself unblock calibration.
+The observed audit is complete. It does not unblock calibration, and no model
+execution, deployment, or app change is authorized by this document.
