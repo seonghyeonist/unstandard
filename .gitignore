@@ -65,6 +65,14 @@ next-env.d.ts
 # --- Docker ---
 docker-compose.override.yml
 
+# --- Confidential offline label data (절대 커밋 금지) ---
+# Narrow on purpose. See docs/LOCAL_AI_LABEL_DATASET_GATE.md — a broad *.xlsx
+# rule would also hide legitimate spreadsheets and make a renamed copy of the
+# workbook harder to spot in review.
+project_sources/01-Unstandard_LabelingDataset_v0.1.xlsx
+private-data/local-ai/*.xlsx
+artifacts/local-ai-labeling/raw/
+
 # --- Misc ---
 *.log
 *.pid
