@@ -1,0 +1,68 @@
+---
+description: P0.4C human-label blind reviewer pack — schema, privacy, and handling reminder
+alwaysApply: true
+---
+
+# P0.4C Blind Reviewer Pack — Standing Reminder
+
+## What these files are
+
+Operator-local **blind** workbooks for independent human labeling (Reviewer A / Reviewer B).
+They are **not** the source `Unstandard_LabelingDataset_v0.1.xlsx`. They must stay
+**outside Git**, outside chat dumps, and off model/API/Vercel/embedding paths.
+
+Verified upload artifacts (this environment, structure-only):
+
+| Role | Upload basename (suffix may vary) | SHA-256 |
+|---|---|---|
+| Reviewer A | `P0.4C_Reviewer_A_Blind_Workbook_*.xlsx` | `e71832672a6c7528453809f273a04337ffbff8c9aa6a2ee979fdf228c3727b79` |
+| Reviewer B | `P0.4C_Reviewer_B_Blind_Workbook_*.xlsx` | `1b8bcc0245ca52424d8e0760595cf8798b4f66478621e4c34417173d2730fccd` |
+
+Do **not** treat SHA as a substitute for the source workbook hash. Source workbook
+expected SHA-256 remains:
+
+`b63f77dc7fa10694e4af6d3fc5ee86c4fcb4b01bda0889a1e96bcba4b1a55e51`
+
+## Required schema (both A and B)
+
+- Sheet: exactly `Blind Review`
+- Header row + **200** data rows (201 physical rows including header)
+- Columns **exactly** (and only):
+
+  1. `sample_id` — local opaque id (verified: 200 unique, length 8)
+  2. `question`
+  3. `answer`
+  4. `reviewer label` — empty until the human fills it
+  5. `reviewer note` — empty until the human fills it
+
+- Forbidden columns (must never appear in reviewer-facing files):
+  `category`, recommended label/path, expected Depth score, peer reviewer label,
+  source row ids, or any unblinding metadata.
+
+## Cross-file invariants
+
+- A and B share the **same** `sample_id` set (same 200 pairs).
+- A and B row **order differs** (independent shuffle) — do not re-sort to match.
+- Labels/notes start empty on both sides.
+- No adjudication / Cohen’s kappa until **both** reviewers finish independently.
+
+## Hard privacy rules (always)
+
+- Never print question, answer, reviewer note, `sample_id`, or whole rows to
+  stdout, logs, chat, commits, PR bodies, or issues.
+- Never copy these workbooks (or the source workbook) into a Git worktree,
+  commit, upload to model/API/embedding, or send to Vercel.
+- Reports may include **aggregates only**: counts, fill rates, schema checks,
+  set-equality / order-inequality booleans, hashes of files — not cell text.
+- Deliver / store packs only under an **operator-local private directory**
+  outside the repo (e.g. via `UNSTANDARD_LABELING_WORKBOOK_PATH` for the source;
+  reviewer packs similarly private).
+
+## Agent behavior when these files are mentioned
+
+1. Confirm schema + counts + blind columns; do not dump contents.
+2. Do not invent missing source-workbook rows or regenerate packs unless
+   explicitly tasked with P0.4C generation **and** the hash-verified source is present.
+3. Do not commit/push reviewer xlsx. Do not open PRs that add workbook bytes.
+4. Do not start calibration, model scoring, or kappa until the human-label gate says so.
+5. App code, DB, Docker, Preview, Production are out of scope for pack handling.
