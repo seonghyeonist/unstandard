@@ -4,7 +4,7 @@
 
 | Gate | Verdict |
 |---|---|
-| `DATASET_INTEGRITY` | **`STRUCTURALLY_FAIL`** — the hash-verified aggregate audit completed, but two pre-audit expected diagnostics do not reproduce (see section 4). This is a documented expectation mismatch, not permission to substitute a favorable result. |
+| `DATASET_INTEGRITY` | **`STRUCTURALLY_PASS`** — the hash-verified aggregate audit and an independent aggregate-only reconciliation both pass. The two earlier discrepancies were diagnostic-definition/counting errors, not workbook-integrity failures (see sections 3–4). |
 | `CALIBRATION_READINESS` | **`NOT_READY`** |
 | `HUMAN_LABEL_GATE` | **`BLOCKED`** |
 
@@ -64,16 +64,28 @@ workbook and correctly left its observations as `_pending_`. That is no longer
 the current audit state. The observations in section 4 are measurements from
 the hash-verified workbook, not fixture output and not transcribed expectations.
 
-The outcome is deliberately fail-closed: two diagnostic expectations do not
-match the observed aggregates. The audit therefore does **not** promote
-`DATASET_INTEGRITY` to `STRUCTURALLY_PASS`, even though the core container,
-row, ID, distribution, duplicate, and human-label-completion checks match.
+A follow-up read-only, aggregate-only reconciliation was completed on
+**2026-07-28** against the same hash-verified workbook. It resolved both prior
+diagnostic discrepancies without altering the workbook or substituting observed
+values:
+
+- the phone diagnostic had double-counted the same five physical rows because
+  two overlapping recognizers matched the same five occurrences;
+- the raw-length expectation had overlooked answers containing no ASCII space,
+  for which raw length and ASCII-space-removed length are necessarily equal.
+
+The corrected metrics are recorded in section 4. The core container, row, ID,
+distribution, duplicate, containment, and answer-length-invariant checks pass,
+so `DATASET_INTEGRITY` is `STRUCTURALLY_PASS`. This does not change the
+independent human-label or calibration gates.
 
 ## 4. Aggregate audit results
 
 `expected` = the pre-audit assertion retained for traceability. `observed` = the
-2026-07-27 measurement against the hash-verified workbook. A divergence is a
-finding, not something to overwrite or explain away.
+hash-verified workbook measurement, including the 2026-07-28 aggregate-only
+reconciliation where noted. A divergence must be investigated rather than
+overwritten; when the diagnostic itself is wrong, the correction and reason
+must remain explicit.
 
 ### Container and structure
 
@@ -143,15 +155,20 @@ Counts and classification only. The matched strings must never be recorded.
 
 | Metric | Expected | Observed |
 |---|---|---|
-| Phone-shaped physical rows | 5 | **10** — expectation mismatch |
+| Phone-shaped physical rows | 5 | **5** |
+| Phone-shaped match occurrences | 5 | **5** (answer field: 5; question field: 0) |
+| Unique normalized question–answer pairs containing a match | not previously specified | **1** |
 | Their category | all `SPAM_ABUSE` | all `SPAM_ABUSE` |
 | Their recommended label | all `REJECT` | all `REJECT` |
 | Their recommended path | all `SPAM_REJECT` | all `SPAM_REJECT` |
 
-All observed phone-shaped rows are classified as `SPAM_ABUSE` / `REJECT` /
-`SPAM_REJECT`; no classification-containment exception was observed. The count
-still differs from the published physical-row expectation, so the mismatch is a
-gate finding. It must not be silently redefined as a five-row result.
+A physical row is counted once if either text field contains at least one match.
+Overlapping recognizers must be unioned at row and occurrence level; their raw
+per-recognizer counts must not be summed. The earlier value 10 double-counted the
+same five occurrences because two recognizers matched each one. No matched text
+was emitted or retained. All five physical rows are classified as
+`SPAM_ABUSE` / `REJECT` / `SPAM_REJECT`; no classification-containment
+exception was observed.
 
 ### Answer-length validation
 
@@ -166,13 +183,17 @@ calculation with all Unicode whitespace removed.
 
 | Metric | Expected | Observed |
 |---|---:|---:|
-| `stored == len(answer)` | 0 / 1000 | **145 / 1000** — expectation mismatch |
-| `stored == len(answer.replace(" ", ""))` | 1000 / 1000 | 1000 / 1000 |
+| `stored == len(answer)` | 0 / 1000 (pre-audit assertion) | **145 / 1000** |
+| Answers containing no ASCII space U+0020 | not previously specified | **145 / 1000** |
+| Raw-length matches that contain an ASCII space | not previously specified | **0 / 1000** |
+| `stored == len(answer.replace(" ", ""))` | 1000 / 1000 | **1000 / 1000** |
 | Non-integer stored values | 0 | 0 |
 
-The governing answer-length invariant passes for every physical row. The raw
-length comparison is retained as a separate diagnostic and does not authorize
-rewriting its observed value to zero.
+The 145 raw-length matches are exactly the 145 answers containing no ASCII space,
+so equality is required by the governing definition rather than anomalous. None
+of the 855 answers containing an ASCII space matches raw length. The pre-audit
+0/1000 assertion was therefore a diagnostic-definition error. The governing
+ASCII-space-only answer-length invariant passes for every physical row.
 
 ### Duplicate structure
 
@@ -245,8 +266,8 @@ len(answer.replace(" ", ""))
 It is not raw Unicode string length, byte length, `strip()` length, normalized
 text length, or a calculation that removes every Unicode whitespace character.
 The audit checks raw length and the ASCII-space-only calculation separately in
-section 4. The observed raw equality is 145/1000, not the prior asserted 0/1000;
-the ASCII-space-only invariant is 1000/1000.
+section 4. The observed raw equality is 145/1000 because exactly 145 answers
+contain no ASCII space; the ASCII-space-only invariant is 1000/1000.
 
 Do not silently reinterpret this column as raw string length. If a future
 consumer applies a minimum-length rule, it must use this same ASCII-space-only
@@ -352,19 +373,13 @@ git ls-files | rg -i 'LabelingDataset|label.*xlsx|project_sources'   # expect: n
 
 ## 12. Gate resolution and next gate
 
-Before this dataset can be called `STRUCTURALLY_PASS`, the owner must reconcile
-the two published pre-audit expectations with the observed workbook aggregates:
+The two audit discrepancies are resolved in sections 3–4. The dataset is
+`STRUCTURALLY_PASS`, but this is only an integrity verdict: it does not create
+human ground truth and does not authorize calibration or model work.
 
-- raw answer-length equality: expected 0/1000; observed 145/1000;
-- phone-shaped physical rows: expected 5; observed 10, all in the required
-  `SPAM_ABUSE` / `REJECT` / `SPAM_REJECT` classification.
-
-This reconciliation must not alter the observed values, inspect or publish raw
-content, or trigger model work.
-
-Once that documentation finding is resolved, the next minimum operational gate
-is **blind double-labeling of at least 200 deduplicated unique question–answer
-pairs, per section 9. It is not model execution.**
+The next minimum operational gate is **blind double-labeling of at least 200
+deduplicated unique question–answer pairs, per section 9. It is not model
+execution.**
 
 Explicitly *not* next: TEI/BGE-M3/Qwen download or execution, Docker Compose
 startup, embedding generation, threshold simulation, calibration, wiring the
