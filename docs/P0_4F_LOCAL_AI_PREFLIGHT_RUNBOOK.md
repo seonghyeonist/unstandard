@@ -73,6 +73,9 @@ Hard rules:
    (operator-local; never committed).
 5. Question/answer text and XLSX **must not** enter the repository.
 6. AI adjudication remains **not** human ground truth.
+7. The AI A/B agreement rate and Cohen's kappa are **reference /
+   provenance-continuity evidence only**. They do **not** constitute an
+   independent human ground-truth answer set.
 
 ## 3. Future preflight manifest (fields only — do not fill or run)
 
