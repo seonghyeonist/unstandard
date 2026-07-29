@@ -11,6 +11,7 @@
 - **Preview/Production에서 mock auth 금지.** `UNSTANDARD_RUNTIME_MODE=database` 필수.
 - **빌드 중 자동 migration 금지.** `db:migrate`는 명시적 확인 env 필요.
 - **변경 후 `git diff --stat` 확인**, `npm run check` 통과 후 종료.
+- **P0.4D AI adjudication 작업 전** [`docs/P0_4D_AI_ADJUDICATION_CURSOR_WORKSHEET.md`](./docs/P0_4D_AI_ADJUDICATION_CURSOR_WORKSHEET.md)를 읽는다. AI-only offline labels는 human ground truth나 readiness 증거로 승격하지 않는다.
 
 ## 로컬 실행
 
