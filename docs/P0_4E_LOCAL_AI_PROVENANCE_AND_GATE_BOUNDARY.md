@@ -124,7 +124,7 @@ Do not infer authorization for:
 - generating embeddings or sending raw text to remote services;
 - changing thresholds, weights, SDS, Fast-track, or unlock behavior;
 - wiring Depth Score into Next.js, Preview, or Production;
-- applying migrations or changing Neon / Supabase data;
+- applying migrations or changing live database data;
 - declaring `HUMAN_LABEL_GATE`, `CALIBRATION_READINESS`, or alpha readiness
   passed;
 - committing XLSX or row-level question/answer text.
