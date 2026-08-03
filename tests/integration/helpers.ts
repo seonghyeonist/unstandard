@@ -4,6 +4,7 @@ import ws from "ws";
 import { assertTestDatabaseEnv } from "@/lib/config/database-env";
 import { requireDestructiveTestConfirmation, requireTestDatabaseUrl } from "@/lib/db/migration-guards";
 import { schema } from "@/lib/db/schema";
+import { assertDatabaseReachable } from "@/lib/readiness/integration-database";
 import type { DbExecutor } from "@/lib/db/types";
 
 neonConfig.webSocketConstructor = ws;
@@ -25,13 +26,4 @@ export function createIntegrationDb(url = getIntegrationDatabaseUrl()): Integrat
   return drizzle(pool, { schema });
 }
 
-export async function assertDatabaseReachable(url: string): Promise<void> {
-  const pool = new Pool({ connectionString: url });
-  const client = await pool.connect();
-  try {
-    await client.query("SELECT 1");
-  } finally {
-    client.release();
-    await pool.end();
-  }
-}
+export { assertDatabaseReachable };

@@ -21,8 +21,8 @@ import {
   requireDestructiveTestConfirmation,
   requireTestDatabaseUrl,
 } from "../../lib/db/migration-guards";
-import { assertDatabaseReachable } from "../../tests/integration/helpers";
 import { getCurrentGitSha } from "../../lib/readiness/evidence";
+import { assertDatabaseReachable } from "./integration-database";
 import {
   buildIntegrationArtifact,
   writeProofArtifactAtomically,
