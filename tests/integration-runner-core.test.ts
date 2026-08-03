@@ -57,6 +57,8 @@ describe("integration runner-core termination and serial execution", () => {
     assert.doesNotMatch(source, /suite\/\*\.test\.ts/);
     assert.doesNotMatch(source, /execSync\(/);
     assert.doesNotMatch(source, /process\.exit\(/);
+    assert.match(source, /--import/);
+    assert.doesNotMatch(source, /tsx\/dist\/cli\.mjs/);
 
     const cli = readFileSync(join(process.cwd(), "scripts/test/integration.ts"), "utf8");
     assert.match(cli, /process\.exitCode/);

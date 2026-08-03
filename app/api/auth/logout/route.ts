@@ -1,7 +1,7 @@
-import { NextResponse } from "next/server";
 import { signOutCurrentUser } from "@/lib/auth/server";
+import { privateJson } from "@/lib/http/private-json";
 
 export async function POST() {
   await signOutCurrentUser();
-  return NextResponse.json({ ok: true });
+  return privateJson({ ok: true });
 }

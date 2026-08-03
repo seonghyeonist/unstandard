@@ -135,11 +135,14 @@ export function defaultSuiteExecutor(args: {
   env: NodeJS.ProcessEnv;
   cwd: string;
 }): SuiteExecutorResult {
-  const tsxCli = resolve(args.cwd, "node_modules/tsx/dist/cli.mjs");
-  const command = existsSync(tsxCli) ? process.execPath : "npx";
-  const commandArgs = existsSync(tsxCli)
-    ? [tsxCli, "--test", "--test-concurrency=1", ...args.files]
-    : ["tsx", "--test", "--test-concurrency=1", ...args.files];
+  const command = process.execPath;
+  const commandArgs = [
+    "--import",
+    "tsx",
+    "--test",
+    "--test-concurrency=1",
+    ...args.files,
+  ];
 
   const joined = commandArgs.join(" ");
   if (joined.includes("*") || joined.includes("?")) {

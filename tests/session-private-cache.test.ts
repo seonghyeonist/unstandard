@@ -15,6 +15,7 @@ describe("session / private-profile / unlock cache contracts", () => {
     assert.match(source, /privateJson\(\{ user: null \}, \{ status: 401 \}\)/);
     assert.match(source, /status: 503/);
     assert.match(source, /status: 500/);
+    assert.doesNotMatch(source, /error\.message/);
     assert.doesNotMatch(source, /NextResponse\.json/);
   });
 

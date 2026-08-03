@@ -1,5 +1,4 @@
-import { NextResponse } from "next/server";
-import { AuthError, requireAuthenticatedUser } from "@/lib/auth/server";
+import { AuthError, requireAuthenticatedUser, ServiceUnavailableError } from "@/lib/auth/server";
 import { isDatabaseAuthConfigured } from "@/lib/config/runtime-mode";
 import { onboardingQuestion } from "@/lib/data/mock-public";
 import {
@@ -9,10 +8,11 @@ import {
 import { mapSaveOnboardingAnswerResultToHttp } from "@/lib/server/persistence/answers.http-mapper";
 import { createAnswersRepository } from "@/lib/server/persistence/answers.repository.factory";
 import { validateOnboardingAnswerInput } from "@/lib/security/onboarding-validation";
+import { privateJson } from "@/lib/http/private-json";
 
 export async function POST(request: Request) {
   if (!isDatabaseAuthConfigured()) {
-    return NextResponse.json({ error: "Database auth required" }, { status: 403 });
+    return privateJson({ error: "Database auth required" }, { status: 403 });
   }
 
   let user;
@@ -20,20 +20,23 @@ export async function POST(request: Request) {
     user = await requireAuthenticatedUser();
   } catch (error) {
     if (error instanceof AuthError) {
-      return NextResponse.json({ error: error.message }, { status: 401 });
+      return privateJson({ error: "Unauthorized" }, { status: 401 });
     }
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    if (error instanceof ServiceUnavailableError) {
+      return privateJson({ error: "Service temporarily unavailable" }, { status: 503 });
+    }
+    return privateJson({ error: "Unauthorized" }, { status: 401 });
   }
 
   let body: unknown;
   try {
     body = await request.json();
   } catch {
-    return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
+    return privateJson({ error: "Invalid JSON" }, { status: 400 });
   }
 
   if (!body || typeof body !== "object") {
-    return NextResponse.json({ error: "Invalid body" }, { status: 400 });
+    return privateJson({ error: "Invalid body" }, { status: 400 });
   }
 
   const input = body as Record<string, unknown>;
@@ -45,8 +48,8 @@ export async function POST(request: Request) {
       answer: input.answer,
     });
   } catch (error) {
-    const message = error instanceof Error ? error.message : "Invalid input";
-    return NextResponse.json({ error: message }, { status: 400 });
+    void error;
+    return privateJson({ error: "Invalid input" }, { status: 400 });
   }
 
   const evaluation = evaluateDepthAnswer({
@@ -70,5 +73,5 @@ export async function POST(request: Request) {
   });
 
   const mapped = mapSaveOnboardingAnswerResultToHttp(result);
-  return NextResponse.json(mapped.body, { status: mapped.status });
+  return privateJson(mapped.body, { status: mapped.status });
 }

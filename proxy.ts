@@ -5,13 +5,16 @@ import { isDatabaseAuthConfigured } from "@/lib/config/runtime-mode";
 const PROTECTED_PREFIXES = ["/app", "/onboarding"];
 
 function isProtectedPath(pathname: string): boolean {
-  return PROTECTED_PREFIXES.some((prefix) => pathname.startsWith(prefix));
+  return PROTECTED_PREFIXES.some(
+    (prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`),
+  );
 }
 
 /**
- * Optimistic redirect only — real session validation happens in route handlers.
+ * Optimistic redirect only — real session validation happens in server
+ * layouts and route handlers.
  */
-export async function middleware(request: NextRequest) {
+export async function proxy(request: NextRequest) {
   const pathname = request.nextUrl.pathname;
   const protectedPath = isProtectedPath(pathname);
 
