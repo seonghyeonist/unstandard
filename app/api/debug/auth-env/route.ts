@@ -2,12 +2,13 @@ import { timingSafeEqual } from "node:crypto";
 import { NextResponse } from "next/server";
 import { buildAuthEnvDiagnostics } from "@/lib/debug/auth-env-diagnostics";
 
-function isAuthorizedDebugRequest(request: Request): boolean {
+export function isAuthorizedDebugRequest(request: Request): boolean {
   const expected = process.env.UNSTANDARD_DEBUG_CHECK_TOKEN?.trim();
   if (!expected) return false;
 
-  const url = new URL(request.url);
-  const provided = url.searchParams.get("token");
+  const authorization = request.headers.get("authorization")?.trim() ?? "";
+  const match = /^Bearer\s+(.+)$/iu.exec(authorization);
+  const provided = match?.[1]?.trim();
   if (!provided) return false;
 
   const providedBuf = Buffer.from(provided);

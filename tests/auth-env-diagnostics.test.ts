@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
+import { isAuthorizedDebugRequest } from "../app/api/debug/auth-env/route.ts";
 import { buildAuthEnvDiagnostics } from "../lib/debug/auth-env-diagnostics.ts";
 
 const ENV_KEYS = [
@@ -12,6 +13,7 @@ const ENV_KEYS = [
   "DATABASE_ENV",
   "NODE_ENV",
   "VERCEL_ENV",
+  "UNSTANDARD_DEBUG_CHECK_TOKEN",
 ] as const;
 
 function snapshotEnv(): Record<(typeof ENV_KEYS)[number], string | undefined> {
@@ -49,7 +51,7 @@ function withEnv(
 }
 
 function makeRequest(host = "preview.example.com"): Request {
-  return new Request(`https://${host}/api/debug/auth-env?token=test`, {
+  return new Request(`https://${host}/api/debug/auth-env`, {
     headers: {
       host,
       "x-forwarded-host": host,
@@ -59,6 +61,20 @@ function makeRequest(host = "preview.example.com"): Request {
 }
 
 describe("buildAuthEnvDiagnostics", () => {
+  it("authorizes only the Bearer header and never a query-string token", () => {
+    withEnv({ UNSTANDARD_DEBUG_CHECK_TOKEN: "debug-token" }, () => {
+      const authorized = new Request("https://preview.example.com/api/debug/auth-env", {
+        headers: { Authorization: "Bearer debug-token" },
+      });
+      const queryToken = new Request(
+        "https://preview.example.com/api/debug/auth-env?token=debug-token",
+      );
+
+      assert.equal(isAuthorizedDebugRequest(authorized), true);
+      assert.equal(isAuthorizedDebugRequest(queryToken), false);
+    });
+  });
+
   it("returns ok=true when required database auth env is present", () => {
     withEnv(
       {

@@ -19,10 +19,10 @@ export async function GET() {
     });
   } catch (error) {
     if (error instanceof ServiceUnavailableError) {
-      return privateJson({ error: error.message }, { status: 503 });
+      return privateJson({ error: "Service temporarily unavailable" }, { status: 503 });
     }
     if (error instanceof AuthError) {
-      return privateJson({ error: error.message }, { status: 401 });
+      return privateJson({ error: "Unauthorized" }, { status: 401 });
     }
     return privateJson({ error: "Internal server error" }, { status: 500 });
   }

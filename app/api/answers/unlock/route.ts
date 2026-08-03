@@ -1,7 +1,8 @@
-import { NextResponse } from "next/server";
-import { AuthError, getAuthenticatedUser } from "@/lib/auth/server";
+import { getAuthenticatedUser, ServiceUnavailableError } from "@/lib/auth/server";
+import { isDatabaseRuntime } from "@/lib/config/runtime-mode";
 import { candidates } from "@/lib/data/mock-public";
 import { evaluateDepthAnswer } from "@/lib/depth/evaluate-depth-answer";
+import { privateJson } from "@/lib/http/private-json";
 import { setUnlockCookie } from "@/lib/server/unlock-cookies";
 
 function questionForProfile(profileId: string): string {
@@ -9,31 +10,50 @@ function questionForProfile(profileId: string): string {
 }
 
 export async function POST(request: Request) {
-  const user = await getAuthenticatedUser();
+  let user;
+  try {
+    user = await getAuthenticatedUser();
+  } catch (error) {
+    if (error instanceof ServiceUnavailableError) {
+      return privateJson({ error: "Service temporarily unavailable" }, { status: 503 });
+    }
+    return privateJson({ error: "Unauthorized" }, { status: 401 });
+  }
   if (!user) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    return privateJson({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  // The current candidate/private-profile surface is mock-backed. Do not let
+  // a signed cookie masquerade as a DB-backed unlock in Preview/Production.
+  if (isDatabaseRuntime()) {
+    return privateJson({ error: "Database-backed unlock is not available" }, { status: 503 });
   }
 
   let body: unknown;
   try {
     body = await request.json();
   } catch {
-    return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
+    return privateJson({ error: "Invalid JSON" }, { status: 400 });
   }
 
-  const profileId = typeof (body as { profileId?: unknown }).profileId === "string"
-    ? (body as { profileId: string }).profileId.trim()
-    : "";
-  const answer = typeof (body as { answer?: unknown }).answer === "string"
-    ? (body as { answer: string }).answer
-    : "";
-
-  if (!profileId || !/^[a-zA-Z0-9_-]+$/.test(profileId)) {
-    return NextResponse.json({ error: "Invalid profileId" }, { status: 400 });
+  if (!body || typeof body !== "object") {
+    return privateJson({ error: "Invalid body" }, { status: 400 });
   }
 
-  if (!answer.trim()) {
-    return NextResponse.json({ error: "Answer required" }, { status: 400 });
+  const input = body as Record<string, unknown>;
+  const profileId = typeof input.profileId === "string"
+    ? input.profileId.trim()
+    : "";
+  const answer = typeof input.answer === "string"
+    ? input.answer.trim()
+    : "";
+
+  if (!profileId || profileId.length > 128 || !/^[a-zA-Z0-9_-]+$/.test(profileId)) {
+    return privateJson({ error: "Invalid profileId" }, { status: 400 });
+  }
+
+  if (!answer || answer.length < 12 || answer.length > 800) {
+    return privateJson({ error: "Invalid answer" }, { status: 400 });
   }
 
   try {
@@ -51,11 +71,9 @@ export async function POST(request: Request) {
       await setUnlockCookie(profileId, user.id);
     }
 
-    return NextResponse.json({ verdict, reasonCodes });
+    return privateJson({ verdict, reasonCodes });
   } catch (error) {
-    if (error instanceof AuthError) {
-      return NextResponse.json({ error: error.message }, { status: 401 });
-    }
-    return NextResponse.json({ verdict: "ERROR", reasonCodes: [] }, { status: 500 });
+    void error;
+    return privateJson({ verdict: "ERROR", reasonCodes: [] }, { status: 500 });
   }
 }

@@ -22,6 +22,9 @@ function resolveLoginError(errorCode?: string): string | null {
   if (errorCode === "auth_callback_failed") {
     return "Sign-in callback failed. Request a new link and open it in this browser.";
   }
+  if (errorCode === "service_unavailable") {
+    return "Authentication is temporarily unavailable. Try again shortly.";
+  }
   return null;
 }
 

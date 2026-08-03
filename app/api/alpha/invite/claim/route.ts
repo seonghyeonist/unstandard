@@ -1,4 +1,3 @@
-import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { isDatabaseAuthConfigured } from "@/lib/config/runtime-mode";
 import { reserveInviteForEmail } from "@/lib/auth/invite-gate";
@@ -7,21 +6,22 @@ import {
   createRegistrationTicket,
   getRegistrationTicketCookieName,
 } from "@/lib/auth/invite-ticket";
+import { privateJson } from "@/lib/http/private-json";
 
 export async function POST(request: Request) {
   if (!isDatabaseAuthConfigured()) {
-    return NextResponse.json({ error: "Registration unavailable" }, { status: 503 });
+    return privateJson({ error: "Registration unavailable" }, { status: 503 });
   }
 
   let body: unknown;
   try {
     body = await request.json();
   } catch {
-    return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
+    return privateJson({ error: "Invalid JSON" }, { status: 400 });
   }
 
   if (!body || typeof body !== "object") {
-    return NextResponse.json({ error: "Invalid body" }, { status: 400 });
+    return privateJson({ error: "Invalid body" }, { status: 400 });
   }
 
   const input = body as Record<string, unknown>;
@@ -29,17 +29,17 @@ export async function POST(request: Request) {
   const code = String(input.code ?? "").trim();
 
   if (!email.includes("@") || code.length < 8) {
-    return NextResponse.json({ error: "Invalid invite claim" }, { status: 422 });
+    return privateJson({ error: "Invalid invite claim" }, { status: 422 });
   }
 
   const claim = await reserveInviteForEmail(code, email);
   if (!claim.ok) {
-    return NextResponse.json({ error: "Invalid invite claim" }, { status: 403 });
+    return privateJson({ error: "Invalid invite claim" }, { status: 403 });
   }
 
   const secret = process.env.BETTER_AUTH_SECRET?.trim();
   if (!secret) {
-    return NextResponse.json({ error: "Registration unavailable" }, { status: 503 });
+    return privateJson({ error: "Registration unavailable" }, { status: 503 });
   }
 
   const ticket = createRegistrationTicket(
@@ -57,5 +57,5 @@ export async function POST(request: Request) {
     maxAge: ticket.maxAge,
   });
 
-  return NextResponse.json({ ok: true });
+  return privateJson({ ok: true });
 }
