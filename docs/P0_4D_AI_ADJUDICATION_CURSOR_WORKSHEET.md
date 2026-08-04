@@ -158,7 +158,7 @@ Do not infer authorization for any of the following from P0.4D completion:
 - generating embeddings or sending raw text to any remote service;
 - changing thresholds, weights, `SDS`, `Fast-track`, or unlock behavior;
 - wiring the Depth Score service into Next.js, Preview, or Production;
-- applying migrations, changing Neon/Supabase data, or deploying;
+- applying migrations, changing Neon or any retired hosted-BaaS data, or deploying;
 - declaring `CALIBRATION_READINESS`, `HUMAN_LABEL_GATE`, or alpha readiness
   passed.
 

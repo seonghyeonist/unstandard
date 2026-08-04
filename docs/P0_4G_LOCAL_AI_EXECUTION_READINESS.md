@@ -121,7 +121,7 @@ No package install, model download, Docker image pull, network model fetch, or m
 - PASS / REVIEW / REJECT and the gray-band human review queue remain in force.
 - Reference targets remain threshold `0.38`, Fast-track `0.55`, gray band `±0.03`, and P95 latency `≤ 1,200 ms`; these are PoC targets, not calibration results.
 - Raw answer retention is minimized; embeddings are treated as derived personal data.
-- The AI Agent Harness playbook's generic Supabase examples do not override the repository's current Neon/Drizzle/Better Auth architecture.
+- The AI Agent Harness playbook's generic previous-platform BaaS examples do not override the repository's current Neon/Drizzle/Better Auth architecture.
 - The alpha/beta direction remains university students as an alpha recruitment wedge and ages 25–39 as the beta/main target, with qualitative-first and quantitative-later reveal.
 
 ## Gate status after this closure
