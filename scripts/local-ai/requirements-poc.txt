@@ -1,0 +1,33 @@
+# Isolated Local AI technical PoC dependencies.
+# Install into /tmp/unstandard-local-ai/venv ONLY — never into the app or depth-service.
+# Pin versions for reproducibility. Do not add these to package.json or services/depth-service.
+
+# Workbook parse (operator-local)
+openpyxl==3.1.5
+
+# Embedding stack (BAAI/bge-m3 via sentence-transformers; FlagEmbedding available as alt)
+numpy==2.2.2
+huggingface-hub==0.27.1
+transformers==4.48.1
+sentence-transformers==3.4.1
+FlagEmbedding==1.3.4
+safetensors==0.5.2
+tokenizers==0.21.0
+tqdm==4.67.1
+filelock==3.17.0
+fsspec==2025.2.0
+packaging==24.2
+PyYAML==6.0.2
+regex==2024.11.6
+requests==2.32.3
+scikit-learn==1.6.1
+scipy==1.15.1
+threadpoolctl==3.5.0
+joblib==1.4.2
+
+# Torch CPU wheel — operators on CUDA hosts may install a matching CUDA build instead,
+# but keep the model/cache under /tmp/unstandard-local-ai/{models,cache}.
+torch==2.5.1
+
+# Resource sampling
+psutil==6.1.1

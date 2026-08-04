@@ -26,7 +26,8 @@
     "readiness:evidence:build": "node --import tsx scripts/readiness/build-evidence.ts",
     "readiness:alpha": "node --import tsx scripts/readiness/alpha.ts",
     "guard:no-legacy-backend": "node --import tsx scripts/guard/no-legacy-backend.ts",
-    "guard:boundaries": "node --import tsx scripts/guard/boundaries.ts"
+    "guard:boundaries": "node --import tsx scripts/guard/boundaries.ts",
+    "poc:local-ai:bge-m3": "bash -c 'PY=\"${UNSTANDARD_LOCAL_AI_PYTHON:-/tmp/unstandard-local-ai/venv/bin/python}\"; if [ ! -x \"$PY\" ]; then echo \"BLOCKED_RUNTIME: missing $PY — create venv and pip install -r scripts/local-ai/requirements-poc.txt\" >&2; exit 2; fi; exec \"$PY\" scripts/local-ai/poc_bge_m3.py \"$@\"' --"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.0.1",
