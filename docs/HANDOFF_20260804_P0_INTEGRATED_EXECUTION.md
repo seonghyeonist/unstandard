@@ -51,7 +51,7 @@
 | Disposable integration | Neon project `unstandard-alpha-integration-disposable`, branch `integration-poc-20260804`, host `ep-wispy-queen-…us-east-1` |
 | Preview app DB | Neon project `unstandard-alpha-preview-app-db`, branch `preview-ab-smoke-20260804`, host `ep-noisy-wave-…us-east-2` |
 | Separation check | **PASS** (different project IDs + regions) |
-| Integration | `npm run test:integration` **PASS** 12/12; artifact `docs/evidence/INTEGRATION_PROOF_20260804_5d2fece.json`; artifact records test SHA `5d2fece…`, so it is not exact-tip evidence for the later `3c30c56…` documentation commit |
+| Integration | `npm run test:integration` **PASS** 12/12; artifact `docs/evidence/INTEGRATION_PROOF_20260804_5d2fece.json`; artifact records test SHA `5d2fece…`, so it is not exact-tip evidence for current integration head `0f4086a…` |
 | Preview migrate/seed | complete on Preview branch |
 | Preview aggregates | users=4, profiles=4, sessions=9, pending_invites=0 |
 
@@ -60,7 +60,9 @@
 | Field | Value |
 |---|---|
 | Canonical project | `unstandard-m9qj` (`prj_9RHqHMFTeB0c2V3LGlAdTezmvcYn`) |
-| Exact-SHA deploy for integration head | **NOT CREATED** — Vercel CLI credentials ABSENT; Git auto-deploy not observed for this branch |
+| Preview build | **READY** — deployment `dpl_5YggAwzJ8K3YVEFJsdeDiYWuGi99`, URL `https://unstandard-m9qj-mz9w3gm0r-unstandard.vercel.app`; `npm ci` + Next.js build completed without errors |
+| Exact-SHA deploy for integration head | **NOT PROVEN** — this was a successful manual file deployment; Vercel returned no `githubCommitSha` metadata, so READY is not treated as exact-SHA evidence |
+| Earlier failed Preview attempt | `dpl_91bsco8Qzy7UuNG6cnnnTHG4sUMX` failed at `npm ci` because the upload omitted `package-lock.json`; fixed by the READY deployment above |
 | Production touched | **no** |
 
 ## A/B Smoke
@@ -86,5 +88,5 @@
 
 ## USER ACTION REQUIRED
 
-1. Provide or connect Vercel Preview deployment credentials if the connected Vercel deployment path cannot deploy the published integration head to **`unstandard-m9qj` only** (non-production).
+1. Provide or connect a Vercel Git-linked/CLI Preview deployment path so the published integration head `0f4086a…` is recorded as `githubCommitSha` on **`unstandard-m9qj` only** (non-production).
 2. Inject Preview smoke secrets through the secret manager, never chat: A/B passwords, optional protection bypass, `ALPHA_INVITE_PEPPER` or `BETTER_AUTH_SECRET`, and confirm Preview `DATABASE_URL` targets `preview-ab-smoke-20260804`.
