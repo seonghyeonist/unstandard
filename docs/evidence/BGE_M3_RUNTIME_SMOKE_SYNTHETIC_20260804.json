@@ -1,0 +1,19 @@
+{
+  "kind": "runtime_smoke_synthetic_only",
+  "not_a_dataset_poc": true,
+  "model_id": "BAAI/bge-m3",
+  "device": "cpu",
+  "embedding_dimension": 1024,
+  "cold_ms": 103.5,
+  "warm_p50_ms": 131.6,
+  "warm_p95_ms": 238.92,
+  "throughput_qps": 7.089,
+  "determinism_max_abs_delta": 0.0,
+  "peak_rss_mb": 1901.9,
+  "p95_ref_target_ms": 1200,
+  "p95_vs_ref": "within",
+  "human_label_gate": "NOT_RUN_FOUNDER_DEFERRED",
+  "qwen_status": "INACTIVE_NOT_INSTALLED",
+  "dataset_poc_verdict": "BLOCKED_INPUT_FILE_NOT_FOUND",
+  "technical_runtime_verdict": "RUNTIME_SMOKE_PASS_SYNTHETIC"
+}
