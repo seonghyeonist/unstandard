@@ -49,7 +49,7 @@
 | Disposable integration | Neon project `unstandard-alpha-integration-disposable`, branch `integration-poc-20260804`, host `ep-wispy-queen-…us-east-1` |
 | Preview app DB | Neon project `unstandard-alpha-preview-app-db`, branch `preview-ab-smoke-20260804`, host `ep-noisy-wave-…us-east-2` |
 | Separation check | **PASS** (different project IDs + regions) |
-| Integration | `npm run test:integration` **PASS** 12/12; artifact `docs/evidence/INTEGRATION_PROOF_20260804_eb73843.json` |
+| Integration | `npm run test:integration` **PASS** 12/12; artifact `docs/evidence/INTEGRATION_PROOF_20260804_5d2fece.json` (also retained earlier `…_eb73843.json`) |
 | Preview migrate/seed | complete on Preview branch |
 | Preview aggregates | users=4, profiles=4, sessions=9, pending_invites=0 |
 
