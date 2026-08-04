@@ -73,9 +73,15 @@ LABELING_SHEET_HINTS = ("라벨링 세트", "labeling")
 HEADER_ALIASES: dict[str, tuple[str, ...]] = {
     "id": ("id", "번호", "row_id", "sample_id"),
     "category": ("카테고리", "category", "그룹", "group"),
-    "question": ("질문", "question", "question_text", "q"),
-    "answer": ("답변", "answer", "answer_text", "a"),
-    "answer_length": ("답변 길이", "답변길이", "answer_length", "length"),
+    "question": ("질문", "질문 텍스트", "question", "question_text", "q"),
+    "answer": ("답변", "답변 텍스트", "answer", "answer_text", "a"),
+    "answer_length": (
+        "답변 길이",
+        "답변길이",
+        "답변 길이 (글자)",
+        "answer_length",
+        "length",
+    ),
     "recommended_label": ("권장 레이블", "권장레이블", "recommended_label", "label"),
     "recommended_path": ("권장 경로", "권장경로", "recommended_path", "path"),
 }
@@ -196,14 +202,30 @@ def _map_headers(headers: Sequence[Any]) -> dict[str, int]:
     normalized = [_normalize_header(h) for h in headers]
     mapping: dict[str, int] = {}
     for field, aliases in HEADER_ALIASES.items():
-        for idx, header in enumerate(normalized):
-            for alias in aliases:
-                alias_n = _normalize_header(alias)
-                if header == alias_n or alias_n in header:
-                    mapping[field] = idx
-                    break
-            if field in mapping:
-                break
+        normalized_aliases = [_normalize_header(alias) for alias in aliases]
+
+        # Prefer an exact, specific header before falling back to containment.
+        # For example, the workbook has both "질문 레벨" and "질문 텍스트";
+        # allowing the generic alias "질문" to win by column order would map
+        # the level column as the question text and silently corrupt deduping.
+        exact_matches = [
+            (len(alias_n), idx)
+            for idx, header in enumerate(normalized)
+            for alias_n in normalized_aliases
+            if alias_n and header == alias_n
+        ]
+        if exact_matches:
+            mapping[field] = max(exact_matches, key=lambda item: item[0])[1]
+            continue
+
+        contains_matches = [
+            (len(alias_n), -idx)
+            for idx, header in enumerate(normalized)
+            for alias_n in normalized_aliases
+            if alias_n and alias_n in header
+        ]
+        if contains_matches:
+            mapping[field] = -max(contains_matches, key=lambda item: item[0])[1]
     required = ("category", "question", "answer", "recommended_label")
     missing = [name for name in required if name not in mapping]
     if missing:
@@ -212,6 +234,24 @@ def _map_headers(headers: Sequence[Any]) -> dict[str, int]:
             f"workbook_header_unmapped:{','.join(missing)}",
         )
     return mapping
+
+
+def _find_header_row(rows_iter: Iterable[Sequence[Any]]) -> tuple[int, Sequence[Any]]:
+    """Find the first row containing the complete required workbook schema.
+
+    The operator workbook has a title row before its tabular header. Header
+    discovery must therefore not assume that the first worksheet row is data
+    schema, while still failing closed when no complete schema is present.
+    """
+    for row_number, candidate in enumerate(rows_iter, start=1):
+        if candidate is None:
+            continue
+        try:
+            _map_headers(candidate)
+        except PocBlocked:
+            continue
+        return row_number, candidate
+    raise PocBlocked("BLOCKED_RUNTIME", "workbook_header_unmapped")
 
 
 def load_workbook_rows(path: str) -> tuple[list[RowRecord], dict[str, Any]]:
@@ -231,11 +271,7 @@ def load_workbook_rows(path: str) -> tuple[list[RowRecord], dict[str, Any]]:
         sheet = workbook[workbook.sheetnames[0]]
 
     rows_iter = sheet.iter_rows(values_only=True)
-    try:
-        header = next(rows_iter)
-    except StopIteration as exc:
-        raise PocBlocked("BLOCKED_RUNTIME", "workbook_empty") from exc
-
+    header_row_number, header = _find_header_row(rows_iter)
     mapping = _map_headers(header)
     records: list[RowRecord] = []
     for raw in rows_iter:
@@ -283,6 +319,7 @@ def load_workbook_rows(path: str) -> tuple[list[RowRecord], dict[str, Any]]:
         "physical_rows": len(records),
         "unique_pairs": len(unique_keys),
         "sheet_used": sheet.title,
+        "header_row_number": header_row_number,
         "category_distribution_physical": count_distribution(r.category for r in records),
         "recommended_label_distribution_physical": count_distribution(
             r.recommended_label for r in records

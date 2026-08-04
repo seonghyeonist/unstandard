@@ -1,0 +1,261 @@
+{
+  "agreement_with_synthetic_prior": {
+    "agreements": 171,
+    "disagreements": 89,
+    "metric": "agreement_with_synthetic_prior",
+    "n": 260,
+    "note": "synthetic design prior only; not human ground truth",
+    "rate": 0.657692
+  },
+  "alpha_readiness": "NOT_CLAIMED",
+  "canonical_thresholds": {
+    "fast_track_min_length": 8,
+    "fast_track_threshold": 0.55,
+    "gray_band": 0.03,
+    "min_answer_length": 12,
+    "threshold": 0.38
+  },
+  "dataset": {
+    "answer_length_invariant_checked": 1000,
+    "answer_length_invariant_ok": 1000,
+    "category_distribution_physical": {
+      "AI_STYLED": 50,
+      "GRAY_BAND": 100,
+      "L1_PASS": 100,
+      "L2_PASS": 100,
+      "L3_PASS": 150,
+      "L4_PASS": 150,
+      "L5_PASS": 150,
+      "ONBOARDING": 100,
+      "SPAM_ABUSE": 100
+    },
+    "expected_physical_rows": 1000,
+    "expected_unique_pairs": 260,
+    "header_row_number": 2,
+    "max_pairs_cap": null,
+    "physical_rows": 1000,
+    "recommended_label_distribution_physical": {
+      "PASS": 750,
+      "REJECT": 100,
+      "REVIEW": 150
+    },
+    "scoring_universe": "unique_pairs",
+    "sheet_used": "\ud83d\udccb \ub77c\ubca8\ub9c1 \uc138\ud2b8",
+    "unique_pair_failures": 0,
+    "unique_pairs": 260,
+    "unique_pairs_scored": 260
+  },
+  "determinism": {
+    "cold_latency_ms": 155.676,
+    "max_abs_diff": 0.0,
+    "probe": "synthetic_fixed_phrase",
+    "warm_latency_ms": 146.844
+  },
+  "embedding_health": {
+    "dim_ok": true,
+    "dims_observed": [
+      1024
+    ],
+    "expected_dim": 1024,
+    "inf_count": 0,
+    "nan_count": 0,
+    "vector_count": 260
+  },
+  "generated_at_utc": "2026-08-04T07:16:39Z",
+  "human_label_gate": "NOT_RUN_FOUNDER_DEFERRED",
+  "issues": {
+    "hard": [],
+    "soft": []
+  },
+  "latency_physical_smoke_ms": {
+    "enabled": true,
+    "n": 32,
+    "note": "smoke only; score distribution uses unique pairs",
+    "p50": 181.21445050019247,
+    "p95": 1179.225532100054
+  },
+  "latency_unique_pairs_ms": {
+    "mean": 207.448,
+    "n": 260,
+    "p50": 157.63680249983736,
+    "p95": 295.80197904999744
+  },
+  "model": {
+    "backend": "sentence-transformers",
+    "cache_dir": "/tmp/unstandard-local-ai/cache",
+    "expected_embedding_dim": 1024,
+    "load_ms": 6285,
+    "model_config_sha256": "26159e7ad065073448460117eb24b7a4572f6f4e78eadff65dc0a11c052449fa",
+    "model_id": "BAAI/bge-m3",
+    "model_revision": "5617a9f61b028005a4858fdac845db406aefb181",
+    "models_dir": "/tmp/unstandard-local-ai/models",
+    "torch_device": "cpu"
+  },
+  "notes": [
+    "Technical PoC only. Not calibration. Not alpha readiness.",
+    "agreement_with_synthetic_prior is an offline synthetic-label proxy, not human accuracy.",
+    "Qwen remains INACTIVE_NOT_INSTALLED for this harness."
+  ],
+  "preflight": {
+    "arch": "x86_64",
+    "cpu_count": 9,
+    "disk_free_bytes": 43359784960,
+    "disk_total_bytes": 67049664512,
+    "executable": "/tmp/unstandard-local-ai/venv/bin/python",
+    "gpu": {
+      "available": false,
+      "detail": "nvidia-smi_absent"
+    },
+    "local_ai_root": "/tmp/unstandard-local-ai",
+    "os": "Linux-6.12.13-x86_64-with-glibc2.39",
+    "python": "3.12.13",
+    "qwen_status": "INACTIVE_NOT_INSTALLED",
+    "ram_available_bytes": 15872778240,
+    "ram_total_bytes": 17105375232,
+    "sentence_transformers": {
+      "present": true,
+      "version": "3.4.1"
+    },
+    "torch": {
+      "cuda_available": false,
+      "present": true,
+      "version": "2.5.1+cu124"
+    }
+  },
+  "production_scoring": "UNTOUCHED_MOCK_ACTIVE",
+  "qwen_status": "INACTIVE_NOT_INSTALLED",
+  "redaction": {
+    "embeddings": "omitted",
+    "pair_keys": "omitted",
+    "raw_qa_text": "omitted",
+    "secrets": "omitted"
+  },
+  "resources": {
+    "peak_rss_bytes": 2285060096,
+    "rss_after_bytes": 2285060096,
+    "rss_before_bytes": 1032392704,
+    "rss_delta_bytes": 1252667392,
+    "throughput_pairs_per_sec": 4.820475536909275
+  },
+  "schema_version": "local-ai-technical-poc-v1",
+  "score_distribution_unique_pairs": {
+    "by_category": {
+      "AI_STYLED": {
+        "n": 30,
+        "score_mean": 0.753443,
+        "score_p50": 0.75075,
+        "score_p95": 0.803585,
+        "verdict_counts": {
+          "PASS": 30
+        }
+      },
+      "GRAY_BAND": {
+        "n": 60,
+        "score_mean": 0.364677,
+        "score_p50": 0.3831,
+        "score_p95": 0.48688499999999985,
+        "verdict_counts": {
+          "PASS": 16,
+          "REJECT": 24,
+          "REVIEW": 20
+        }
+      },
+      "L1_PASS": {
+        "n": 20,
+        "score_mean": 0.57504,
+        "score_p50": 0.5617,
+        "score_p95": 0.76789,
+        "verdict_counts": {
+          "PASS": 20
+        }
+      },
+      "L2_PASS": {
+        "n": 30,
+        "score_mean": 0.606103,
+        "score_p50": 0.62845,
+        "score_p95": 0.7187699999999999,
+        "verdict_counts": {
+          "PASS": 29,
+          "REVIEW": 1
+        }
+      },
+      "L3_PASS": {
+        "n": 30,
+        "score_mean": 0.575903,
+        "score_p50": 0.5582,
+        "score_p95": 0.7089399999999999,
+        "verdict_counts": {
+          "PASS": 30
+        }
+      },
+      "L4_PASS": {
+        "n": 30,
+        "score_mean": 0.58058,
+        "score_p50": 0.5645,
+        "score_p95": 0.7198949999999997,
+        "verdict_counts": {
+          "PASS": 30
+        }
+      },
+      "L5_PASS": {
+        "n": 30,
+        "score_mean": 0.617467,
+        "score_p50": 0.61505,
+        "score_p95": 0.7565749999999999,
+        "verdict_counts": {
+          "PASS": 30
+        }
+      },
+      "ONBOARDING": {
+        "n": 10,
+        "score_mean": 0.19993,
+        "score_p50": 0.17975,
+        "score_p95": 0.32307999999999987,
+        "verdict_counts": {
+          "REJECT": 9,
+          "REVIEW": 1
+        }
+      },
+      "SPAM_ABUSE": {
+        "n": 20,
+        "score_mean": 0.37614,
+        "score_p50": 0.2756,
+        "score_p95": 0.783695,
+        "verdict_counts": {
+          "PASS": 7,
+          "REJECT": 12,
+          "REVIEW": 1
+        }
+      }
+    },
+    "mean": 0.526571,
+    "n": 260,
+    "p50": 0.5398000000000001,
+    "p95": 0.78293,
+    "path_counts": {
+      "BASIC": 67,
+      "FAST_TRACK": 125,
+      "GRAY_BAND": 23,
+      "LOW_SCORE": 44,
+      "SPAM_REJECT": 1
+    },
+    "threshold_band_counts": {
+      "above_threshold_below_fast_track": 70,
+      "below_gray": 41,
+      "fast_track_or_above": 125,
+      "in_gray_band": 24
+    },
+    "verdict_counts": {
+      "PASS": 192,
+      "REJECT": 45,
+      "REVIEW": 23
+    }
+  },
+  "snapshot": {
+    "approved_snapshot_id": "ULDS-v0.1-b63f77dc-20260804",
+    "expected_sha256": "b63f77dc7fa10694e4af6d3fc5ee86c4fcb4b01bda0889a1e96bcba4b1a55e51",
+    "hash_matched": true,
+    "workbook_sha256": "b63f77dc7fa10694e4af6d3fc5ee86c4fcb4b01bda0889a1e96bcba4b1a55e51"
+  },
+  "verdict": "TECHNICAL_POC_PASS"
+}

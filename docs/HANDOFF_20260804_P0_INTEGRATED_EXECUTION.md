@@ -2,7 +2,7 @@
 
 ## RESULT
 
-`CONDITIONAL` / `BLOCKED_EXTERNAL` for remaining Preview A/B + dataset PoC gates.
+`CONDITIONAL` / `BLOCKED_EXTERNAL` for remaining exact-SHA Preview + A/B gates.
 
 ## Explicit non-claims
 
@@ -31,14 +31,16 @@
 | Dataset filename | `Unstandard_LabelingDataset_v0.1.xlsx` |
 | Expected SHA-256 | `b63f77dc7fa10694e4af6d3fc5ee86c4fcb4b01bda0889a1e96bcba4b1a55e51` |
 | Snapshot ID | `ULDS-v0.1-b63f77dc-20260804` |
-| Workbook in environment | **ABSENT** → `BLOCKED_INPUT_FILE_NOT_FOUND` |
-| Runtime | Python 3.12 + `sentence-transformers==3.4.1` + `torch==2.5.1+cpu` in `/tmp/unstandard-local-ai/venv` |
-| Model | `BAAI/bge-m3` downloaded; snapshot digest in `docs/evidence/BGE_M3_MODEL_MANIFEST_20260804.json` |
+| Workbook in environment | **PRESENT**; hash verified via `UNSTANDARD_LABELING_WORKBOOK_PATH` |
+| Runtime | Python 3.12 + `sentence-transformers==3.4.1` + `torch==2.5.1+cu124` (CUDA unavailable; CPU execution) in `/tmp/unstandard-local-ai/venv` |
+| Model | `BAAI/bge-m3`; revision `5617a9f61b028005a4858fdac845db406aefb181`; config SHA-256 `26159e7ad065073448460117eb24b7a4572f6f4e78eadff65dc0a11c052449fa` |
 | Device | CPU |
 | Embedding dimension | 1024 |
-| Synthetic warm P50 / P95 | ~132ms / ~239ms (ref target ≤1200ms; synthetic only) |
-| Dataset PoC verdict | `BLOCKED_INPUT_FILE_NOT_FOUND` |
-| Runtime smoke verdict | `RUNTIME_SMOKE_PASS_SYNTHETIC` (not a dataset PoC PASS) |
+| Dataset structure | 1,000 physical rows; 260 unique pairs; ASCII-space answer-length invariant 1,000/1,000 |
+| Dataset PoC latency | Unique-pair P50 ~158ms / P95 ~296ms; physical-row smoke P95 ~1,179ms (reference ≤1,200ms) |
+| Dataset PoC verdict | `TECHNICAL_POC_PASS`; report `docs/evidence/bge_m3_technical_poc_20260804T071639Z.json` |
+| Embedding health | 260/260 successful; 1024 dimensions; NaN/Inf 0; determinism max abs diff 0 |
+| Synthetic-prior proxy | 171/260 = 65.7692%; not human accuracy or ground truth |
 | Human-label caveat | founder deferred; not a pass |
 | Qwen | `INACTIVE_NOT_INSTALLED` |
 
@@ -49,7 +51,7 @@
 | Disposable integration | Neon project `unstandard-alpha-integration-disposable`, branch `integration-poc-20260804`, host `ep-wispy-queen-…us-east-1` |
 | Preview app DB | Neon project `unstandard-alpha-preview-app-db`, branch `preview-ab-smoke-20260804`, host `ep-noisy-wave-…us-east-2` |
 | Separation check | **PASS** (different project IDs + regions) |
-| Integration | `npm run test:integration` **PASS** 12/12; artifact `docs/evidence/INTEGRATION_PROOF_20260804_5d2fece.json` (also retained earlier `…_eb73843.json`) |
+| Integration | `npm run test:integration` **PASS** 12/12; artifact `docs/evidence/INTEGRATION_PROOF_20260804_5d2fece.json`; artifact records test SHA `5d2fece…`, so it is not exact-tip evidence for the later `3c30c56…` documentation commit |
 | Preview migrate/seed | complete on Preview branch |
 | Preview aggregates | users=4, profiles=4, sessions=9, pending_invites=0 |
 
@@ -76,14 +78,13 @@
 | Layer | Verdict |
 |---|---|
 | Machine technical (unit/CI + disposable integration) | **PASS** |
-| Local AI technical PoC (full dataset) | **BLOCKED_INPUT_FILE_NOT_FOUND** |
-| Local AI runtime (synthetic) | conditional evidence only |
+| Local AI technical PoC (full dataset) | **PASS** — technical only; not calibration |
+| Local AI runtime/model | **PASS** — isolated CPU execution; Qwen inactive |
 | Human-label gate | `NOT_RUN_FOUNDER_DEFERRED` |
 | Overall Alpha readiness | `BLOCKED_INCOMPLETE_GATES` |
 | Production | `UNTOUCHED` |
 
 ## USER ACTION REQUIRED
 
-1. Attach or inject operator-local `Unstandard_LabelingDataset_v0.1.xlsx` (SHA-256 must match) via `UNSTANDARD_LABELING_WORKBOOK_PATH`.
-2. Provide Vercel auth for CLI (`vercel login` device approval or `VERCEL_TOKEN`) so Preview can be deployed to **`unstandard-m9qj` only** at the integration head SHA (non-production).
-3. Inject Preview smoke secrets (not via chat): A/B passwords, optional protection bypass, `ALPHA_INVITE_PEPPER` or `BETTER_AUTH_SECRET`, and confirm Preview `DATABASE_URL` targets `preview-ab-smoke-20260804`.
+1. Provide or connect Vercel Preview deployment credentials if the connected Vercel deployment path cannot deploy the published integration head to **`unstandard-m9qj` only** (non-production).
+2. Inject Preview smoke secrets through the secret manager, never chat: A/B passwords, optional protection bypass, `ALPHA_INVITE_PEPPER` or `BETTER_AUTH_SECRET`, and confirm Preview `DATABASE_URL` targets `preview-ab-smoke-20260804`.
