@@ -4,10 +4,12 @@ on:
   push:
     branches:
       - cursor/neon-drizzle-better-auth-rebuild-909d
+      - agent/p0-integrated-execution-20260804
   pull_request:
     branches:
       - main
       - cursor/neon-drizzle-better-auth-rebuild-909d
+      - cursor/p0-4g-readiness-closure-909d
 
 jobs:
   static-gates:
