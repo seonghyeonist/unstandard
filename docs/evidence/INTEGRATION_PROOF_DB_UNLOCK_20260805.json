@@ -1,9 +1,9 @@
 {
   "artifactVersion": 1,
   "verdict": "PASS",
-  "gitSha": "fac7d52a933760b3fc66644410bb174c2cea2a37",
+  "gitSha": "872a43224c202fc4114d643d764d4d64543033d3",
   "migrationChecksum": "d486b19abb18faca",
-  "timestamp": "2026-08-05T03:20:13.001Z",
+  "timestamp": "2026-08-05T03:21:32.420Z",
   "matrix": "real_postgresql_integration",
   "cases": [
     {
