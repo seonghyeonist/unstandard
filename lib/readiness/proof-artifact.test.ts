@@ -340,7 +340,7 @@ describe("proof artifact schema", () => {
       expectedPreviewHostname: PREVIEW_HOST,
       nowMs: NOW,
     });
-    assert.ok(failures.some((f) => f.includes("git SHA")));
+    assert.ok(failures.some((f) => f.includes("subject Git SHA")));
   });
 
   it("rejects truncated git SHA", () => {
@@ -433,7 +433,7 @@ describe("proof artifact schema", () => {
     });
     assert.equal(combined.ok, false);
     if (combined.ok) return;
-    assert.ok(combined.failures.some((f) => f.includes("git SHA mismatch")));
+    assert.ok(combined.failures.some((f) => f.includes("subject Git SHA mismatch")));
   });
 
   it("rejects integration/smoke migration checksum mismatch", () => {
