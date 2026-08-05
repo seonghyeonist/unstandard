@@ -29,6 +29,12 @@ export const REQUIRED_INTEGRATION_CASES = [
   "invite_finalization_rollback",
   "migration_second_run_noop",
   "seed_idempotency",
+  "db_unlock_reject_no_row",
+  "db_unlock_pass_and_idempotent",
+  "db_unlock_viewer_isolation",
+  "db_private_profile_gate",
+  "db_unlock_self_denied",
+  "db_unlock_invalid_uuid",
 ] as const;
 
 export type RequiredIntegrationCase = (typeof REQUIRED_INTEGRATION_CASES)[number];
@@ -49,12 +55,20 @@ export const REQUIRED_HTTP_SMOKE_CASES = [
   "logout_invalidates_session",
   "cleared_cookie_denied",
   "revoked_session_rejected",
+  "a_to_b_private_before_unlock_forbidden",
+  "a_to_b_unlock_pass",
+  "a_to_b_unlock_status_true",
+  "a_to_b_private_after_unlock_ok",
+  "b_to_a_private_isolated",
+  "duplicate_unlock_idempotent",
+  "private_response_no_store",
 ] as const;
 
 export type RequiredHttpSmokeCase = (typeof REQUIRED_HTTP_SMOKE_CASES)[number];
 
+/** Retained for historical artifact fixtures only — no longer future/not-applicable. */
 export const FUTURE_NOT_APPLICABLE_PRIVATE_PROFILE = {
-  name: "db_backed_cross_user_private_profile_denial",
+  name: "legacy_mock_private_profile_note",
   reason:
-    "Not applicable: the current private-profile route is mock-backed and does not query Neon profile ownership.",
+    "Historical placeholder only. DB-backed private-profile denial is now a required smoke case.",
 } as const;

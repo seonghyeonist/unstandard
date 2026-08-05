@@ -8,59 +8,74 @@ import {
   type SeedDataset,
 } from "../lib/db/seed-data";
 
+function makeSequentialSql(responses: Array<Record<string, unknown>[]>) {
+  return async () => {
+    const next = responses.shift();
+    assert.ok(next !== undefined, "unexpected extra SQL call");
+    return next;
+  };
+}
+
 describe("seed mutation outcomes", () => {
   it("first insert returns changed=true; identical second run changed=false", async () => {
-    let questionCalls = 0;
-    let configCalls = 0;
-    const sql = async () => {
-      // Alternating question then config within each seed call.
-      if (questionCalls === configCalls) {
-        questionCalls += 1;
-        return questionCalls === 1 ? [{ id: "q1" }] : [];
-      }
-      configCalls += 1;
-      return configCalls === 1 ? [{ key: "k1" }] : [];
-    };
+    const firstResponses: Array<Record<string, unknown>[]> = [
+      [{ id: "q1" }], // onboarding question
+      [{ id: "q2" }], // unlock question
+      [{ key: "k1" }], // alpha.closed
+      [{ key: "k2" }], // unlock.active_question_id
+      [], // profile public enrich
+      [], // profile private enrich
+    ];
+    const secondResponses: Array<Record<string, unknown>[]> = [
+      [],
+      [],
+      [],
+      [],
+      [],
+      [],
+    ];
 
-    const dataset: SeedDataset = {
-      question: {
-        id: "test-q",
-        prompt: "p",
-        helper: null,
-        active: true,
-      },
-      appConfig: { key: "test.k", value: { v: 1 } },
-    };
+    const dataset = DEFAULT_CLOSED_ALPHA_SEED;
+    const first = await seedClosedAlphaDataWithSql(makeSequentialSql(firstResponses) as never, dataset);
+    assert.equal(first.questionChanged, true);
+    assert.equal(first.unlockQuestionChanged, true);
+    assert.equal(first.appConfigChanged, true);
+    assert.equal(first.unlockQuestionConfigChanged, true);
 
-    const first = await seedClosedAlphaDataWithSql(sql as never, dataset);
-    assert.deepEqual(first, { questionChanged: true, appConfigChanged: true });
-
-    const second = await seedClosedAlphaDataWithSql(sql as never, dataset);
-    assert.deepEqual(second, { questionChanged: false, appConfigChanged: false });
+    const second = await seedClosedAlphaDataWithSql(
+      makeSequentialSql(secondResponses) as never,
+      dataset,
+    );
+    assert.equal(second.questionChanged, false);
+    assert.equal(second.unlockQuestionChanged, false);
+    assert.equal(second.appConfigChanged, false);
+    assert.equal(second.unlockQuestionConfigChanged, false);
   });
 
   it("changed value returns changed=true then repeated returns false", async () => {
     const responses: Array<Record<string, unknown>[]> = [
       [{ id: "q" }],
+      [],
       [{ key: "k" }],
       [],
       [],
+      [],
+      [],
+      [],
+      [],
+      [],
+      [],
+      [],
     ];
-    const sql = async () => {
-      const next = responses.shift();
-      assert.ok(next);
-      return next;
-    };
-
-    const dataset = {
+    const dataset: SeedDataset = {
       ...DEFAULT_CLOSED_ALPHA_SEED,
       question: { ...DEFAULT_CLOSED_ALPHA_SEED.question, prompt: "changed" },
     };
-    const changed = await seedClosedAlphaDataWithSql(sql as never, dataset);
+    const changed = await seedClosedAlphaDataWithSql(makeSequentialSql(responses) as never, dataset);
     assert.equal(changed.questionChanged, true);
     assert.equal(changed.appConfigChanged, true);
 
-    const again = await seedClosedAlphaDataWithSql(sql as never, dataset);
+    const again = await seedClosedAlphaDataWithSql(makeSequentialSql(responses) as never, dataset);
     assert.equal(again.questionChanged, false);
     assert.equal(again.appConfigChanged, false);
   });
@@ -72,6 +87,7 @@ describe("seed mutation outcomes", () => {
     assert.match(source, /IS DISTINCT FROM/);
     assert.match(source, /SeedMutationOutcome/);
     assert.match(source, /DEFAULT_CLOSED_ALPHA_SEED/);
+    assert.match(source, /unlock\.active_question_id|UNLOCK_QUESTION_CONFIG_KEY/);
   });
 
   it("operator CLI seeds the default dataset", () => {

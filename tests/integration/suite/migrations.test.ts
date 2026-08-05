@@ -76,9 +76,19 @@ describe("integration: migrations and seed", () => {
           helper: `helper-${uniqueSuffix}`,
           active: true,
         },
+        unlockQuestion: {
+          id: randomUUID(),
+          prompt: `integration unlock prompt ${uniqueSuffix}`,
+          helper: `unlock-helper-${uniqueSuffix}`,
+          active: true,
+        },
         appConfig: {
           key: `alpha.integration.seed.${uniqueSuffix}`,
           value: { marker: uniqueSuffix, enabled: true },
+        },
+        unlockQuestionConfig: {
+          key: `unlock.integration.seed.${uniqueSuffix}`,
+          value: { questionId: "00000000-0000-4000-8000-000000000001" },
         },
       };
 
@@ -106,6 +116,7 @@ describe("integration: migrations and seed", () => {
         assert.equal(second.appConfigChanged, false);
 
         const changedDataset: SeedDataset = {
+          ...dataset,
           question: {
             ...dataset.question,
             prompt: `${dataset.question.prompt}::changed`,
@@ -156,7 +167,9 @@ describe("integration: migrations and seed", () => {
         assert.ok(DEFAULT_CLOSED_ALPHA_SEED.question.id);
       } finally {
         await sql`DELETE FROM questions WHERE id = ${dataset.question.id}`;
+        await sql`DELETE FROM questions WHERE id = ${dataset.unlockQuestion.id}`;
         await sql`DELETE FROM app_config WHERE key = ${dataset.appConfig.key}`;
+        await sql`DELETE FROM app_config WHERE key = ${dataset.unlockQuestionConfig.key}`;
       }
     });
   });

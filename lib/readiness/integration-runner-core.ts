@@ -36,6 +36,7 @@ import {
 export const INTEGRATION_SUITE_DIR = "tests/integration/suite";
 
 export const EXPECTED_INTEGRATION_SUITE_FILES = [
+  "tests/integration/suite/db-unlock.test.ts",
   "tests/integration/suite/invites.test.ts",
   "tests/integration/suite/migrations.test.ts",
   "tests/integration/suite/persistence.test.ts",

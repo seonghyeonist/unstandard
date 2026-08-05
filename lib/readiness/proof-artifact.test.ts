@@ -63,9 +63,8 @@ function validSmoke(overrides: Record<string, unknown> = {}) {
     cases: allPassCases(REQUIRED_HTTP_SMOKE_CASES),
     futureNotApplicable: [
       {
-        name: "db_backed_cross_user_private_profile_denial",
-        reason:
-          "Not applicable: the current private-profile route is mock-backed and does not query Neon profile ownership.",
+        name: "duplicate_block_rejected",
+        reason: "No HTTP block endpoint in alpha rebuild",
       },
     ],
     ...overrides,
@@ -276,8 +275,8 @@ describe("proof artifact schema", () => {
     const parsed = parseSmokeProofArtifact(
       validSmoke({
         futureNotApplicable: [
-          { name: "db_backed_cross_user_private_profile_denial", reason: "a" },
-          { name: "db_backed_cross_user_private_profile_denial", reason: "b" },
+          { name: "legacy_mock_private_profile_note", reason: "a" },
+          { name: "legacy_mock_private_profile_note", reason: "b" },
         ],
       }),
       { nowMs: NOW },

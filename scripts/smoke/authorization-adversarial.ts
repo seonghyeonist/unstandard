@@ -9,10 +9,7 @@
 
 import { migrationSetChecksum } from "../../lib/db/migration-guards";
 import { getCurrentGitSha } from "../../lib/readiness/evidence";
-import {
-  FUTURE_NOT_APPLICABLE_PRIVATE_PROFILE,
-  REQUIRED_HTTP_SMOKE_CASES,
-} from "../../lib/readiness/proof-constants";
+import { REQUIRED_HTTP_SMOKE_CASES } from "../../lib/readiness/proof-constants";
 import {
   buildSmokeArtifact,
   writeProofArtifactAtomically,
@@ -136,19 +133,9 @@ function pushCase(cases: ProofCase[], name: string, pass: boolean): void {
 async function main(): Promise<void> {
   const cases: ProofCase[] = [];
   const futureNotApplicable: FutureCase[] = [
-    { ...FUTURE_NOT_APPLICABLE_PRIVATE_PROFILE },
-    {
-      name: "private_mock_profile_requires_unlock_cookie",
-      reason:
-        "Informational mock-contract only: /api/profile/[id]/private uses mock publicProfiles IDs and unlock cookies; it does not establish Neon A/B ownership isolation. HTTP 404 is not authorization denial.",
-    },
     {
       name: "duplicate_block_rejected",
       reason: "No HTTP block endpoint in alpha rebuild",
-    },
-    {
-      name: "duplicate_unlock_rejected",
-      reason: "Unlock duplicate contract is DB/integration-only in alpha rebuild",
     },
     {
       name: "user_a_cannot_modify_user_b_profile",
@@ -318,6 +305,83 @@ async function main(): Promise<void> {
     "session_response_no_store",
     redactionCheck.status === 200 && isPrivateNoStore(redactionCheck.headers),
   );
+
+  // DB-backed unlock vertical slice (requires real profile UUIDs, not mock c1/c2/c3).
+  if (!profileAId || !profileBId || profileAId === "c1" || profileBId === "c3") {
+    pushCase(cases, "a_to_b_private_before_unlock_forbidden", false);
+    pushCase(cases, "a_to_b_unlock_pass", false);
+    pushCase(cases, "a_to_b_unlock_status_true", false);
+    pushCase(cases, "a_to_b_private_after_unlock_ok", false);
+    pushCase(cases, "b_to_a_private_isolated", false);
+    pushCase(cases, "duplicate_unlock_idempotent", false);
+    pushCase(cases, "private_response_no_store", false);
+  } else {
+    const beforePrivate = await fetchJson(`/api/profile/${profileBId}/private`, {}, jarA);
+    pushCase(
+      cases,
+      "a_to_b_private_before_unlock_forbidden",
+      beforePrivate.status === 403 && isPrivateNoStore(beforePrivate.headers),
+    );
+
+    const unlockAnswer =
+      "어제 비 오는 골목에서 따뜻한 국물을 마시며 마음이 조금 풀렸어요. 창밖 빗소리가 선명했어요.";
+    const unlockPass = await fetchJson(
+      "/api/answers/unlock",
+      {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ profileId: profileBId, answer: unlockAnswer }),
+      },
+      jarA,
+    );
+    const unlockBody = unlockPass.body as { verdict?: string; unlocked?: boolean };
+    pushCase(
+      cases,
+      "a_to_b_unlock_pass",
+      unlockPass.status === 200 && unlockBody.verdict === "PASS" && unlockBody.unlocked === true,
+    );
+
+    const unlockStatus = await fetchJson(`/api/unlock/${profileBId}`, {}, jarA);
+    pushCase(
+      cases,
+      "a_to_b_unlock_status_true",
+      unlockStatus.status === 200 &&
+        (unlockStatus.body as { unlocked?: boolean })?.unlocked === true,
+    );
+
+    const afterPrivate = await fetchJson(`/api/profile/${profileBId}/private`, {}, jarA);
+    pushCase(
+      cases,
+      "a_to_b_private_after_unlock_ok",
+      afterPrivate.status === 200 &&
+        isPrivateNoStore(afterPrivate.headers) &&
+        !sessionHasSensitiveFields(afterPrivate.body),
+    );
+    pushCase(
+      cases,
+      "private_response_no_store",
+      afterPrivate.status === 200 && isPrivateNoStore(afterPrivate.headers),
+    );
+
+    const bSeesA = await fetchJson(`/api/profile/${profileAId}/private`, {}, jarB);
+    pushCase(cases, "b_to_a_private_isolated", bSeesA.status === 403);
+
+    const unlockAgain = await fetchJson(
+      "/api/answers/unlock",
+      {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ profileId: profileBId, answer: unlockAnswer }),
+      },
+      jarA,
+    );
+    pushCase(
+      cases,
+      "duplicate_unlock_idempotent",
+      unlockAgain.status === 200 &&
+        (unlockAgain.body as { unlocked?: boolean; idempotent?: boolean })?.unlocked === true,
+    );
+  }
 
   const getSession = async (jar: CookieJar) => {
     const result = await fetchJson("/api/auth/session", {}, jar);

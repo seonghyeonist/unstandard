@@ -26,6 +26,7 @@ export const REQUIRED_APPLICATION_TABLES = [
   "reports",
   "blocks",
   "unlocks",
+  "unlock_attempts",
   "alpha_invites",
   "app_config",
 ] as const;

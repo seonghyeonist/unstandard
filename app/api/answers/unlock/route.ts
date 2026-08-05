@@ -4,64 +4,135 @@ import { candidates } from "@/lib/data/mock-public";
 import { evaluateDepthAnswer } from "@/lib/depth/evaluate-depth-answer";
 import { privateJson } from "@/lib/http/private-json";
 import { setUnlockCookie } from "@/lib/server/unlock-cookies";
+import { submitDbUnlockAnswer } from "@/lib/server/unlock/db-unlock.service";
+import {
+  unlockErrorClientMessage,
+  unlockErrorHttpStatus,
+} from "@/lib/unlock/unlock-codes";
+import { createCorrelationId } from "@/lib/server/unlock/unlock-logger";
 
-function questionForProfile(profileId: string): string {
+function questionForMockProfile(profileId: string): string {
   return candidates.find((candidate) => candidate.id === profileId)?.question ?? "";
 }
 
 export async function POST(request: Request) {
+  const correlationId = createCorrelationId();
+
   let user;
   try {
     user = await getAuthenticatedUser();
   } catch (error) {
     if (error instanceof ServiceUnavailableError) {
-      return privateJson({ error: "Service temporarily unavailable" }, { status: 503 });
+      return privateJson(
+        {
+          error: unlockErrorClientMessage("UNLOCK_SERVICE_UNAVAILABLE"),
+          code: "UNLOCK_SERVICE_UNAVAILABLE",
+          correlationId,
+        },
+        { status: 503 },
+      );
     }
-    return privateJson({ error: "Unauthorized" }, { status: 401 });
+    return privateJson(
+      { error: unlockErrorClientMessage("UNAUTHORIZED"), code: "UNAUTHORIZED", correlationId },
+      { status: 401 },
+    );
   }
   if (!user) {
-    return privateJson({ error: "Unauthorized" }, { status: 401 });
+    return privateJson(
+      { error: unlockErrorClientMessage("UNAUTHORIZED"), code: "UNAUTHORIZED", correlationId },
+      { status: 401 },
+    );
   }
 
-  // The current candidate/private-profile surface is mock-backed. Do not let
-  // a signed cookie masquerade as a DB-backed unlock in Preview/Production.
+  // Database runtime: DB-backed unlock (unlocks table is source of truth).
   if (isDatabaseRuntime()) {
-    return privateJson({ error: "Database-backed unlock is not available" }, { status: 503 });
+    let body: unknown;
+    try {
+      body = await request.json();
+    } catch {
+      return privateJson(
+        {
+          error: unlockErrorClientMessage("INVALID_BODY"),
+          code: "INVALID_BODY",
+          correlationId,
+        },
+        { status: 400 },
+      );
+    }
+
+    if (!body || typeof body !== "object") {
+      return privateJson(
+        {
+          error: unlockErrorClientMessage("INVALID_BODY"),
+          code: "INVALID_BODY",
+          correlationId,
+        },
+        { status: 400 },
+      );
+    }
+
+    const input = body as Record<string, unknown>;
+    const profileId = typeof input.profileId === "string" ? input.profileId : "";
+    const answer = typeof input.answer === "string" ? input.answer : "";
+
+    const result = await submitDbUnlockAnswer({
+      viewerUserId: user.id,
+      profileId,
+      answer,
+    });
+
+    if (!result.ok) {
+      return privateJson(
+        {
+          error: unlockErrorClientMessage(result.code),
+          code: result.code,
+          correlationId: result.correlationId,
+          verdict: "ERROR",
+          reasonCodes: [],
+        },
+        { status: unlockErrorHttpStatus(result.code) },
+      );
+    }
+
+    return privateJson({
+      verdict: result.verdict,
+      reasonCodes: result.reasonCodes,
+      unlocked: result.unlocked,
+      idempotent: result.idempotent,
+      correlationId: result.correlationId,
+    });
   }
 
+  // Local mock runtime only: signed cookie unlock for mock candidate IDs.
   let body: unknown;
   try {
     body = await request.json();
   } catch {
-    return privateJson({ error: "Invalid JSON" }, { status: 400 });
+    return privateJson({ error: "Invalid JSON", code: "INVALID_BODY", correlationId }, { status: 400 });
   }
 
   if (!body || typeof body !== "object") {
-    return privateJson({ error: "Invalid body" }, { status: 400 });
+    return privateJson({ error: "Invalid body", code: "INVALID_BODY", correlationId }, { status: 400 });
   }
 
   const input = body as Record<string, unknown>;
-  const profileId = typeof input.profileId === "string"
-    ? input.profileId.trim()
-    : "";
-  const answer = typeof input.answer === "string"
-    ? input.answer.trim()
-    : "";
+  const profileId = typeof input.profileId === "string" ? input.profileId.trim() : "";
+  const answer = typeof input.answer === "string" ? input.answer.trim() : "";
 
   if (!profileId || profileId.length > 128 || !/^[a-zA-Z0-9_-]+$/.test(profileId)) {
-    return privateJson({ error: "Invalid profileId" }, { status: 400 });
+    return privateJson(
+      { error: "Invalid profileId", code: "INVALID_PROFILE_ID", correlationId },
+      { status: 400 },
+    );
   }
 
   if (!answer || answer.length < 12 || answer.length > 800) {
-    return privateJson({ error: "Invalid answer" }, { status: 400 });
+    return privateJson({ error: "Invalid answer", code: "INVALID_BODY", correlationId }, { status: 400 });
   }
 
   try {
-    // The live app scores answers with the deterministic local heuristic only
-    // (mock-local-heuristic-v0.0). There is no path here that can select or
-    // credential a remote Depth service — see docs/LOCAL_AI_POC_STATUS.md.
     const evaluation = evaluateDepthAnswer({
-      questionText: questionForProfile(profileId),
+      questionText: questionForMockProfile(profileId),
       answerText: answer,
     });
     const verdict: "PASS" | "REVIEW" | "REJECT" | "ERROR" = evaluation.verdict;
@@ -71,9 +142,12 @@ export async function POST(request: Request) {
       await setUnlockCookie(profileId, user.id);
     }
 
-    return privateJson({ verdict, reasonCodes });
+    return privateJson({ verdict, reasonCodes, correlationId, source: "mock" });
   } catch (error) {
     void error;
-    return privateJson({ verdict: "ERROR", reasonCodes: [] }, { status: 500 });
+    return privateJson(
+      { verdict: "ERROR", reasonCodes: [], code: "EVALUATION_FAILED", correlationId },
+      { status: 500 },
+    );
   }
 }

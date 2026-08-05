@@ -1,0 +1,83 @@
+{
+  "artifactVersion": 1,
+  "verdict": "PASS",
+  "gitSha": "fac7d52a933760b3fc66644410bb174c2cea2a37",
+  "migrationChecksum": "d486b19abb18faca",
+  "timestamp": "2026-08-05T03:20:13.001Z",
+  "matrix": "real_postgresql_integration",
+  "cases": [
+    {
+      "name": "report_user_fk",
+      "status": "PASS"
+    },
+    {
+      "name": "invite_consumed_by_user_fk",
+      "status": "PASS"
+    },
+    {
+      "name": "lowercase_report_target_type",
+      "status": "PASS"
+    },
+    {
+      "name": "duplicate_report_idempotency",
+      "status": "PASS"
+    },
+    {
+      "name": "no_duplicate_report_row",
+      "status": "PASS"
+    },
+    {
+      "name": "block_uniqueness",
+      "status": "PASS"
+    },
+    {
+      "name": "unlock_uniqueness",
+      "status": "PASS"
+    },
+    {
+      "name": "invite_concurrency",
+      "status": "PASS"
+    },
+    {
+      "name": "invite_finalization_success",
+      "status": "PASS"
+    },
+    {
+      "name": "invite_finalization_rollback",
+      "status": "PASS"
+    },
+    {
+      "name": "migration_second_run_noop",
+      "status": "PASS"
+    },
+    {
+      "name": "seed_idempotency",
+      "status": "PASS"
+    },
+    {
+      "name": "db_unlock_reject_no_row",
+      "status": "PASS"
+    },
+    {
+      "name": "db_unlock_pass_and_idempotent",
+      "status": "PASS"
+    },
+    {
+      "name": "db_unlock_viewer_isolation",
+      "status": "PASS"
+    },
+    {
+      "name": "db_private_profile_gate",
+      "status": "PASS"
+    },
+    {
+      "name": "db_unlock_self_denied",
+      "status": "PASS"
+    },
+    {
+      "name": "db_unlock_invalid_uuid",
+      "status": "PASS"
+    }
+  ],
+  "kind": "integration"
+}
