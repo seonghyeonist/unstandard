@@ -97,8 +97,8 @@ export function validateReadinessEvidence(
     return failures;
   }
 
-  if (evidence.gitSha !== options.currentGitSha) {
-    failures.push("evidence git SHA does not match current HEAD");
+  if (evidence.subjectGitSha !== options.currentGitSha) {
+    failures.push("evidence subject Git SHA does not match current HEAD");
   }
 
   if (!/^[a-f0-9]{40}$/.test(options.currentGitSha)) {
@@ -137,7 +137,7 @@ export function sanitizeEvidenceForOutput(evidence: CombinedReadinessArtifact): 
     contentDigest: evidence.contentDigest,
     contentDigestNote:
       "contentDigest identifies serialized content only; it is not a signature, not tamper-proof, and not an independent attestation",
-    gitSha: evidence.gitSha,
+    subjectGitSha: evidence.subjectGitSha,
     previewHostname: evidence.previewHostname,
     migrationChecksum: evidence.migrationChecksum,
     timestamp: evidence.timestamp,
@@ -202,8 +202,8 @@ export function combineSourceArtifacts(input: {
     failures.push("smoke source verdict is not PASS");
   }
 
-  if (integration.gitSha !== smoke.gitSha) {
-    failures.push("integration/smoke git SHA mismatch");
+  if (integration.subjectGitSha !== smoke.subjectGitSha) {
+    failures.push("integration/smoke subject Git SHA mismatch");
   }
   if (integration.migrationChecksum !== smoke.migrationChecksum) {
     failures.push("integration/smoke migration checksum mismatch");

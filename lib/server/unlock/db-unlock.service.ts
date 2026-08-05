@@ -1,9 +1,11 @@
 import "server-only";
 
-import { and, eq } from "drizzle-orm";
 import { getDb } from "@/lib/db/client";
 import { getTargetProfileForUnlock } from "@/lib/db/repositories/candidates.repository";
-import { createUnlock, hasUnlock } from "@/lib/db/repositories/unlocks.repository";
+import {
+  countUnlocks,
+  createUnlock,
+} from "@/lib/db/repositories/unlocks.repository";
 import { unlockAttempts } from "@/lib/db/schema/unlock-attempts";
 import {
   DEPTH_MOCK_MODEL_VERSION,
@@ -201,23 +203,45 @@ export async function submitDbUnlockAnswer(
     return { ok: false, correlationId, code: "EVALUATION_FAILED" };
   }
 
+  let unlocked = false;
+  let idempotent = false;
   const db = getDb();
   try {
-    await db.insert(unlockAttempts).values({
-      viewerUserId: input.viewerUserId,
-      targetProfileId: target.profileId,
-      questionId: question.id,
-      answerText: answer,
-      verdict: evaluation.verdict,
-      score: String(evaluation.score),
-      path: evaluation.path,
-      reasonCodes: evaluation.reasonCodes,
-      modelVersion: evaluation.modelVersion || DEPTH_MOCK_MODEL_VERSION,
+    const transactionResult = await db.transaction(async (tx) => {
+      await tx.insert(unlockAttempts).values({
+        viewerUserId: input.viewerUserId,
+        targetProfileId: target.profileId,
+        questionId: question.id,
+        answerText: answer,
+        verdict: evaluation.verdict,
+        score: String(evaluation.score),
+        path: evaluation.path,
+        reasonCodes: evaluation.reasonCodes,
+        modelVersion: evaluation.modelVersion || DEPTH_MOCK_MODEL_VERSION,
+      });
+
+      if (evaluation.verdict !== "PASS") {
+        return { unlocked: false, idempotent: false };
+      }
+
+      const created = await createUnlock(
+        {
+          viewerUserId: input.viewerUserId,
+          profileId: target.profileId,
+        },
+        tx,
+      );
+      if (!created.ok) {
+        throw new Error("unlock transaction persistence failed");
+      }
+      return { unlocked: true, idempotent: !created.inserted };
     });
+    unlocked = transactionResult.unlocked;
+    idempotent = transactionResult.idempotent;
   } catch (error) {
     logDatabaseFailure({
       correlationId,
-      stage: "ATTEMPT_INSERT",
+      stage: evaluation.verdict === "PASS" ? "UNLOCK_UPSERT" : "ATTEMPT_INSERT",
       code: "PERSISTENCE_FAILED",
       error,
       viewerUserIdPrefix: viewerPrefix,
@@ -226,54 +250,18 @@ export async function submitDbUnlockAnswer(
     return { ok: false, correlationId, code: "PERSISTENCE_FAILED" };
   }
 
-  let unlocked = false;
-  let idempotent = false;
-
   if (evaluation.verdict === "PASS") {
-    try {
-      const already = await hasUnlock(input.viewerUserId, target.profileId);
-      const created = await createUnlock({
-        viewerUserId: input.viewerUserId,
-        profileId: target.profileId,
-      });
-      if (!created.ok) {
-        logUnlockEvent({
-          event: "unlock.submit.reject",
-          correlationId,
-          stage: "UNLOCK_UPSERT",
-          status: "error",
-          code: "PERSISTENCE_FAILED",
-          viewerUserIdPrefix: viewerPrefix,
-          targetProfileIdPrefix: idPrefix(target.profileId),
-          verdict: evaluation.verdict,
-          durationMs: Date.now() - started,
-        });
-        return { ok: false, correlationId, code: "PERSISTENCE_FAILED" };
-      }
-      unlocked = true;
-      idempotent = already || !created.inserted;
-      logUnlockEvent({
-        event: "unlock.submit.pass",
-        correlationId,
-        stage: "UNLOCK_UPSERT",
-        status: "ok",
-        viewerUserIdPrefix: viewerPrefix,
-        targetProfileIdPrefix: idPrefix(target.profileId),
-        verdict: evaluation.verdict,
-        idempotent,
-        durationMs: Date.now() - started,
-      });
-    } catch (error) {
-      logDatabaseFailure({
-        correlationId,
-        stage: "UNLOCK_UPSERT",
-        code: "PERSISTENCE_FAILED",
-        error,
-        viewerUserIdPrefix: viewerPrefix,
-        targetProfileIdPrefix: idPrefix(target.profileId),
-      });
-      return { ok: false, correlationId, code: "PERSISTENCE_FAILED" };
-    }
+    logUnlockEvent({
+      event: "unlock.submit.pass",
+      correlationId,
+      stage: "UNLOCK_UPSERT",
+      status: "ok",
+      viewerUserIdPrefix: viewerPrefix,
+      targetProfileIdPrefix: idPrefix(target.profileId),
+      verdict: evaluation.verdict,
+      idempotent,
+      durationMs: Date.now() - started,
+    });
   } else {
     logUnlockEvent({
       event: "unlock.submit.evaluated",
@@ -301,7 +289,13 @@ export async function getDbUnlockStatus(input: {
   viewerUserId: string;
   profileId: string;
 }): Promise<
-  | { ok: true; profileId: string; unlocked: boolean; correlationId: string }
+  | {
+      ok: true;
+      profileId: string;
+      unlocked: boolean;
+      unlockRowCount: number;
+      correlationId: string;
+    }
   | { ok: false; code: UnlockErrorCode; correlationId: string }
 > {
   const correlationId = createCorrelationId();
@@ -321,7 +315,8 @@ export async function getDbUnlockStatus(input: {
   }
 
   try {
-    const unlocked = await hasUnlock(input.viewerUserId, target.profileId);
+    const unlockRowCount = await countUnlocks(input.viewerUserId, target.profileId);
+    const unlocked = unlockRowCount === 1;
     logUnlockEvent({
       event: "unlock.status",
       correlationId,
@@ -336,6 +331,7 @@ export async function getDbUnlockStatus(input: {
       correlationId,
       profileId: target.profileId,
       unlocked,
+      unlockRowCount,
     };
   } catch (error) {
     logDatabaseFailure({
@@ -348,21 +344,4 @@ export async function getDbUnlockStatus(input: {
     });
     return { ok: false, correlationId, code: "UNLOCK_SERVICE_UNAVAILABLE" };
   }
-}
-
-export async function countUnlockPair(viewerUserId: string, profileId: string): Promise<number> {
-  const db = getDb();
-  const rows = await db
-    .select({ id: unlockAttempts.id })
-    .from(unlockAttempts)
-    .where(
-      and(
-        eq(unlockAttempts.viewerUserId, viewerUserId),
-        eq(unlockAttempts.targetProfileId, profileId),
-      ),
-    );
-  // unused helper kept for tests via repository; unlocks count uses hasUnlock/createUnlock
-  void rows;
-  const unlocked = await hasUnlock(viewerUserId, profileId);
-  return unlocked ? 1 : 0;
 }

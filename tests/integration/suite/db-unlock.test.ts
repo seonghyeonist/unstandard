@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import { describe, it } from "node:test";
-import { eq } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 import { createIntegrationDb, getIntegrationDatabaseUrl } from "../helpers";
 import { runDrizzleMigrations } from "../../../lib/db/run-migrations";
 import { seedClosedAlphaData } from "../../../lib/db/seed-data";
@@ -75,9 +75,10 @@ describe("integration: db-backed unlock vertical slice", () => {
       assert.equal(unlockRows.length, 0);
     });
 
-    await observeIntegrationCase("db_unlock_pass_and_idempotent", async () => {
-      const passAnswer =
-        "어제 비 오는 골목에서 따뜻한 국물을 마시며 마음이 조금 풀렸어요. 창밖 소리가 선명했어요.";
+    const passAnswer =
+      "어제 비 오는 골목에서 따뜻한 국물을 마시며 마음이 조금 풀렸어요. 창밖 소리가 선명했어요.";
+
+    await observeIntegrationCase("pass_transaction_commits_attempt_and_unlock", async () => {
       const first = await submitDbUnlockAnswer({
         viewerUserId: viewerA.userId,
         profileId: targetB.profileId,
@@ -87,8 +88,32 @@ describe("integration: db-backed unlock vertical slice", () => {
       if (first.ok) {
         assert.equal(first.verdict, "PASS");
         assert.equal(first.unlocked, true);
+        assert.equal(first.idempotent, false);
       }
 
+      const unlockRows = await db
+        .select({ id: unlocks.id })
+        .from(unlocks)
+        .where(
+          and(
+            eq(unlocks.viewerUserId, viewerA.userId),
+            eq(unlocks.profileId, targetB.profileId),
+          ),
+        );
+      const attempts = await db
+        .select({ id: unlockAttempts.id })
+        .from(unlockAttempts)
+        .where(
+          and(
+            eq(unlockAttempts.viewerUserId, viewerA.userId),
+            eq(unlockAttempts.targetProfileId, targetB.profileId),
+          ),
+        );
+      assert.equal(unlockRows.length, 1);
+      assert.equal(attempts.length, 2);
+    });
+
+    await observeIntegrationCase("duplicate_unlock_single_row", async () => {
       const second = await submitDbUnlockAnswer({
         viewerUserId: viewerA.userId,
         profileId: targetB.profileId,
@@ -104,14 +129,84 @@ describe("integration: db-backed unlock vertical slice", () => {
       const unlockRows = await db
         .select({ id: unlocks.id })
         .from(unlocks)
-        .where(eq(unlocks.viewerUserId, viewerA.userId));
+        .where(
+          and(
+            eq(unlocks.viewerUserId, viewerA.userId),
+            eq(unlocks.profileId, targetB.profileId),
+          ),
+        );
       assert.equal(unlockRows.length, 1);
 
       const attempts = await db
         .select({ id: unlockAttempts.id })
         .from(unlockAttempts)
-        .where(eq(unlockAttempts.viewerUserId, viewerA.userId));
-      assert.ok(attempts.length >= 2);
+        .where(
+          and(
+            eq(unlockAttempts.viewerUserId, viewerA.userId),
+            eq(unlockAttempts.targetProfileId, targetB.profileId),
+          ),
+        );
+      assert.equal(attempts.length, 3);
+    });
+
+    await observeIntegrationCase("unlock_failure_rolls_back_attempt", async () => {
+      await db.execute(sql`
+        CREATE OR REPLACE FUNCTION test_fail_unlock_insert()
+        RETURNS trigger
+        LANGUAGE plpgsql
+        AS $$
+        BEGIN
+          RAISE EXCEPTION 'forced unlock insert failure';
+        END;
+        $$
+      `);
+      await db.execute(sql`
+        CREATE TRIGGER test_fail_unlock_insert
+        BEFORE INSERT ON unlocks
+        FOR EACH ROW
+        EXECUTE FUNCTION test_fail_unlock_insert()
+      `);
+
+      const logLines: string[] = [];
+      const originalConsoleError = console.error;
+      console.error = (...args: unknown[]) => {
+        logLines.push(args.map(String).join(" "));
+      };
+      try {
+        const failed = await submitDbUnlockAnswer({
+          viewerUserId: stranger.userId,
+          profileId: targetB.profileId,
+          answer: passAnswer,
+        });
+        assert.equal(failed.ok, false);
+        if (!failed.ok) assert.equal(failed.code, "PERSISTENCE_FAILED");
+      } finally {
+        console.error = originalConsoleError;
+        await db.execute(sql`DROP TRIGGER IF EXISTS test_fail_unlock_insert ON unlocks`);
+        await db.execute(sql`DROP FUNCTION IF EXISTS test_fail_unlock_insert()`);
+      }
+
+      const failedAttempts = await db
+        .select({ id: unlockAttempts.id })
+        .from(unlockAttempts)
+        .where(
+          and(
+            eq(unlockAttempts.viewerUserId, stranger.userId),
+            eq(unlockAttempts.targetProfileId, targetB.profileId),
+          ),
+        );
+      const failedUnlocks = await db
+        .select({ id: unlocks.id })
+        .from(unlocks)
+        .where(
+          and(
+            eq(unlocks.viewerUserId, stranger.userId),
+            eq(unlocks.profileId, targetB.profileId),
+          ),
+        );
+      assert.equal(failedAttempts.length, 0);
+      assert.equal(failedUnlocks.length, 0);
+      assert.equal(logLines.some((line) => line.includes(passAnswer)), false);
     });
 
     await observeIntegrationCase("db_unlock_viewer_isolation", async () => {
@@ -150,6 +245,41 @@ describe("integration: db-backed unlock vertical slice", () => {
       }
     });
 
+    await observeIntegrationCase("bidirectional_viewer_isolation", async () => {
+      const before = await getDbPrivateProfile({
+        viewerUserId: targetB.userId,
+        profileId: viewerA.profileId,
+      });
+      assert.equal(before.ok, false);
+      if (!before.ok) assert.equal(before.code, "FORBIDDEN");
+
+      const reverse = await submitDbUnlockAnswer({
+        viewerUserId: targetB.userId,
+        profileId: viewerA.profileId,
+        answer: passAnswer,
+      });
+      assert.equal(reverse.ok, true);
+      if (reverse.ok) {
+        assert.equal(reverse.verdict, "PASS");
+        assert.equal(reverse.unlocked, true);
+      }
+
+      const forwardStatus = await getDbUnlockStatus({
+        viewerUserId: viewerA.userId,
+        profileId: targetB.profileId,
+      });
+      const reverseStatus = await getDbUnlockStatus({
+        viewerUserId: targetB.userId,
+        profileId: viewerA.profileId,
+      });
+      assert.equal(forwardStatus.ok, true);
+      assert.equal(reverseStatus.ok, true);
+      if (forwardStatus.ok && reverseStatus.ok) {
+        assert.equal(forwardStatus.unlockRowCount, 1);
+        assert.equal(reverseStatus.unlockRowCount, 1);
+      }
+    });
+
     await observeIntegrationCase("db_unlock_self_denied", async () => {
       const self = await submitDbUnlockAnswer({
         viewerUserId: viewerA.userId,
@@ -171,8 +301,10 @@ describe("integration: db-backed unlock vertical slice", () => {
     });
 
     // cleanup
-    await db.delete(unlockAttempts).where(eq(unlockAttempts.viewerUserId, viewerA.userId));
-    await db.delete(unlocks).where(eq(unlocks.viewerUserId, viewerA.userId));
+    for (const row of [viewerA, targetB, stranger]) {
+      await db.delete(unlockAttempts).where(eq(unlockAttempts.viewerUserId, row.userId));
+      await db.delete(unlocks).where(eq(unlocks.viewerUserId, row.userId));
+    }
     for (const row of [viewerA, targetB, stranger]) {
       await db.delete(profilePrivate).where(eq(profilePrivate.profileId, row.profileId));
       await db.delete(profiles).where(eq(profiles.id, row.profileId));

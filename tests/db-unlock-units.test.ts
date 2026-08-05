@@ -1,6 +1,10 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { isUuid } from "../lib/server/unlock/uuid.ts";
+import { isCanonicalUuid, isUuid } from "../lib/server/unlock/uuid.ts";
+import {
+  credentialsOwnExpectedProfiles,
+  validateSmokeProfileIds,
+} from "../lib/smoke/authorization-preflight.ts";
 import {
   unlockErrorClientMessage,
   unlockErrorHttpStatus,
@@ -16,6 +20,50 @@ describe("unlock uuid + error mapping", () => {
   it("accepts UUID profile ids only", () => {
     assert.equal(isUuid("c3"), false);
     assert.equal(isUuid("8bcb3e0e-49a9-4e1d-ba70-88b7a49d154d"), true);
+    assert.equal(isCanonicalUuid("8BCB3E0E-49A9-4E1D-BA70-88B7A49D154D"), false);
+  });
+
+  it("smoke_rejects_non_uuid_profiles", () => {
+    const validA = "d28f5b1d-2d32-42ec-98eb-b90d0d2d9a37";
+    const validB = "8bcb3e0e-49a9-4e1d-ba70-88b7a49d154d";
+    for (const invalid of ["", "c1", "c2", "c3", "not-a-uuid"]) {
+      assert.ok(validateSmokeProfileIds(invalid, validB).length > 0);
+      assert.ok(validateSmokeProfileIds(validA, invalid).length > 0);
+    }
+    assert.deepEqual(validateSmokeProfileIds(validA, validB), []);
+  });
+
+  it("smoke_rejects_same_profile_ids", () => {
+    const validA = "d28f5b1d-2d32-42ec-98eb-b90d0d2d9a37";
+    assert.ok(validateSmokeProfileIds(validA, validA).length > 0);
+  });
+
+  it("proves credential/profile mapping from self-excluding DB candidates", () => {
+    const profileAId = "d28f5b1d-2d32-42ec-98eb-b90d0d2d9a37";
+    const profileBId = "8bcb3e0e-49a9-4e1d-ba70-88b7a49d154d";
+    const body = (ids: string[]) => ({
+      source: "database",
+      candidates: ids.map((id) => ({ id })),
+    });
+
+    assert.equal(
+      credentialsOwnExpectedProfiles({
+        profileAId,
+        profileBId,
+        candidatesForA: body([profileBId]),
+        candidatesForB: body([profileAId]),
+      }),
+      true,
+    );
+    assert.equal(
+      credentialsOwnExpectedProfiles({
+        profileAId,
+        profileBId,
+        candidatesForA: body([profileAId]),
+        candidatesForB: body([profileBId]),
+      }),
+      false,
+    );
   });
 
   it("maps FK/capability failures to safe statuses", () => {

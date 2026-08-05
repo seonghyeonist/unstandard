@@ -261,7 +261,7 @@ export async function runIntegrationProofCore(
 
     const built = buildArtifact({
       verdict: "PASS",
-      gitSha: getGitSha(),
+      subjectGitSha: getGitSha(),
       migrationChecksum: migrationChecksum(),
       cases: aggregated.cases,
     });

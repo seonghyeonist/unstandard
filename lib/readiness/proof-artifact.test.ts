@@ -29,6 +29,8 @@ import {
 const GIT_SHA = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
 const GIT_SHA_B = "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb";
 const CHECKSUM = "0123456789abcdef";
+const FINGERPRINT_SHA = "c".repeat(64);
+const DEPLOYMENT_ID = "dpl_Abc123";
 const PREVIEW_HOST = "unstandard-m9qj-git-cursor-neon-drizzle-better-auth-rebuild-909d-unstandard.vercel.app";
 const NOW = Date.parse("2026-07-14T06:00:00.000Z");
 
@@ -38,10 +40,10 @@ function allPassCases(names: readonly string[]): ProofCase[] {
 
 function validIntegration(overrides: Record<string, unknown> = {}) {
   return {
-    artifactVersion: 1,
+    artifactVersion: 2,
     kind: "integration",
     verdict: "PASS",
-    gitSha: GIT_SHA,
+    subjectGitSha: GIT_SHA,
     migrationChecksum: CHECKSUM,
     timestamp: "2026-07-14T05:00:00.000Z",
     matrix: "real_postgresql_integration",
@@ -52,14 +54,18 @@ function validIntegration(overrides: Record<string, unknown> = {}) {
 
 function validSmoke(overrides: Record<string, unknown> = {}) {
   return {
-    artifactVersion: 1,
+    artifactVersion: 2,
     kind: "smoke",
     verdict: "PASS",
-    gitSha: GIT_SHA,
+    subjectGitSha: GIT_SHA,
     migrationChecksum: CHECKSUM,
     timestamp: "2026-07-14T05:05:00.000Z",
     matrix: "deployed_http_alpha_surface",
     previewHostname: PREVIEW_HOST,
+    runnerGitSha: GIT_SHA,
+    deploymentGitSha: GIT_SHA,
+    deploymentId: DEPLOYMENT_ID,
+    databaseFingerprintSha: FINGERPRINT_SHA,
     cases: allPassCases(REQUIRED_HTTP_SMOKE_CASES),
     futureNotApplicable: [
       {
@@ -126,7 +132,7 @@ describe("proof artifact schema", () => {
     const built = buildIntegrationArtifact(
       {
         verdict: "PASS",
-        gitSha: GIT_SHA,
+        subjectGitSha: GIT_SHA,
         migrationChecksum: CHECKSUM,
         timestamp: "2026-07-14T05:00:00.000Z",
         cases,
@@ -175,7 +181,7 @@ describe("proof artifact schema", () => {
     const integration = buildIntegrationArtifact(
       {
         verdict: "FAIL",
-        gitSha: GIT_SHA,
+        subjectGitSha: GIT_SHA,
         migrationChecksum: CHECKSUM,
         timestamp: "2026-07-14T05:00:00.000Z",
         cases,
@@ -203,7 +209,11 @@ describe("proof artifact schema", () => {
     const smoke = buildSmokeArtifact(
       {
         verdict: "FAIL",
-        gitSha: GIT_SHA,
+        subjectGitSha: GIT_SHA,
+        runnerGitSha: GIT_SHA,
+        deploymentGitSha: GIT_SHA,
+        deploymentId: DEPLOYMENT_ID,
+        databaseFingerprintSha: FINGERPRINT_SHA,
         migrationChecksum: CHECKSUM,
         timestamp: "2026-07-14T05:00:00.000Z",
         previewHostname: PREVIEW_HOST,
@@ -334,7 +344,7 @@ describe("proof artifact schema", () => {
   });
 
   it("rejects truncated git SHA", () => {
-    const parsed = parseIntegrationProofArtifact(validIntegration({ gitSha: "aaaaaaaaaaaa" }), {
+    const parsed = parseIntegrationProofArtifact(validIntegration({ subjectGitSha: "aaaaaaaaaaaa" }), {
       nowMs: NOW,
     });
     assert.equal(parsed.ok, false);
@@ -405,7 +415,14 @@ describe("proof artifact schema", () => {
 
   it("rejects integration/smoke SHA mismatch", () => {
     const integration = parseIntegrationProofArtifact(validIntegration(), { nowMs: NOW });
-    const smoke = parseSmokeProofArtifact(validSmoke({ gitSha: GIT_SHA_B }), { nowMs: NOW });
+    const smoke = parseSmokeProofArtifact(
+      validSmoke({
+        subjectGitSha: GIT_SHA_B,
+        runnerGitSha: GIT_SHA_B,
+        deploymentGitSha: GIT_SHA_B,
+      }),
+      { nowMs: NOW },
+    );
     assert.equal(integration.ok && smoke.ok, true);
     if (!integration.ok || !smoke.ok) return;
     const combined = combineSourceArtifacts({
@@ -436,8 +453,18 @@ describe("proof artifact schema", () => {
   });
 
   it("rejects malformed artifactVersion", () => {
-    const parsed = parseProofArtifact(validIntegration({ artifactVersion: 2 }), { nowMs: NOW });
+    const parsed = parseProofArtifact(validIntegration({ artifactVersion: 1 }), { nowMs: NOW });
     assert.equal(parsed.ok, false);
+  });
+
+  it("artifact_subject_sha_semantics", () => {
+    const parsed = parseSmokeProofArtifact(
+      validSmoke({ deploymentGitSha: GIT_SHA_B }),
+      { nowMs: NOW },
+    );
+    assert.equal(parsed.ok, false);
+    if (parsed.ok) return;
+    assert.ok(parsed.failures.some((failure) => failure.includes("must match")));
   });
 
   it("rejects unknown top-level field", () => {
@@ -534,7 +561,11 @@ describe("artifact secret safety and atomic write", () => {
     const withCookie = buildSmokeArtifact(
       {
         verdict: "PASS",
-        gitSha: GIT_SHA,
+        subjectGitSha: GIT_SHA,
+        runnerGitSha: GIT_SHA,
+        deploymentGitSha: GIT_SHA,
+        deploymentId: DEPLOYMENT_ID,
+        databaseFingerprintSha: FINGERPRINT_SHA,
         migrationChecksum: CHECKSUM,
         timestamp: "2026-07-14T05:00:00.000Z",
         previewHostname: PREVIEW_HOST,
@@ -605,7 +636,7 @@ describe("artifact secret safety and atomic write", () => {
       const built = buildIntegrationArtifact(
         {
           verdict: "PASS",
-          gitSha: GIT_SHA,
+          subjectGitSha: GIT_SHA,
           migrationChecksum: CHECKSUM,
           timestamp: "2026-07-14T05:00:00.000Z",
           cases: allPassCases(REQUIRED_INTEGRATION_CASES),
@@ -627,7 +658,7 @@ describe("artifact secret safety and atomic write", () => {
     const blocked = buildIntegrationArtifact(
       {
         verdict: "BLOCKED_EXTERNAL",
-        gitSha: GIT_SHA,
+        subjectGitSha: GIT_SHA,
         migrationChecksum: CHECKSUM,
         timestamp: "2026-07-14T05:00:00.000Z",
         cases: [{ name: "report_user_fk", status: "PASS" }],
@@ -639,7 +670,11 @@ describe("artifact secret safety and atomic write", () => {
     const blockedSmoke = buildSmokeArtifact(
       {
         verdict: "BLOCKED_EXTERNAL",
-        gitSha: GIT_SHA,
+        subjectGitSha: GIT_SHA,
+        runnerGitSha: GIT_SHA,
+        deploymentGitSha: GIT_SHA,
+        deploymentId: DEPLOYMENT_ID,
+        databaseFingerprintSha: FINGERPRINT_SHA,
         migrationChecksum: CHECKSUM,
         timestamp: "2026-07-14T05:00:00.000Z",
         previewHostname: PREVIEW_HOST,

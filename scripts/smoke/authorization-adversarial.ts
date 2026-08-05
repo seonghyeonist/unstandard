@@ -18,6 +18,10 @@ import {
 import { extractHostname, validateEvidenceHostname, hostnameFailureMessage } from "../../lib/readiness/hostnames";
 import { CookieJar, collectSetCookieHeaders } from "../../lib/smoke/cookie-jar";
 import {
+  credentialsOwnExpectedProfiles,
+  validateSmokeProfileIds,
+} from "../../lib/smoke/authorization-preflight";
+import {
   proveClearedCookieDenied,
   proveLogoutInvalidatesSession,
   proveRevokedSessionRejected,
@@ -31,6 +35,9 @@ const userBPassword = process.env.SMOKE_USER_B_PASSWORD;
 const previewBypass = process.env.SMOKE_VERCEL_PROTECTION_BYPASS?.trim();
 const profileAId = process.env.SMOKE_USER_A_PROFILE_ID?.trim();
 const profileBId = process.env.SMOKE_USER_B_PROFILE_ID?.trim();
+const deploymentGitSha = process.env.SMOKE_DEPLOYMENT_GIT_SHA?.trim();
+const deploymentId = process.env.SMOKE_DEPLOYMENT_ID?.trim();
+const databaseFingerprintSha = process.env.SMOKE_DATABASE_FINGERPRINT_SHA256?.trim();
 
 type FutureCase = {
   name: string;
@@ -48,11 +55,11 @@ function redact(value: string): string {
     .replace(/Bearer\s+[A-Za-z0-9._-]+/gi, "[authorization]");
 }
 
-function blocked(message: string): never {
-  console.error(`BLOCKED_EXTERNAL: ${message}`);
+function blocked(message: string, code = "BLOCKED_EXTERNAL"): never {
+  console.error(`${code}: ${message}`);
   const out = process.env.UNSTANDARD_SMOKE_EVIDENCE_OUT?.trim();
   if (out) {
-    console.error("BLOCKED_EXTERNAL: no smoke PASS artifact written");
+    console.error(`${code}: no smoke PASS artifact written`);
   }
   process.exit(2);
 }
@@ -158,6 +165,23 @@ async function main(): Promise<void> {
   if (!profileAId || !profileBId) {
     blocked("SMOKE_USER_A_PROFILE_ID and SMOKE_USER_B_PROFILE_ID are required");
   }
+  const profileIdFailures = validateSmokeProfileIds(profileAId, profileBId);
+  if (profileIdFailures.length > 0) {
+    blocked(profileIdFailures.join("; "));
+  }
+  const runnerGitSha = getCurrentGitSha();
+  if (!deploymentGitSha || !/^[a-f0-9]{40}$/.test(deploymentGitSha)) {
+    blocked("SMOKE_DEPLOYMENT_GIT_SHA must be the full verified Preview commit SHA");
+  }
+  if (deploymentGitSha !== runnerGitSha) {
+    blocked("runner checkout SHA does not match Preview deployment SHA");
+  }
+  if (!deploymentId || !/^dpl_[A-Za-z0-9]+$/.test(deploymentId)) {
+    blocked("SMOKE_DEPLOYMENT_ID must be the verified Preview deployment ID");
+  }
+  if (!databaseFingerprintSha || !/^[a-f0-9]{64}$/.test(databaseFingerprintSha)) {
+    blocked("SMOKE_DATABASE_FINGERPRINT_SHA256 must hash the matched safe fingerprint");
+  }
 
   const previewHostname = extractHostname(baseUrl);
   if (!previewHostname) {
@@ -209,6 +233,25 @@ async function main(): Promise<void> {
 
   const sessionB = await fetchJson("/api/auth/session", {}, jarB);
   pushCase(cases, "user_b_session", sessionB.status === 200);
+
+  const candidatesForA = await fetchJson("/api/candidates", {}, jarA);
+  const candidatesForB = await fetchJson("/api/candidates", {}, jarB);
+  const identityMappingVerified =
+    candidatesForA.status === 200 &&
+    candidatesForB.status === 200 &&
+    credentialsOwnExpectedProfiles({
+      profileAId,
+      profileBId,
+      candidatesForA: candidatesForA.body,
+      candidatesForB: candidatesForB.body,
+    });
+  if (!identityMappingVerified) {
+    blocked(
+      "credential-to-profile ownership could not be proven from database candidate exclusion",
+      "BLOCKED_IDENTITY_MISMATCH",
+    );
+  }
+  pushCase(cases, "credential_profile_mapping_verified", true);
 
   pushCase(
     cases,
@@ -306,82 +349,171 @@ async function main(): Promise<void> {
     redactionCheck.status === 200 && isPrivateNoStore(redactionCheck.headers),
   );
 
-  // DB-backed unlock vertical slice (requires real profile UUIDs, not mock c1/c2/c3).
-  if (!profileAId || !profileBId || profileAId === "c1" || profileBId === "c3") {
-    pushCase(cases, "a_to_b_private_before_unlock_forbidden", false);
-    pushCase(cases, "a_to_b_unlock_pass", false);
-    pushCase(cases, "a_to_b_unlock_status_true", false);
-    pushCase(cases, "a_to_b_private_after_unlock_ok", false);
-    pushCase(cases, "b_to_a_private_isolated", false);
-    pushCase(cases, "duplicate_unlock_idempotent", false);
-    pushCase(cases, "private_response_no_store", false);
-  } else {
-    const beforePrivate = await fetchJson(`/api/profile/${profileBId}/private`, {}, jarA);
-    pushCase(
-      cases,
-      "a_to_b_private_before_unlock_forbidden",
-      beforePrivate.status === 403 && isPrivateNoStore(beforePrivate.headers),
-    );
+  // DB-backed unlock proof. Pair state must be cleaned by the operator before this run.
+  const initialAStatus = await fetchJson(`/api/unlock/${profileBId}`, {}, jarA);
+  const initialBStatus = await fetchJson(`/api/unlock/${profileAId}`, {}, jarB);
+  pushCase(
+    cases,
+    "initial_unlock_pair_state_clean",
+    initialAStatus.status === 200 &&
+      initialBStatus.status === 200 &&
+      (initialAStatus.body as { unlocked?: boolean; unlockRowCount?: number }).unlocked === false &&
+      (initialAStatus.body as { unlockRowCount?: number }).unlockRowCount === 0 &&
+      (initialBStatus.body as { unlocked?: boolean; unlockRowCount?: number }).unlocked === false &&
+      (initialBStatus.body as { unlockRowCount?: number }).unlockRowCount === 0,
+  );
 
-    const unlockAnswer =
-      "어제 비 오는 골목에서 따뜻한 국물을 마시며 마음이 조금 풀렸어요. 창밖 빗소리가 선명했어요.";
-    const unlockPass = await fetchJson(
-      "/api/answers/unlock",
-      {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ profileId: profileBId, answer: unlockAnswer }),
-      },
-      jarA,
-    );
-    const unlockBody = unlockPass.body as { verdict?: string; unlocked?: boolean };
-    pushCase(
-      cases,
-      "a_to_b_unlock_pass",
-      unlockPass.status === 200 && unlockBody.verdict === "PASS" && unlockBody.unlocked === true,
-    );
+  const beforePrivate = await fetchJson(`/api/profile/${profileBId}/private`, {}, jarA);
+  pushCase(
+    cases,
+    "a_to_b_private_before_unlock_forbidden",
+    beforePrivate.status === 403 && isPrivateNoStore(beforePrivate.headers),
+  );
 
-    const unlockStatus = await fetchJson(`/api/unlock/${profileBId}`, {}, jarA);
-    pushCase(
-      cases,
-      "a_to_b_unlock_status_true",
-      unlockStatus.status === 200 &&
-        (unlockStatus.body as { unlocked?: boolean })?.unlocked === true,
-    );
+  const unlockAnswer =
+    "어제 비 오는 골목에서 따뜻한 국물을 마시며 마음이 조금 풀렸어요. 창밖 빗소리가 선명했어요.";
+  const unlockPass = await fetchJson(
+    "/api/answers/unlock",
+    {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ profileId: profileBId, answer: unlockAnswer }),
+    },
+    jarA,
+  );
+  const unlockBody = unlockPass.body as { verdict?: string; unlocked?: boolean };
+  pushCase(
+    cases,
+    "a_to_b_unlock_pass",
+    unlockPass.status === 200 && unlockBody.verdict === "PASS" && unlockBody.unlocked === true,
+  );
 
-    const afterPrivate = await fetchJson(`/api/profile/${profileBId}/private`, {}, jarA);
-    pushCase(
-      cases,
-      "a_to_b_private_after_unlock_ok",
-      afterPrivate.status === 200 &&
-        isPrivateNoStore(afterPrivate.headers) &&
-        !sessionHasSensitiveFields(afterPrivate.body),
-    );
-    pushCase(
-      cases,
-      "private_response_no_store",
-      afterPrivate.status === 200 && isPrivateNoStore(afterPrivate.headers),
-    );
+  const unlockStatus = await fetchJson(`/api/unlock/${profileBId}`, {}, jarA);
+  const aStatusBody = unlockStatus.body as {
+    unlocked?: boolean;
+    unlockRowCount?: number;
+  };
+  pushCase(
+    cases,
+    "a_to_b_unlock_status_true",
+    unlockStatus.status === 200 && aStatusBody.unlocked === true,
+  );
+  pushCase(
+    cases,
+    "a_to_b_unlock_row_exactly_one",
+    unlockStatus.status === 200 && aStatusBody.unlockRowCount === 1,
+  );
 
-    const bSeesA = await fetchJson(`/api/profile/${profileAId}/private`, {}, jarB);
-    pushCase(cases, "b_to_a_private_isolated", bSeesA.status === 403);
+  const afterPrivate = await fetchJson(`/api/profile/${profileBId}/private`, {}, jarA);
+  pushCase(
+    cases,
+    "a_to_b_private_after_unlock_ok",
+    afterPrivate.status === 200 &&
+      isPrivateNoStore(afterPrivate.headers) &&
+      !sessionHasSensitiveFields(afterPrivate.body),
+  );
 
-    const unlockAgain = await fetchJson(
-      "/api/answers/unlock",
-      {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ profileId: profileBId, answer: unlockAnswer }),
-      },
-      jarA,
-    );
-    pushCase(
-      cases,
-      "duplicate_unlock_idempotent",
-      unlockAgain.status === 200 &&
-        (unlockAgain.body as { unlocked?: boolean; idempotent?: boolean })?.unlocked === true,
-    );
-  }
+  const unlockAgain = await fetchJson(
+    "/api/answers/unlock",
+    {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ profileId: profileBId, answer: unlockAnswer }),
+    },
+    jarA,
+  );
+  const duplicateBody = unlockAgain.body as {
+    verdict?: string;
+    unlocked?: boolean;
+    idempotent?: boolean;
+  };
+  const statusAfterDuplicate = await fetchJson(`/api/unlock/${profileBId}`, {}, jarA);
+  pushCase(
+    cases,
+    "duplicate_unlock_idempotent",
+    unlockAgain.status === 200 &&
+      duplicateBody.verdict === "PASS" &&
+      duplicateBody.unlocked === true &&
+      duplicateBody.idempotent === true &&
+      (statusAfterDuplicate.body as { unlockRowCount?: number }).unlockRowCount === 1,
+  );
+
+  const bBeforeOwnUnlock = await fetchJson(`/api/profile/${profileAId}/private`, {}, jarB);
+  pushCase(cases, "b_does_not_inherit_a_to_b_permission", bBeforeOwnUnlock.status === 403);
+  pushCase(
+    cases,
+    "b_to_a_private_before_unlock_forbidden",
+    bBeforeOwnUnlock.status === 403 && isPrivateNoStore(bBeforeOwnUnlock.headers),
+  );
+
+  const forgedJarB = jarB.clone();
+  forgedJarB.ingest(`unstandard_unlock_${profileAId}=forged; Path=/; HttpOnly`);
+  const forgedCookiePrivate = await fetchJson(
+    `/api/profile/${profileAId}/private`,
+    {},
+    forgedJarB,
+  );
+  pushCase(cases, "forged_unlock_cookie_no_authority", forgedCookiePrivate.status === 403);
+
+  const bUnlockPass = await fetchJson(
+    "/api/answers/unlock",
+    {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ profileId: profileAId, answer: unlockAnswer }),
+    },
+    jarB,
+  );
+  const bUnlockBody = bUnlockPass.body as { verdict?: string; unlocked?: boolean };
+  pushCase(
+    cases,
+    "b_to_a_unlock_pass",
+    bUnlockPass.status === 200 &&
+      bUnlockBody.verdict === "PASS" &&
+      bUnlockBody.unlocked === true,
+  );
+
+  const bUnlockStatus = await fetchJson(`/api/unlock/${profileAId}`, {}, jarB);
+  const bStatusBody = bUnlockStatus.body as {
+    unlocked?: boolean;
+    unlockRowCount?: number;
+  };
+  pushCase(
+    cases,
+    "b_to_a_unlock_status_true",
+    bUnlockStatus.status === 200 && bStatusBody.unlocked === true,
+  );
+  pushCase(
+    cases,
+    "b_to_a_unlock_row_exactly_one",
+    bUnlockStatus.status === 200 && bStatusBody.unlockRowCount === 1,
+  );
+
+  const bAfterPrivate = await fetchJson(`/api/profile/${profileAId}/private`, {}, jarB);
+  pushCase(
+    cases,
+    "b_to_a_private_after_unlock_ok",
+    bAfterPrivate.status === 200 &&
+      isPrivateNoStore(bAfterPrivate.headers) &&
+      !sessionHasSensitiveFields(bAfterPrivate.body),
+  );
+
+  const finalAStatus = await fetchJson(`/api/unlock/${profileBId}`, {}, jarA);
+  const finalBStatus = await fetchJson(`/api/unlock/${profileAId}`, {}, jarB);
+  pushCase(
+    cases,
+    "bidirectional_viewer_isolation",
+    (finalAStatus.body as { unlockRowCount?: number }).unlockRowCount === 1 &&
+      (finalBStatus.body as { unlockRowCount?: number }).unlockRowCount === 1,
+  );
+  pushCase(
+    cases,
+    "private_response_no_store",
+    afterPrivate.status === 200 &&
+      bAfterPrivate.status === 200 &&
+      isPrivateNoStore(afterPrivate.headers) &&
+      isPrivateNoStore(bAfterPrivate.headers),
+  );
 
   const getSession = async (jar: CookieJar) => {
     const result = await fetchJson("/api/auth/session", {}, jar);
@@ -433,7 +565,11 @@ async function main(): Promise<void> {
 
   const built = buildSmokeArtifact({
     verdict,
-    gitSha: getCurrentGitSha(),
+    subjectGitSha: runnerGitSha,
+    runnerGitSha,
+    deploymentGitSha,
+    deploymentId,
+    databaseFingerprintSha,
     migrationChecksum: migrationSetChecksum(),
     previewHostname,
     cases: activeRequired,
@@ -452,8 +588,10 @@ async function main(): Promise<void> {
         kind: "smoke",
         matrix: "deployed_http_alpha_surface",
         previewHostname,
-        runnerGitShaNote:
-          "gitSha is local runner checkout provenance only — not signed remote deployment attestation",
+        subjectGitSha: runnerGitSha,
+        runnerGitSha,
+        deploymentGitSha,
+        deploymentId,
         caseNames: activeRequired.map((item) => item.name),
         futureNotApplicable: futureNotApplicable.map((item) => item.name),
         timestamp: built.artifact.timestamp,

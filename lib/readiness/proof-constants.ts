@@ -1,6 +1,6 @@
-/** Shared constants for versioned proof artifacts (Artifact Version 1). */
+/** Shared constants for versioned proof artifacts (Artifact Version 2). */
 
-export const ARTIFACT_VERSION = 1 as const;
+export const ARTIFACT_VERSION = 2 as const;
 
 /** Maximum age of a proof artifact accepted as readiness evidence (24h). */
 export const PROOF_MAX_AGE_MS = 24 * 60 * 60 * 1000;
@@ -30,8 +30,11 @@ export const REQUIRED_INTEGRATION_CASES = [
   "migration_second_run_noop",
   "seed_idempotency",
   "db_unlock_reject_no_row",
-  "db_unlock_pass_and_idempotent",
+  "pass_transaction_commits_attempt_and_unlock",
+  "unlock_failure_rolls_back_attempt",
+  "duplicate_unlock_single_row",
   "db_unlock_viewer_isolation",
+  "bidirectional_viewer_isolation",
   "db_private_profile_gate",
   "db_unlock_self_denied",
   "db_unlock_invalid_uuid",
@@ -47,6 +50,7 @@ export const REQUIRED_HTTP_SMOKE_CASES = [
   "user_b_session",
   "user_a_owns_session",
   "user_b_owns_session",
+  "credential_profile_mapping_verified",
   "forged_reporter_id_rejected",
   "self_report_rejected",
   "duplicate_open_report_is_idempotent",
@@ -55,12 +59,21 @@ export const REQUIRED_HTTP_SMOKE_CASES = [
   "logout_invalidates_session",
   "cleared_cookie_denied",
   "revoked_session_rejected",
+  "initial_unlock_pair_state_clean",
   "a_to_b_private_before_unlock_forbidden",
   "a_to_b_unlock_pass",
   "a_to_b_unlock_status_true",
+  "a_to_b_unlock_row_exactly_one",
   "a_to_b_private_after_unlock_ok",
-  "b_to_a_private_isolated",
   "duplicate_unlock_idempotent",
+  "b_does_not_inherit_a_to_b_permission",
+  "b_to_a_private_before_unlock_forbidden",
+  "forged_unlock_cookie_no_authority",
+  "b_to_a_unlock_pass",
+  "b_to_a_unlock_status_true",
+  "b_to_a_unlock_row_exactly_one",
+  "b_to_a_private_after_unlock_ok",
+  "bidirectional_viewer_isolation",
   "private_response_no_store",
 ] as const;
 

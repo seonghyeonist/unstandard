@@ -57,6 +57,7 @@ export async function GET(_request: Request, context: { params: Promise<{ profil
     return privateJson({
       profileId: result.profileId,
       unlocked: result.unlocked,
+      unlockRowCount: result.unlockRowCount,
       correlationId: result.correlationId,
       source: "database",
     });

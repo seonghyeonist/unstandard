@@ -43,10 +43,10 @@ describe("canonical proof timestamp", () => {
   it("rejects stale artifact timestamps", () => {
     const parsed = parseIntegrationProofArtifact(
       {
-        artifactVersion: 1,
+        artifactVersion: 2,
         kind: "integration",
         verdict: "PASS",
-        gitSha: GIT_SHA,
+        subjectGitSha: GIT_SHA,
         migrationChecksum: CHECKSUM,
         timestamp: "2020-01-01T00:00:00.000Z",
         matrix: "real_postgresql_integration",
@@ -60,10 +60,10 @@ describe("canonical proof timestamp", () => {
   it("rejects excessive future timestamps", () => {
     const parsed = parseIntegrationProofArtifact(
       {
-        artifactVersion: 1,
+        artifactVersion: 2,
         kind: "integration",
         verdict: "PASS",
-        gitSha: GIT_SHA,
+        subjectGitSha: GIT_SHA,
         migrationChecksum: CHECKSUM,
         timestamp: "2099-01-01T00:00:00.000Z",
         matrix: "real_postgresql_integration",

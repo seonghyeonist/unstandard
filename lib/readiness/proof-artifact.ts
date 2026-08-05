@@ -15,14 +15,18 @@ import { isCanonicalProofTimestamp, nowCanonicalProofTimestamp } from "./canonic
 
 const fullGitShaSchema = z
   .string()
-  .regex(/^[a-f0-9]{40}$/, "gitSha must be a full 40-character lowercase hex SHA");
+  .regex(/^[a-f0-9]{40}$/, "Git SHA must be a full 40-character lowercase hex SHA");
+
+const sha256Schema = z
+  .string()
+  .regex(/^[a-f0-9]{64}$/, "databaseFingerprintSha must be a full lowercase SHA-256");
 
 const migrationChecksumSchema = z
   .string()
   .min(1)
   .regex(/^[a-f0-9]{16}$/, "migrationChecksum must be 16 lowercase hex chars");
 
-/** Canonical UTC timestamp: new Date().toISOString() only (Artifact Version 1, stricter validation). */
+/** Canonical UTC timestamp: new Date().toISOString() only. */
 const isoTimestampSchema = z.string().refine((value) => isCanonicalProofTimestamp(value), {
   message:
     "timestamp must be canonical UTC ISO-8601 from Date.toISOString() (YYYY-MM-DDTHH:mm:ss.sssZ)",
@@ -49,7 +53,7 @@ const verdictSchema = z.enum(["PASS", "FAIL", "BLOCKED_EXTERNAL", "INCOMPLETE"])
 const baseArtifactFields = {
   artifactVersion: z.literal(ARTIFACT_VERSION),
   verdict: verdictSchema,
-  gitSha: fullGitShaSchema,
+  subjectGitSha: fullGitShaSchema,
   migrationChecksum: migrationChecksumSchema,
   timestamp: isoTimestampSchema,
   matrix: z.string().min(1),
@@ -71,6 +75,10 @@ export const smokeProofArtifactSchema = z
     kind: z.literal("smoke"),
     matrix: z.literal(SMOKE_MATRIX),
     previewHostname: z.string().min(1),
+    runnerGitSha: fullGitShaSchema,
+    deploymentGitSha: fullGitShaSchema,
+    deploymentId: z.string().regex(/^dpl_[A-Za-z0-9]+$/),
+    databaseFingerprintSha: sha256Schema,
   })
   .strict();
 
@@ -91,7 +99,7 @@ export const combinedReadinessArtifactSchema = z
     artifactVersion: z.literal(ARTIFACT_VERSION),
     kind: z.literal("readiness"),
     verdict: z.literal("PASS"),
-    gitSha: fullGitShaSchema,
+    subjectGitSha: fullGitShaSchema,
     migrationChecksum: migrationChecksumSchema,
     previewHostname: z.string().min(1),
     timestamp: isoTimestampSchema,
@@ -256,6 +264,14 @@ export function validateProofArtifactSemantics(
     if (hostFailure && (options.requirePreviewHostnameRules ?? true)) {
       failures.push(hostnameFailureMessage(hostFailure));
     }
+    if (
+      artifact.subjectGitSha !== artifact.runnerGitSha ||
+      artifact.subjectGitSha !== artifact.deploymentGitSha
+    ) {
+      failures.push(
+        "smoke subjectGitSha, runnerGitSha, and deploymentGitSha must match",
+      );
+    }
   }
 
   const secretHits = scanForSecrets(artifact);
@@ -375,7 +391,7 @@ export function parseCombinedReadinessArtifact(
 
 export type BuildIntegrationArtifactInput = {
   verdict: ProofVerdict;
-  gitSha: string;
+  subjectGitSha: string;
   migrationChecksum: string;
   timestamp?: string;
   cases: ProofCase[];
@@ -384,6 +400,10 @@ export type BuildIntegrationArtifactInput = {
 
 export type BuildSmokeArtifactInput = BuildIntegrationArtifactInput & {
   previewHostname: string;
+  runnerGitSha: string;
+  deploymentGitSha: string;
+  deploymentId: string;
+  databaseFingerprintSha: string;
 };
 
 export function buildIntegrationArtifact(
@@ -394,7 +414,7 @@ export function buildIntegrationArtifact(
     artifactVersion: ARTIFACT_VERSION,
     kind: "integration" as const,
     verdict: input.verdict,
-    gitSha: input.gitSha,
+    subjectGitSha: input.subjectGitSha,
     migrationChecksum: input.migrationChecksum,
     timestamp: input.timestamp ?? nowCanonicalProofTimestamp(options.nowMs),
     matrix: INTEGRATION_MATRIX,
@@ -413,11 +433,15 @@ export function buildSmokeArtifact(
     artifactVersion: ARTIFACT_VERSION,
     kind: "smoke" as const,
     verdict: input.verdict,
-    gitSha: input.gitSha,
+    subjectGitSha: input.subjectGitSha,
     migrationChecksum: input.migrationChecksum,
     timestamp: input.timestamp ?? nowCanonicalProofTimestamp(options.nowMs),
     matrix: SMOKE_MATRIX,
     previewHostname: input.previewHostname,
+    runnerGitSha: input.runnerGitSha,
+    deploymentGitSha: input.deploymentGitSha,
+    deploymentId: input.deploymentId,
+    databaseFingerprintSha: input.databaseFingerprintSha,
     cases: input.cases,
     ...(input.futureNotApplicable ? { futureNotApplicable: input.futureNotApplicable } : {}),
   };
@@ -446,7 +470,7 @@ export function buildCombinedReadinessArtifact(
     artifactVersion: ARTIFACT_VERSION,
     kind: "readiness" as const,
     verdict: "PASS" as const,
-    gitSha: input.integration.gitSha,
+    subjectGitSha: input.integration.subjectGitSha,
     migrationChecksum: input.integration.migrationChecksum,
     previewHostname: input.smoke.previewHostname,
     timestamp: input.nowIso ?? nowCanonicalProofTimestamp(options.nowMs),
@@ -475,13 +499,17 @@ export function buildCombinedReadinessArtifact(
 export type WriteArtifactOptions = {
   outputPath: string;
   artifact: object;
-  /** When true, allow overwriting a PASS artifact from a different gitSha. */
+  /** When true, allow overwriting a PASS artifact from a different subjectGitSha. */
   allowOverwriteDifferentSha?: boolean;
 };
 
 function readExistingGitSha(path: string): string | null {
   try {
-    const raw = JSON.parse(readFileSync(path, "utf8")) as { gitSha?: unknown; verdict?: unknown };
+    const raw = JSON.parse(readFileSync(path, "utf8")) as {
+      subjectGitSha?: unknown;
+      gitSha?: unknown;
+    };
+    if (typeof raw.subjectGitSha === "string") return raw.subjectGitSha;
     if (typeof raw.gitSha === "string") return raw.gitSha;
     return null;
   } catch {
@@ -491,7 +519,7 @@ function readExistingGitSha(path: string): string | null {
 
 /**
  * Atomic write: temp sibling → fsync → rename.
- * Refuses to overwrite a non-empty PASS artifact from another gitSha unless override is set.
+ * Refuses to overwrite a non-empty PASS artifact from another subjectGitSha unless override is set.
  * Never leaves a partial PASS artifact as the destination on failure.
  */
 export function writeProofArtifactAtomically(options: WriteArtifactOptions): void {
@@ -509,24 +537,27 @@ export function writeProofArtifactAtomically(options: WriteArtifactOptions): voi
     artifact && typeof artifact === "object" && "verdict" in artifact
       ? (artifact as { verdict?: unknown }).verdict
       : undefined;
-  const gitSha =
-    artifact && typeof artifact === "object" && "gitSha" in artifact
-      ? (artifact as { gitSha?: unknown }).gitSha
+  const subjectGitSha =
+    artifact && typeof artifact === "object" && "subjectGitSha" in artifact
+      ? (artifact as { subjectGitSha?: unknown }).subjectGitSha
       : undefined;
 
-  if (existsSync(outputPath) && verdict === "PASS" && typeof gitSha === "string") {
+  if (existsSync(outputPath) && verdict === "PASS" && typeof subjectGitSha === "string") {
     try {
       const existingRaw = readFileSync(outputPath, "utf8");
       if (existingRaw.trim().length > 0) {
-        const existing = JSON.parse(existingRaw) as { verdict?: unknown; gitSha?: unknown };
+        const existing = JSON.parse(existingRaw) as {
+          verdict?: unknown;
+          subjectGitSha?: unknown;
+        };
         if (
           existing.verdict === "PASS" &&
-          typeof existing.gitSha === "string" &&
-          existing.gitSha !== gitSha &&
+          typeof existing.subjectGitSha === "string" &&
+          existing.subjectGitSha !== subjectGitSha &&
           !options.allowOverwriteDifferentSha
         ) {
           throw new Error(
-            "refusing to overwrite PASS artifact from a different gitSha (set UNSTANDARD_PROOF_OVERWRITE_DIFFERENT_SHA=yes to override)",
+            "refusing to overwrite PASS artifact from a different subjectGitSha (set UNSTANDARD_PROOF_OVERWRITE_DIFFERENT_SHA=yes to override)",
           );
         }
       }

@@ -4,3 +4,7 @@ const UUID_RE =
 export function isUuid(value: string): boolean {
   return UUID_RE.test(value);
 }
+
+export function isCanonicalUuid(value: string): boolean {
+  return isUuid(value) && value === value.toLowerCase();
+}
