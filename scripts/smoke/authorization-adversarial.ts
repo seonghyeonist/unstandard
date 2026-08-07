@@ -26,6 +26,10 @@ import {
   proveLogoutInvalidatesSession,
   proveRevokedSessionRejected,
 } from "../../lib/smoke/session-revocation";
+import {
+  privateProfileResponseHasSensitiveFields,
+  sessionResponseHasSensitiveFields,
+} from "../../lib/smoke/response-redaction";
 
 const baseUrl = process.env.SMOKE_BASE_URL?.trim();
 const userAEmail = process.env.SMOKE_USER_A_EMAIL?.trim();
@@ -121,16 +125,6 @@ async function signIn(
   );
 
   return { ok: response.status >= 200 && response.status < 300, status: response.status };
-}
-
-function sessionHasSensitiveFields(body: unknown): boolean {
-  const serialized = JSON.stringify(body ?? {});
-  return (
-    /[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/.test(serialized) ||
-    /"email"\s*:/.test(serialized) ||
-    /"token"\s*:/.test(serialized) ||
-    /\b[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\b/i.test(serialized)
-  );
 }
 
 function pushCase(cases: ProofCase[], name: string, pass: boolean): void {
@@ -341,7 +335,7 @@ async function main(): Promise<void> {
   pushCase(
     cases,
     "session_response_redacted",
-    redactionCheck.status === 200 && !sessionHasSensitiveFields(redactionCheck.body),
+    redactionCheck.status === 200 && !sessionResponseHasSensitiveFields(redactionCheck.body),
   );
   pushCase(
     cases,
@@ -410,7 +404,7 @@ async function main(): Promise<void> {
     "a_to_b_private_after_unlock_ok",
     afterPrivate.status === 200 &&
       isPrivateNoStore(afterPrivate.headers) &&
-      !sessionHasSensitiveFields(afterPrivate.body),
+      !privateProfileResponseHasSensitiveFields(afterPrivate.body),
   );
 
   const unlockAgain = await fetchJson(
@@ -495,7 +489,7 @@ async function main(): Promise<void> {
     "b_to_a_private_after_unlock_ok",
     bAfterPrivate.status === 200 &&
       isPrivateNoStore(bAfterPrivate.headers) &&
-      !sessionHasSensitiveFields(bAfterPrivate.body),
+      !privateProfileResponseHasSensitiveFields(bAfterPrivate.body),
   );
 
   const finalAStatus = await fetchJson(`/api/unlock/${profileBId}`, {}, jarA);
