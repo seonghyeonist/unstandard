@@ -37,11 +37,13 @@ const userAPassword = process.env.SMOKE_USER_A_PASSWORD;
 const userBEmail = process.env.SMOKE_USER_B_EMAIL?.trim();
 const userBPassword = process.env.SMOKE_USER_B_PASSWORD;
 const previewBypass = process.env.SMOKE_VERCEL_PROTECTION_BYPASS?.trim();
+const previewShareUrl = process.env.SMOKE_VERCEL_SHARE_URL?.trim();
 const profileAId = process.env.SMOKE_USER_A_PROFILE_ID?.trim();
 const profileBId = process.env.SMOKE_USER_B_PROFILE_ID?.trim();
 const deploymentGitSha = process.env.SMOKE_DEPLOYMENT_GIT_SHA?.trim();
 const deploymentId = process.env.SMOKE_DEPLOYMENT_ID?.trim();
 const databaseFingerprintSha = process.env.SMOKE_DATABASE_FINGERPRINT_SHA256?.trim();
+const protectionJar = new CookieJar();
 
 type FutureCase = {
   name: string;
@@ -83,7 +85,7 @@ async function fetchJson(
   if (previewBypass) {
     headers.set("x-vercel-protection-bypass", previewBypass);
   }
-  const cookieHeader = jar?.header();
+  const cookieHeader = [protectionJar.header(), jar?.header()].filter(Boolean).join("; ");
   if (cookieHeader) {
     headers.set("cookie", cookieHeader);
   }
@@ -193,16 +195,48 @@ async function main(): Promise<void> {
     blocked(hostnameFailureMessage(hostFailure));
   }
 
+  if (previewShareUrl) {
+    let shareUrl: URL;
+    try {
+      shareUrl = new URL(previewShareUrl);
+    } catch {
+      blocked("SMOKE_VERCEL_SHARE_URL must be a valid URL");
+    }
+    if (
+      shareUrl.protocol !== "https:" ||
+      shareUrl.hostname.toLowerCase() !== previewHostname ||
+      !shareUrl.searchParams.has("_vercel_share")
+    ) {
+      blocked("SMOKE_VERCEL_SHARE_URL must be for the exact Preview hostname");
+    }
+    const shareResponse = await fetch(shareUrl, { redirect: "manual" }).catch(() => null);
+    if (!shareResponse) {
+      blocked("Preview share authentication is not reachable");
+    }
+    protectionJar.ingestAll(collectSetCookieHeaders(shareResponse.headers));
+    if (protectionJar.size() === 0) {
+      blocked("Preview share authentication did not issue a protection cookie");
+    }
+  }
+
+  const reachabilityHeaders = new Headers();
+  if (previewBypass) {
+    reachabilityHeaders.set("x-vercel-protection-bypass", previewBypass);
+  }
+  const protectionCookie = protectionJar.header();
+  if (protectionCookie) {
+    reachabilityHeaders.set("cookie", protectionCookie);
+  }
   const reachability = await fetch(`${baseUrl}/api/auth/session`, {
-    headers: previewBypass ? { "x-vercel-protection-bypass": previewBypass } : undefined,
+    headers: reachabilityHeaders,
   }).catch(() => null);
 
   if (!reachability) {
     blocked("Preview base URL is not reachable");
   }
 
-  if (reachability.status === 403 && !previewBypass) {
-    blocked("Preview protection requires SMOKE_VERCEL_PROTECTION_BYPASS");
+  if (reachability.status === 403) {
+    blocked("Preview protection authentication was rejected");
   }
 
   const anonSession = await fetchJson("/api/auth/session");
