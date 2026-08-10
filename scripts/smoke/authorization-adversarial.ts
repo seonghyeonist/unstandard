@@ -74,6 +74,12 @@ async function fetchJson(
   jar?: CookieJar,
 ): Promise<{ status: number; body: unknown; headers: Headers }> {
   const headers = new Headers(init.headers ?? {});
+  // Better Auth rejects state-changing auth requests without a browser Origin.
+  // The smoke client exercises the deployed browser boundary, so mirror the
+  // Origin header a real same-origin browser request would send.
+  if (baseUrl && !headers.has("origin")) {
+    headers.set("origin", new URL(baseUrl).origin);
+  }
   if (previewBypass) {
     headers.set("x-vercel-protection-bypass", previewBypass);
   }
