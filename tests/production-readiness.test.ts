@@ -134,7 +134,7 @@ function freePlanAttestation(
           approvedProjectId: "raspy-fog-00907976",
           approvedBranchId: "br-bitter-wave-ajs8dy0u",
           migrationDrillReference: "br-fragrant-sunset-ajf5nddl-pass",
-          productionResetDeleteDropTruncateProhibited: true,
+          productionBranchResetDeleteDropTableTruncateProhibited: true,
           perChangeManualApprovalRequired: true,
           invitationsPausedOnQuotaOrRecoveryDegradation: true,
         },

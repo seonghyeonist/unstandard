@@ -52,7 +52,7 @@ export type ClosedAlphaOperationalAttestation = {
         approvedProjectId: string;
         approvedBranchId: string;
         migrationDrillReference: string;
-        productionResetDeleteDropTruncateProhibited: true;
+        productionBranchResetDeleteDropTableTruncateProhibited: true;
         perChangeManualApprovalRequired: true;
         invitationsPausedOnQuotaOrRecoveryDegradation: true;
       };
@@ -147,7 +147,7 @@ function freePlanExceptionIsValid(
     exception.approvedProjectId === database.projectId &&
     exception.approvedBranchId === database.branchId &&
     isSubstantive(exception.migrationDrillReference) &&
-    exception.productionResetDeleteDropTruncateProhibited === true &&
+    exception.productionBranchResetDeleteDropTableTruncateProhibited === true &&
     exception.perChangeManualApprovalRequired === true &&
     exception.invitationsPausedOnQuotaOrRecoveryDegradation === true
   );

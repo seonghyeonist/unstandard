@@ -40,7 +40,7 @@
         "approvedProjectId": "REPLACE_WITH_NEON_PROJECT_ID",
         "approvedBranchId": "br-replace-with-approved-branch-id",
         "migrationDrillReference": "REPLACE_WITH_DISPOSABLE_MIGRATION_DRILL_REFERENCE",
-        "productionResetDeleteDropTruncateProhibited": true,
+        "productionBranchResetDeleteDropTableTruncateProhibited": true,
         "perChangeManualApprovalRequired": true,
         "invitationsPausedOnQuotaOrRecoveryDegradation": true
       }

@@ -238,8 +238,10 @@ normal Production approval and passes only when all of these are true:
   than 30 days later
 - initial cohort no larger than 30; invitations pause when compute/storage
   quota, recovery evidence, error rate, or operator response degrades
-- no Production branch reset/delete and no `DROP` or `TRUNCATE`; each
-  Production write or migration requires explicit human approval
+- no Production branch reset/delete, `DROP TABLE`, or `TRUNCATE`; each
+  Production write or migration requires explicit human approval. Canonical
+  migration 0004's reviewed `DROP CONSTRAINT` + replacement PK/UNIQUE is
+  permitted only inside the same migration transaction
 - migration tested first on a disposable child branch; restore drill reference
   and exact migration hashes retained
 - no seed during Production migration, and user/profile counts checked before
