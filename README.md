@@ -44,15 +44,23 @@ npm run guard:no-legacy-backend
 npm run guard:boundaries
 ```
 
-## Proof pipeline (external)
+## Proof pipeline (credentialed, exact-SHA)
 
-| Command | Role | Without credentials |
-|---------|------|---------------------|
-| `npm run test` | Unit / static proof | PASS locally |
-| `npm run test:integration` | Real PostgreSQL integration artifact | `BLOCKED_EXTERNAL` (exit 2) |
-| `npm run smoke:authorization` | Deployed Preview HTTP artifact | `BLOCKED_EXTERNAL` (exit 2) |
-| `npm run readiness:evidence:build` | Combine machine artifacts | `BLOCKED_EXTERNAL` (exit 2) |
-| `npm run readiness:alpha` | Validate combined readiness | `BLOCKED_EXTERNAL` (exit 2) |
+| Command | Role | Evidence rule |
+|---------|------|---------------|
+| `npm run test` | Unit / static proof | Must PASS at the subject SHA |
+| `npm run test:integration` | Real PostgreSQL integration artifact | Disposable/non-production DB only |
+| `npm run smoke:authorization` | Deployed Preview HTTP artifact | Exact Preview deployment SHA + A/B credentials required |
+| `npm run readiness:evidence:build` | Combine machine artifacts | Source artifacts must share SHA/checksum/host/freshness |
+| `npm run readiness:alpha` | Validate combined readiness | Proof-harness verdict only; not a launch verdict |
+
+The runtime-tested parent `2d8203e5d81275030955c81d477b39d59e6d29b7`
+has machine-generated PASS evidence for PostgreSQL integration (`21/21`),
+deployed Preview authorization smoke (`32/32` required), and combined readiness.
+Evidence is never relabeled across commits: any later documentation or metadata
+commit requires a new exact-head Preview and regenerated artifacts before merge.
+Without the required credentials or target identity, external commands exit
+`BLOCKED_EXTERNAL` (exit 2) and do not write a PASS artifact.
 
 See `docs/AUTHORIZATION_ADVERSARIAL_SMOKE.md` and `docs/ALPHA_READINESS_CHECKLIST.md`.
 
@@ -74,6 +82,8 @@ Integration proof suites run serially against one DB + one observation log; obse
 
 See `docs/NEON_BOOTSTRAP_RUNBOOK.md`, `docs/BETTER_AUTH_SECURITY_MODEL.md`, and `docs/AUTHORIZATION_ADVERSARIAL_SMOKE.md`.
 
-**Alpha verdict: BLOCKED_EXTERNAL** until Neon test DB, Preview A/B smoke, combined readiness evidence, and Vercel Preview SHA mapping are evidenced for project `unstandard-m9qj`.
-
-**Internal proof contradictions:** closed by P0.2.2 unit/static gates. External PostgreSQL + authenticated Preview A/B remain blocked without credentials.
+**Closed-alpha launch verdict: NOT_READY.** The proof harness has passed on an
+exact tested parent, but that is narrower than launch readiness. Production
+cutover, remaining operational checklist items, and a separate merge decision
+remain open. The authoritative exact-head evidence boundary is recorded in PR
+#65 and its machine artifacts for Vercel project `unstandard-m9qj`.
