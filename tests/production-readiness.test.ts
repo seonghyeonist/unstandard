@@ -65,7 +65,7 @@ function attestation(
   overrides: Partial<ClosedAlphaOperationalAttestation> = {},
 ): ClosedAlphaOperationalAttestation {
   return {
-    artifactVersion: 2,
+    artifactVersion: 3,
     kind: "closed_alpha_operational_attestation",
     subjectGitSha: SHA,
     reviewedAt: NOW,
@@ -80,7 +80,7 @@ function attestation(
       accountDeletionProcedureVerified: true,
       moderationOwnerAssigned: true,
       rateLimitPolicyApproved: true,
-      productionDatabaseBranchProtected: true,
+      productionDatabaseSafetyControlsApproved: true,
     },
     evidence: {
       incidentOwner: "founder-seonghyeonist",
@@ -94,7 +94,9 @@ function attestation(
         projectId: "raspy-fog-00907976",
         branchId: "br-bitter-wave-ajs8dy0u",
         branchName: "production",
+        plan: "Launch",
         protected: true,
+        safetyMode: "protected_branch",
       },
       restoreDrill: {
         branchId: "br-restore-drill-123",
@@ -107,6 +109,39 @@ function attestation(
     },
     ...overrides,
   };
+}
+
+function freePlanAttestation(
+  overrides: Partial<ClosedAlphaOperationalAttestation> = {},
+): ClosedAlphaOperationalAttestation {
+  return attestation({
+    initialCohortCap: 30,
+    evidence: {
+      ...attestation().evidence,
+      productionDatabase: {
+        projectId: "raspy-fog-00907976",
+        branchId: "br-bitter-wave-ajs8dy0u",
+        branchName: "main",
+        plan: "Free",
+        protected: false,
+        safetyMode: "free_plan_closed_alpha_exception_v1",
+        freePlanException: {
+          policyVersion: "neon-free-closed-alpha-v1",
+          acceptedBy: "founder-seonghyeonist",
+          acceptedAt: NOW,
+          expiresAt: "2026-09-10T08:00:00.000Z",
+          maximumCohortSize: 30,
+          approvedProjectId: "raspy-fog-00907976",
+          approvedBranchId: "br-bitter-wave-ajs8dy0u",
+          migrationDrillReference: "br-fragrant-sunset-ajf5nddl-pass",
+          productionResetDeleteDropTruncateProhibited: true,
+          perChangeManualApprovalRequired: true,
+          invitationsPausedOnQuotaOrRecoveryDegradation: true,
+        },
+      },
+    },
+    ...overrides,
+  });
 }
 
 describe("Production readiness", () => {
@@ -225,5 +260,85 @@ describe("Closed-alpha launch separation", () => {
     assert.equal(artifact.ok, true);
     assert.match(artifact.contentDigest, /^[a-f0-9]{64}$/u);
     assert.equal(artifact.gitSha, SHA);
+  });
+
+  it("accepts the time-bounded Neon Free exception only with every compensating control", () => {
+    const report = buildProductionReadinessReport({
+      environment: environment(),
+      database: database(),
+      requestUrl: "https://alpha.example.com/api/operations/readiness",
+      generatedAt: NOW,
+    });
+    const production = buildVerifiedProductionEvidence({
+      report,
+      hostname: "alpha.example.com",
+      verifiedAt: NOW,
+    });
+
+    const result = evaluateClosedAlphaLaunch({
+      production,
+      attestation: freePlanAttestation(),
+      nowMs: Date.parse(NOW) + 60_000,
+    });
+
+    assert.equal(result.ok, true);
+    assert.equal(
+      result.gates.find((item) => item.name === "production_database_safety")?.status,
+      "PASS",
+    );
+  });
+
+  it("rejects an oversized, expired, or mismatched Neon Free exception", () => {
+    const report = buildProductionReadinessReport({
+      environment: environment(),
+      database: database(),
+      requestUrl: "https://alpha.example.com/api/operations/readiness",
+      generatedAt: NOW,
+    });
+    const production = buildVerifiedProductionEvidence({
+      report,
+      hostname: "alpha.example.com",
+      verifiedAt: NOW,
+    });
+    const base = freePlanAttestation();
+
+    for (const invalid of [
+      freePlanAttestation({ initialCohortCap: 31 }),
+      freePlanAttestation({
+        evidence: {
+          ...base.evidence,
+          productionDatabase: {
+            ...base.evidence.productionDatabase,
+            freePlanException: {
+              ...base.evidence.productionDatabase.freePlanException!,
+              expiresAt: "2026-08-11T07:59:59.000Z",
+            },
+          },
+        },
+      }),
+      freePlanAttestation({
+        evidence: {
+          ...base.evidence,
+          productionDatabase: {
+            ...base.evidence.productionDatabase,
+            freePlanException: {
+              ...base.evidence.productionDatabase.freePlanException!,
+              approvedBranchId: "br-wrong-branch",
+            },
+          },
+        },
+      }),
+    ]) {
+      const result = evaluateClosedAlphaLaunch({
+        production,
+        attestation: invalid,
+        nowMs: Date.parse(NOW) + 60_000,
+      });
+      assert.equal(result.ok, false);
+      assert.equal(
+        result.gates.find((item) => item.name === "production_database_safety")?.status,
+        "FAIL",
+      );
+    }
   });
 });

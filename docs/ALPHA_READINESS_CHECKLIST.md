@@ -53,7 +53,7 @@ This decision does **not** mark export, Preview bootstrap, smoke, or Production 
 - [ ] Legacy read-only archive created and verified **only if** retention is required (otherwise N/A; do not claim complete)
 - [x] `npm run guard:no-legacy-backend` PASS at the snapshot-only head
 - [ ] Fresh exact-SHA Production readiness artifact (`operations:production:verify`)
-- [ ] Production Neon branch identity confirmed and branch protected
+- [ ] Production Neon branch identity confirmed and either protected or covered by a passing v3 Free-plan closed-alpha exception
 - [ ] Restore drill, incident/rollback/support/moderation/privacy/deletion/abuse attestations complete
 - [ ] Closed-alpha operational gate PASS (`operations:closed-alpha:gate`)
 

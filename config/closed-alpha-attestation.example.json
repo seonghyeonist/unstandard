@@ -1,9 +1,9 @@
 {
-  "artifactVersion": 2,
+  "artifactVersion": 3,
   "kind": "closed_alpha_operational_attestation",
   "subjectGitSha": "REPLACE_WITH_40_HEX_PRODUCTION_SHA",
   "reviewedAt": "REPLACE_WITH_ISO_8601_TIMESTAMP",
-  "initialCohortCap": 20,
+  "initialCohortCap": 30,
   "incidentResponseMinutes": 240,
   "attestations": {
     "incidentOwnerAssigned": false,
@@ -14,7 +14,7 @@
     "accountDeletionProcedureVerified": false,
     "moderationOwnerAssigned": false,
     "rateLimitPolicyApproved": false,
-    "productionDatabaseBranchProtected": false
+    "productionDatabaseSafetyControlsApproved": false
   },
   "evidence": {
     "incidentOwner": "REPLACE_WITH_OWNER",
@@ -26,9 +26,24 @@
     "rollbackDeploymentId": "dpl_REPLACE_WITH_READY_DEPLOYMENT",
     "productionDatabase": {
       "projectId": "REPLACE_WITH_NEON_PROJECT_ID",
-      "branchId": "br-replace-with-protected-branch-id",
+      "branchId": "br-replace-with-approved-branch-id",
       "branchName": "REPLACE_WITH_BRANCH_NAME",
-      "protected": false
+      "plan": "Free",
+      "protected": false,
+      "safetyMode": "free_plan_closed_alpha_exception_v1",
+      "freePlanException": {
+        "policyVersion": "neon-free-closed-alpha-v1",
+        "acceptedBy": "REPLACE_WITH_OWNER",
+        "acceptedAt": "REPLACE_WITH_ISO_8601_TIMESTAMP",
+        "expiresAt": "REPLACE_WITH_ISO_8601_TIMESTAMP_WITHIN_30_DAYS",
+        "maximumCohortSize": 30,
+        "approvedProjectId": "REPLACE_WITH_NEON_PROJECT_ID",
+        "approvedBranchId": "br-replace-with-approved-branch-id",
+        "migrationDrillReference": "REPLACE_WITH_DISPOSABLE_MIGRATION_DRILL_REFERENCE",
+        "productionResetDeleteDropTruncateProhibited": true,
+        "perChangeManualApprovalRequired": true,
+        "invitationsPausedOnQuotaOrRecoveryDegradation": true
+      }
     },
     "restoreDrill": {
       "branchId": "br-replace-with-drill-branch-id",

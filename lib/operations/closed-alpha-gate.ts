@@ -3,6 +3,8 @@ import type { VerifiedProductionReadinessEvidence } from "@/lib/operations/produ
 
 export const CLOSED_ALPHA_TECHNICAL_MAX_AGE_MS = 6 * 60 * 60 * 1000;
 export const CLOSED_ALPHA_ATTESTATION_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000;
+export const FREE_PLAN_EXCEPTION_MAX_COHORT = 30;
+export const FREE_PLAN_EXCEPTION_MAX_AGE_MS = 30 * 24 * 60 * 60 * 1000;
 
 export const REQUIRED_OPERATIONAL_ATTESTATIONS = [
   "incidentOwnerAssigned",
@@ -13,13 +15,13 @@ export const REQUIRED_OPERATIONAL_ATTESTATIONS = [
   "accountDeletionProcedureVerified",
   "moderationOwnerAssigned",
   "rateLimitPolicyApproved",
-  "productionDatabaseBranchProtected",
+  "productionDatabaseSafetyControlsApproved",
 ] as const;
 
 export type OperationalAttestationKey = (typeof REQUIRED_OPERATIONAL_ATTESTATIONS)[number];
 
 export type ClosedAlphaOperationalAttestation = {
-  artifactVersion: 2;
+  artifactVersion: 3;
   kind: "closed_alpha_operational_attestation";
   subjectGitSha: string;
   reviewedAt: string;
@@ -38,7 +40,22 @@ export type ClosedAlphaOperationalAttestation = {
       projectId: string;
       branchId: string;
       branchName: string;
+      plan: "Free" | "Launch" | "Scale";
       protected: boolean;
+      safetyMode: "protected_branch" | "free_plan_closed_alpha_exception_v1";
+      freePlanException?: {
+        policyVersion: "neon-free-closed-alpha-v1";
+        acceptedBy: string;
+        acceptedAt: string;
+        expiresAt: string;
+        maximumCohortSize: number;
+        approvedProjectId: string;
+        approvedBranchId: string;
+        migrationDrillReference: string;
+        productionResetDeleteDropTruncateProhibited: true;
+        perChangeManualApprovalRequired: true;
+        invitationsPausedOnQuotaOrRecoveryDegradation: true;
+      };
     };
     restoreDrill: {
       branchId: string;
@@ -59,7 +76,7 @@ export type ClosedAlphaLaunchGate = {
 };
 
 export type ClosedAlphaLaunchArtifact = {
-  artifactVersion: 2;
+  artifactVersion: 3;
   kind: "closed_alpha_launch_gate";
   ok: true;
   generatedAt: string;
@@ -96,6 +113,61 @@ function isHttpsPrivacyUrl(value: string): boolean {
   }
 }
 
+function freePlanExceptionIsValid(
+  attestation: ClosedAlphaOperationalAttestation,
+  nowMs: number,
+): boolean {
+  const database = attestation.evidence.productionDatabase;
+  const exception = database.freePlanException;
+  if (
+    database.plan !== "Free" ||
+    database.protected !== false ||
+    database.safetyMode !== "free_plan_closed_alpha_exception_v1" ||
+    !exception ||
+    exception.policyVersion !== "neon-free-closed-alpha-v1"
+  ) {
+    return false;
+  }
+
+  const acceptedAtMs = Date.parse(exception.acceptedAt);
+  const expiresAtMs = Date.parse(exception.expiresAt);
+  return (
+    isSubstantive(exception.acceptedBy) &&
+    timestampIsFresh(
+      exception.acceptedAt,
+      CLOSED_ALPHA_ATTESTATION_MAX_AGE_MS,
+      nowMs,
+    ) &&
+    Number.isFinite(expiresAtMs) &&
+    expiresAtMs > nowMs &&
+    expiresAtMs > acceptedAtMs &&
+    expiresAtMs - acceptedAtMs <= FREE_PLAN_EXCEPTION_MAX_AGE_MS &&
+    exception.maximumCohortSize === FREE_PLAN_EXCEPTION_MAX_COHORT &&
+    attestation.initialCohortCap <= exception.maximumCohortSize &&
+    exception.approvedProjectId === database.projectId &&
+    exception.approvedBranchId === database.branchId &&
+    isSubstantive(exception.migrationDrillReference) &&
+    exception.productionResetDeleteDropTruncateProhibited === true &&
+    exception.perChangeManualApprovalRequired === true &&
+    exception.invitationsPausedOnQuotaOrRecoveryDegradation === true
+  );
+}
+
+function productionDatabaseSafetyIsValid(
+  attestation: ClosedAlphaOperationalAttestation,
+  nowMs: number,
+): boolean {
+  const database = attestation.evidence.productionDatabase;
+  if (
+    database.safetyMode === "protected_branch" &&
+    database.protected === true &&
+    database.plan !== "Free"
+  ) {
+    return true;
+  }
+  return freePlanExceptionIsValid(attestation, nowMs);
+}
+
 function operationalEvidenceIsComplete(
   attestation: ClosedAlphaOperationalAttestation,
   nowMs: number,
@@ -116,7 +188,6 @@ function operationalEvidenceIsComplete(
     isSubstantive(evidence.productionDatabase.projectId) &&
     /^br-[a-z0-9-]+$/u.test(evidence.productionDatabase.branchId) &&
     isSubstantive(evidence.productionDatabase.branchName) &&
-    evidence.productionDatabase.protected === true &&
     /^br-[a-z0-9-]+$/u.test(evidence.restoreDrill.branchId) &&
     evidence.restoreDrill.result === "PASS" &&
     timestampIsFresh(evidence.restoreDrill.completedAt, CLOSED_ALPHA_ATTESTATION_MAX_AGE_MS, nowMs) &&
@@ -168,7 +239,7 @@ export function evaluateClosedAlphaLaunch(input: {
     ),
     gate(
       "attestation_identity",
-      input.attestation.artifactVersion === 2 &&
+      input.attestation.artifactVersion === 3 &&
         input.attestation.kind === "closed_alpha_operational_attestation",
       "ATTESTATION_IDENTITY_PASS",
       "ATTESTATION_IDENTITY_FAIL",
@@ -212,6 +283,12 @@ export function evaluateClosedAlphaLaunch(input: {
       "OPERATIONAL_EVIDENCE_MISSING_OR_PLACEHOLDER",
     ),
     gate(
+      "production_database_safety",
+      productionDatabaseSafetyIsValid(input.attestation, nowMs),
+      "PRODUCTION_DATABASE_SAFETY_APPROVED",
+      "PRODUCTION_DATABASE_SAFETY_UNAPPROVED",
+    ),
+    gate(
       "cohort_cap",
       Number.isInteger(input.attestation.initialCohortCap) &&
         input.attestation.initialCohortCap >= 1 &&
@@ -248,7 +325,7 @@ export function buildClosedAlphaLaunchArtifact(input: {
   }
 
   const base = {
-    artifactVersion: 2 as const,
+    artifactVersion: 3 as const,
     kind: "closed_alpha_launch_gate" as const,
     ok: true as const,
     generatedAt,

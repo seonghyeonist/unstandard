@@ -9,17 +9,18 @@
 | Closed-alpha blocker implementation | `PASS` | DB-backed rate limits, authenticated self-deletion, support queue, privacy notice, v2 operational attestation, and Production readiness evidence are implemented and tested. |
 | Isolated Neon drills | `PASS` | Account-deletion cascade, parent reset recovery, fresh 0000→0004 migration application, and both limiter update shapes passed on disposable child branches that were then deleted. |
 | GitHub/Preview validation | `PASS` | PR head `6ff374049582f075ff810d8de3f09a5639bf6c34`, tree `d59a0e315d081c8d1365226bfd7a607d910038b8`, CI #124, Rebuild CI #70, and Vercel Preview build all passed. |
-| Production Neon protection | `BLOCKED_EXTERNAL` | Project `raspy-fog-00907976`, branch `br-bitter-wave-ajs8dy0u` is confirmed `protected=false`. The organization is on Neon Free, where the Console disables `Set as protected`; Neon documents protection as paid-plan only. |
-| Overall closed-alpha launch | `CLOSED_ALPHA_NOT_READY` | Protection is a mandatory predecessor of Production migration, merge, deployment, and attestation. None of those downstream actions was performed after the blocker was observed. |
+| Production Neon safety mode | `EXCEPTION_AUTHORIZED / IMPLEMENTED` | Project `raspy-fog-00907976`, branch `br-bitter-wave-ajs8dy0u` remains truthfully `protected=false`. The founder authorized the time-bounded `free_plan_closed_alpha_exception_v1`; attestation v3 enforces exact IDs, 30-user cap, expiry, disposable migration/restore evidence, destructive-operation prohibition, and per-change approval. |
+| Overall closed-alpha launch | `IN_PROGRESS` | The paid-plan blocker is removed without falsifying branch protection. Production migration, merge, deployment, fresh runtime evidence, and final attestation still must pass in order. |
 
-Final stop reason:
+Previous stop reason, now superseded by the approved exception:
 
 ```text
-BLOCKED_EXTERNAL_NEON_PAID_PLAN_REQUIRED
+BLOCKED_EXTERNAL_NEON_PAID_PLAN_REQUIRED (SUPERSEDED)
 ```
 
-No Production database write, migration, seed, PR merge, Production deployment,
-alias change, or completed attestation was performed in this closure pass.
+At this checkpoint no Production database write, migration, seed, PR merge,
+Production deployment, alias change, or completed attestation has yet been
+performed. Subsequent sections are updated again after execution.
 
 ## Published review surface
 
@@ -72,10 +73,11 @@ exact-SHA Production release artifact.
   required secrets, canonical origins, redacted Neon host fingerprint, exact
   five-entry migration ledger, 17 required tables, `alpha.closed`, and the
   active unlock question without writing data.
-- The v2 attestation requires real project/branch IDs, `protected=true`, restore
-  drill evidence, deletion and support references, privacy URL, rollback
-  deployment ID, assigned owners, policy version, SHA match, freshness, and a
-  digest-bound output.
+- The v3 attestation requires real project/branch IDs and either a protected
+  paid-plan branch or the narrow Free-plan exception, plus restore drill
+  evidence, deletion and support references, privacy URL, rollback deployment
+  ID, assigned owners, policy version, SHA match, freshness, and a digest-bound
+  output.
 - Placeholders and incomplete evidence fail closed.
 
 ## Strict verification record
@@ -97,7 +99,7 @@ exact-SHA Production release artifact.
 | Fresh migration drill | `PASS` — migrations 0000 through 0004 applied in order on a fresh child branch |
 | Limiter database contract | `PASS` — Better Auth-style and application-style atomic 1→2 updates |
 | Production branch identity | `PASS` — exact project/branch identified |
-| Production branch protection | `FAIL/BLOCKED` — confirmed `protected=false`; paid plan required |
+| Production database safety | `PASS IN CODE / PENDING FINAL ATTESTATION` — confirmed `protected=false`; v3 exception requires 30-user cap and every compensating control |
 
 ## Neon evidence and boundaries
 
@@ -120,9 +122,11 @@ Disposable drills already cleaned up:
 - `br-fragrant-sunset-ajf5nddl` — fresh migration + limiter contract drill; deleted
 
 The Free-plan Console exposes `Set as protected` as a disabled action. Neon's
-current `Manage branches` documentation states that protected branches are
-available on paid plans. This is a platform capability/cost boundary, not an
-application bug.
+current documentation states that protected branches are available on paid
+plans. The founder elected to accept this residual risk for a maximum 30-person
+closed alpha. The gate does not pretend protection exists: it requires plan
+`Free`, `protected=false`, exact pinned IDs, expiry, disposable drill evidence,
+destructive-operation prohibition, and per-change approval.
 
 ## Operational gate status
 
@@ -136,34 +140,33 @@ application bug.
 | Account deletion | isolated transactional deletion drill passed | evidence available; Production UI/API smoke still required |
 | Moderation owner | Founder · seonghyeonist and response rules documented | operator attestation still required |
 | Rate-limit policy | closed-alpha-v1 implemented and DB-tested | operator approval still required |
-| Production database | exact branch identified | blocked on `protected=true` |
+| Production database | exact branch identified; v3 exception implemented | final operator-local exception evidence required |
 
 No checked-in example was flipped to `true`, and no final launch artifact was
 created.
 
-## Exact continuation procedure after plan upgrade
+## Exact continuation procedure under the Free-plan exception
 
-1. Upgrade the Neon organization from Free to a paid plan. This is a human
-   billing decision; do not place payment data or credentials in chat.
-2. In the exact project/branch above, select `Set as protected`, then verify via
-   the Neon API/MCP that `protected=true`. Stop if the IDs differ.
-3. Re-run the pre-migration read-only ledger/table/count baseline on
+1. Re-run the pre-migration read-only ledger/table/count baseline on
    `br-bitter-wave-ajs8dy0u`.
-4. Apply only migrations 0002, 0003, and 0004 to that branch using the explicit
+2. Record the v3 exception with exact IDs, maximum cohort 30, expiry no more
+   than 30 days away, and the already-passed disposable migration/restore
+   references.
+3. Apply only migrations 0001, 0002, 0003, and 0004 to that branch using the explicit
    migration guard. Do not seed. Verify the five exact migration hashes, 17
    tables, limiter keys, deletion trigger, and unchanged user/profile counts.
-5. Create and receive one opaque support test ticket and run one disposable
+4. Create and receive one opaque support test ticket and run one disposable
    account-deletion test. Do not use a real user.
-6. Re-run final PR checks. Merge PR #67 only with its exact expected head SHA.
-7. Confirm the Vercel Git-linked Production deployment maps to the resulting
+5. Re-run final PR checks. Merge PR #67 only with its exact expected head SHA.
+6. Confirm the Vercel Git-linked Production deployment maps to the resulting
    merge SHA and is READY. Verify required Production env names without printing
    secret values.
-8. Run `operations:production:verify` against the canonical Production host and
+7. Run `operations:production:verify` against the canonical Production host and
    exact redacted DB fingerprint.
-9. Complete an operator-local v2 attestation with the real evidence above and
+8. Complete an operator-local v3 attestation with the real evidence above and
    run `operations:closed-alpha:gate`.
-10. Launch only if both fresh artifacts PASS. Start below the attested cohort
-    cap and inspect Vercel errors/5xx after the first user and every invite batch.
+9. Launch only if both fresh artifacts PASS. Start below the attested cohort
+   cap and inspect Vercel errors/5xx after the first user and every invite batch.
 
 ## Do not infer
 

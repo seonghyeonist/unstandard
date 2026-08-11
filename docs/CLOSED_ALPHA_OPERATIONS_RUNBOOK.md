@@ -80,11 +80,13 @@ Required attestations:
 | Account deletion | Real deletion or documented operator procedure verified end to end |
 | Moderation | Report owner and response rule assigned |
 | Rate-limit policy | Implemented limits or explicitly reviewed cohort-bound control |
-| Production database | Exact Neon project/branch identifiers and `protected=true` observation |
+| Production database | Exact Neon project/branch identifiers plus either `protected=true` or the time-bounded Free-plan compensating-control exception |
 
-The v2 attestation also requires structured evidence. Placeholders including
-`TODO`, `TBD`, `REPLACE`, `unknown`, and unprotected database branches fail
-closed. The launch artifact includes a digest of the full evidence object.
+The v3 attestation also requires structured evidence. Placeholders including
+`TODO`, `TBD`, `REPLACE`, and `unknown` fail closed. An unprotected database
+passes only through `free_plan_closed_alpha_exception_v1`; merely setting
+`protected=false` never passes. The launch artifact includes a digest of the
+full evidence object.
 
 ## Assigned closed-alpha owners and response rule
 
@@ -168,7 +170,8 @@ digest-bound operator record, not a cryptographic signature.
 1. Freeze the exact commit, Vercel deployment ID, canonical hostname, and
    approved Neon host fingerprint.
 2. Require both gates above to PASS.
-3. Start below the attested cohort cap. The example cap is 20, not an approval.
+3. Start at or below the attested cohort cap. The approved Free-plan exception
+   cap is 30; issue invitations in smaller batches.
 4. Issue invitations in batches; pause before the next batch if any P0 flow,
    moderation, or support gate degrades.
 5. Check Vercel runtime errors and 5xx counts after the first real user and
@@ -185,8 +188,9 @@ digest-bound operator record, not a cryptographic signature.
 
 ## Neon recovery
 
-- Production must be an explicitly identified, protected root branch before
-  launch. A Preview/default branch is not accepted by naming inference.
+- Production must be an explicitly identified root branch before launch. A
+  Preview/default branch is not accepted by naming inference. Require either a
+  protected paid-plan branch or the v3 Free-plan exception below.
 - Use a pooled connection string for Vercel request workloads. Use direct
   connections for migrations and administrative tools that need session state.
 - For accidental deletion, first create/query an isolated historical branch or
@@ -216,21 +220,48 @@ Official references:
 - The `disposable-unlock-integration-20260805` child contains integration/A/B
   data and is explicitly excluded from Production.
 
-Identification is not protection. The v2 gate remains `NOT_READY` until the
-Neon branch observation returns `protected=true`, the isolated restore drill
-passes, the exact-SHA Production preflight passes, and all evidence references
-are populated.
+Identification is not protection. Protected branches are a Neon paid-plan
+feature and the observed Free plan cannot enable the control. Do not record a
+compensating `protected=true` value.
 
-Protected branches are a Neon paid-plan feature. On the observed Free plan,
-the exact `main` row exposes `Set as protected` as disabled. Do not weaken the
-gate or record a compensating `true` value. The release sequence stops before
-Production migration, merge, and deployment until a human upgrades the plan
-and the same project/branch is re-observed as protected.
+## Neon Free-plan closed-alpha exception v1
 
-After the plan upgrade:
+The founder accepted the residual risk of using the identified unprotected
+Free-plan branch for the initial closed alpha. This exception is narrower than
+normal Production approval and passes only when all of these are true:
 
-1. Open project `raspy-fog-00907976` → Branches.
-2. Select only `main` / `br-bitter-wave-ajs8dy0u`.
-3. Choose `Set as protected` and confirm the branch action.
-4. Re-read branch metadata and require `protected=true` before applying any
-   Production migration.
+- attestation `artifactVersion=3`, plan `Free`, `protected=false`, and safety
+  mode `free_plan_closed_alpha_exception_v1`
+- exact project `raspy-fog-00907976` and branch
+  `br-bitter-wave-ajs8dy0u` repeated in the exception evidence
+- review no older than seven days; exception expiry after review and no more
+  than 30 days later
+- initial cohort no larger than 30; invitations pause when compute/storage
+  quota, recovery evidence, error rate, or operator response degrades
+- no Production branch reset/delete and no `DROP` or `TRUNCATE`; each
+  Production write or migration requires explicit human approval
+- migration tested first on a disposable child branch; restore drill reference
+  and exact migration hashes retained
+- no seed during Production migration, and user/profile counts checked before
+  and after
+
+Current observed Free-plan capacity evidence on 2026-08-11 is approximately
+30.5 MiB logical storage, 799 compute seconds, and 3,128 active seconds on the
+Production candidate. These are observations, not a future capacity guarantee.
+Neon Free currently provides 0.5 GB storage and 100 CU-hours per project/month.
+
+The same read-only baseline has five users, five profiles, twelve invites,
+fourteen public tables, and only migration `0000` in the canonical ledger.
+Therefore this release must apply `0001` through `0004` in order; the older
+handoff instruction that started at `0002` is superseded by this observed
+ledger, not trusted from memory.
+
+Operational rollout is 30 invited users maximum, with the first batch kept
+smaller and an initial simultaneous-active target of 10–20 users. The database
+and application do not otherwise impose a user-count hard cap, so invite
+issuance is the enforceable operator boundary for this alpha.
+
+Upgrade review is mandatory before exceeding 30 users, before storing payment
+data, after a quota/recovery incident, or when the exception expires. On a paid
+plan, switch the attestation to `protected_branch`, protect only the exact
+branch above, and re-read `protected=true` before the next release.
