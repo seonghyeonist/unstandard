@@ -6,6 +6,7 @@ import { ensureReporterProfile } from "@/lib/server/profile/profile-bootstrap";
 import { mapReporterProfileFailure } from "@/lib/server/profile/profile-bootstrap.http-mapper";
 import { createReportHttpResponse } from "@/lib/server/persistence/reports.http";
 import { createReportsRepository } from "@/lib/server/persistence/reports.repository.factory";
+import { consumeRateLimit, RateLimitUnavailableError } from "@/lib/security/rate-limit";
 
 export async function POST(request: Request) {
   let user;
@@ -19,6 +20,21 @@ export async function POST(request: Request) {
   }
   if (!user) {
     return privateJson({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  try {
+    const decision = await consumeRateLimit({ scope: "reportCreate", subject: user.id });
+    if (!decision.allowed) {
+      return privateJson(
+        { error: "Too many requests" },
+        { status: 429, headers: { "Retry-After": String(decision.retryAfterSeconds) } },
+      );
+    }
+  } catch (error) {
+    if (error instanceof RateLimitUnavailableError) {
+      return privateJson({ error: "Report service unavailable" }, { status: 503 });
+    }
+    throw error;
   }
 
   let body: unknown;

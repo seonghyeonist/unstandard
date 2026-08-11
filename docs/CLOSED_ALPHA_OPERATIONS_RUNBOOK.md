@@ -43,7 +43,7 @@ or application-row count. It checks:
 - exact 40-hex release SHA
 - Neon connectivity and a redacted hostname fingerprint
 - exact Drizzle migration ledger hashes
-- all 15 required application tables
+- all 17 required application tables
 - `alpha.closed.enabled=true`
 - the configured closed-alpha unlock question is active
 
@@ -80,6 +80,75 @@ Required attestations:
 | Account deletion | Real deletion or documented operator procedure verified end to end |
 | Moderation | Report owner and response rule assigned |
 | Rate-limit policy | Implemented limits or explicitly reviewed cohort-bound control |
+| Production database | Exact Neon project/branch identifiers and `protected=true` observation |
+
+The v2 attestation also requires structured evidence. Placeholders including
+`TODO`, `TBD`, `REPLACE`, `unknown`, and unprotected database branches fail
+closed. The launch artifact includes a digest of the full evidence object.
+
+## Assigned closed-alpha owners and response rule
+
+For the initial cohort, the named owner for incidents, support, moderation,
+and privacy requests is **Founder · seonghyeonist**. The response target is
+240 minutes. This is a single-owner alpha arrangement, so the owner must pause
+new invites whenever that response target cannot be met.
+
+- Safety, threats, harassment, impersonation, or exposed private data: pause
+  the affected account/content path immediately, retain the minimum incident
+  reference, and review before the next invite batch.
+- Other reports and support tickets: acknowledge and triage within 240 minutes.
+- The application creates an immediate self-block and an `OPEN` report; it
+  never auto-sanctions a reported user. The owner records the disposition by
+  changing the report/ticket status only after review.
+- The supported channel is `Settings → 지원·안전 요청`. A test ticket UUID
+  is mandatory attestation evidence.
+
+Operator queue (do not select message bodies during routine health checks):
+
+```sql
+SELECT id, category, status, created_at
+FROM support_requests
+WHERE status IN ('OPEN', 'IN_PROGRESS')
+ORDER BY created_at ASC;
+```
+
+## Closed-alpha-v1 rate limits
+
+State is stored atomically in Neon, not function memory. Subjects used by
+application endpoints are HMAC-pseudonymized. Vercel's trusted
+`x-forwarded-for` value is used for unauthenticated invite claims.
+
+| Surface | Limit | Window | Subject |
+|---|---:|---:|---|
+| Better Auth default | 100 | 10 seconds | IP + path |
+| Sign in / sign up | 5 | 60 seconds | IP + path |
+| Account deletion | 3 | 1 hour | IP + path |
+| Invite claim | 10 | 15 minutes | IP |
+| Onboarding answer | 10 | 10 minutes | authenticated user |
+| Unlock answer | 20 | 10 minutes | authenticated user |
+| Report | 5 | 1 hour | authenticated user |
+| Support request | 3 | 24 hours | authenticated user |
+
+Over-limit responses are `429` with `Retry-After`. A limiter storage error is
+fail-closed `503`. Rows older than two days are pruned opportunistically.
+
+## Account deletion
+
+The user opens Settings, enters the current password and the exact confirmation
+text `계정 삭제`, then submits. Better Auth verifies the credential and deletes
+the user. Foreign-key cascades remove sessions, accounts, profiles, private
+profiles, answers/evaluations, unlock data, blocks, reports submitted by the
+user, and support tickets.
+
+A database `BEFORE DELETE` trigger removes residual target reports, consumed
+invite/email links, and verification values in the same transaction. Verification
+must create a disposable test user with dependent rows, delete that user, and
+prove zero remaining rows by opaque test reference only. Never use a real user
+for the drill.
+
+The public notice is `/privacy`. Active data is removed immediately; the
+current Neon restore history window is six hours, after which recoverable
+history expires.
 
 Then run:
 
@@ -134,19 +203,16 @@ Official references:
 - [Neon instant restore](https://neon.com/docs/introduction/branch-restore)
 - [Neon connection pooling](https://neon.com/docs/connect/connection-pooling)
 
-## Current known blockers (2026-08-11 baseline)
+## Production database identity (2026-08-11)
 
-- Vercel Production is READY at merge SHA `2cc3e88a…`, but the new operations
-  endpoint is not on that deployment.
-- The Production deployment's Neon branch identity has not been proven.
-- The observed Neon default branches are not protected.
-- A Neon restore drill has not been recorded.
-- User-facing account deletion is not implemented; an operator deletion
-  procedure has not been proven here.
-- Rate limiting/abuse policy remains open.
-- A moderation owner/SLA and support channel have not been attested.
-- Vercel showed no runtime error clusters in the previous 24 hours, but the
-  observed request sample was only one HTTP 200, so stability is unproven.
+- Project: `raspy-fog-00907976` (`unstandard-alpha-preview-app-db`)
+- Production source branch: `br-bitter-wave-ajs8dy0u` (`main`)
+- Region: AWS `us-east-2`
+- History retention: 6 hours
+- The `disposable-unlock-integration-20260805` child contains integration/A/B
+  data and is explicitly excluded from Production.
 
-Therefore the current overall verdict remains `CLOSED_ALPHA_NOT_READY` even if
-all repository tests pass.
+Identification is not protection. The v2 gate remains `NOT_READY` until the
+Neon branch observation returns `protected=true`, the isolated restore drill
+passes, the exact-SHA Production preflight passes, and all evidence references
+are populated.

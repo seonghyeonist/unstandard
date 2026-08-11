@@ -9,6 +9,7 @@ import { mapSaveOnboardingAnswerResultToHttp } from "@/lib/server/persistence/an
 import { createAnswersRepository } from "@/lib/server/persistence/answers.repository.factory";
 import { validateOnboardingAnswerInput } from "@/lib/security/onboarding-validation";
 import { privateJson } from "@/lib/http/private-json";
+import { consumeRateLimit, RateLimitUnavailableError } from "@/lib/security/rate-limit";
 
 export async function POST(request: Request) {
   if (!isDatabaseAuthConfigured()) {
@@ -26,6 +27,21 @@ export async function POST(request: Request) {
       return privateJson({ error: "Service temporarily unavailable" }, { status: 503 });
     }
     return privateJson({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  try {
+    const decision = await consumeRateLimit({ scope: "onboardingAnswer", subject: user.id });
+    if (!decision.allowed) {
+      return privateJson(
+        { error: "Too many requests" },
+        { status: 429, headers: { "Retry-After": String(decision.retryAfterSeconds) } },
+      );
+    }
+  } catch (error) {
+    if (error instanceof RateLimitUnavailableError) {
+      return privateJson({ error: "Service temporarily unavailable" }, { status: 503 });
+    }
+    throw error;
   }
 
   let body: unknown;

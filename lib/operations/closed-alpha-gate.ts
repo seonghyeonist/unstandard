@@ -13,18 +13,42 @@ export const REQUIRED_OPERATIONAL_ATTESTATIONS = [
   "accountDeletionProcedureVerified",
   "moderationOwnerAssigned",
   "rateLimitPolicyApproved",
+  "productionDatabaseBranchProtected",
 ] as const;
 
 export type OperationalAttestationKey = (typeof REQUIRED_OPERATIONAL_ATTESTATIONS)[number];
 
 export type ClosedAlphaOperationalAttestation = {
-  artifactVersion: 1;
+  artifactVersion: 2;
   kind: "closed_alpha_operational_attestation";
   subjectGitSha: string;
   reviewedAt: string;
   initialCohortCap: number;
   incidentResponseMinutes: number;
   attestations: Record<OperationalAttestationKey, boolean>;
+  evidence: {
+    incidentOwner: string;
+    supportOwner: string;
+    moderationOwner: string;
+    privacyOwner: string;
+    supportChannel: "in_app_support_requests";
+    supportTestReference: string;
+    rollbackDeploymentId: string;
+    productionDatabase: {
+      projectId: string;
+      branchId: string;
+      branchName: string;
+      protected: boolean;
+    };
+    restoreDrill: {
+      branchId: string;
+      completedAt: string;
+      result: "PASS";
+    };
+    privacyNoticeUrl: string;
+    accountDeletionTestReference: string;
+    rateLimitPolicyVersion: "closed-alpha-v1";
+  };
   notes?: string[];
 };
 
@@ -35,13 +59,14 @@ export type ClosedAlphaLaunchGate = {
 };
 
 export type ClosedAlphaLaunchArtifact = {
-  artifactVersion: 1;
+  artifactVersion: 2;
   kind: "closed_alpha_launch_gate";
   ok: true;
   generatedAt: string;
   gitSha: string;
   productionEvidenceDigest: string;
   operationalReviewAt: string;
+  operationalEvidenceDigest: string;
   initialCohortCap: number;
   incidentResponseMinutes: number;
   gates: ClosedAlphaLaunchGate[];
@@ -54,6 +79,50 @@ function gate(name: string, passed: boolean, passCode: string, failCode: string)
     status: passed ? ("PASS" as const) : ("FAIL" as const),
     code: passed ? passCode : failCode,
   };
+}
+
+function isSubstantive(value: string): boolean {
+  return Boolean(
+    value.trim().length >= 3 && !/(?:todo|tbd|replace|placeholder|unknown)/iu.test(value),
+  );
+}
+
+function isHttpsPrivacyUrl(value: string): boolean {
+  try {
+    const url = new URL(value);
+    return url.protocol === "https:" && url.pathname === "/privacy";
+  } catch {
+    return false;
+  }
+}
+
+function operationalEvidenceIsComplete(
+  attestation: ClosedAlphaOperationalAttestation,
+  nowMs: number,
+): boolean {
+  const evidence = attestation.evidence;
+  if (!evidence) return false;
+  return (
+    [
+      evidence.incidentOwner,
+      evidence.supportOwner,
+      evidence.moderationOwner,
+      evidence.privacyOwner,
+      evidence.supportTestReference,
+      evidence.accountDeletionTestReference,
+    ].every(isSubstantive) &&
+    evidence.supportChannel === "in_app_support_requests" &&
+    /^dpl_[A-Za-z0-9]+$/u.test(evidence.rollbackDeploymentId) &&
+    isSubstantive(evidence.productionDatabase.projectId) &&
+    /^br-[a-z0-9-]+$/u.test(evidence.productionDatabase.branchId) &&
+    isSubstantive(evidence.productionDatabase.branchName) &&
+    evidence.productionDatabase.protected === true &&
+    /^br-[a-z0-9-]+$/u.test(evidence.restoreDrill.branchId) &&
+    evidence.restoreDrill.result === "PASS" &&
+    timestampIsFresh(evidence.restoreDrill.completedAt, CLOSED_ALPHA_ATTESTATION_MAX_AGE_MS, nowMs) &&
+    isHttpsPrivacyUrl(evidence.privacyNoticeUrl) &&
+    evidence.rateLimitPolicyVersion === "closed-alpha-v1"
+  );
 }
 
 function timestampIsFresh(value: string, maxAgeMs: number, nowMs: number): boolean {
@@ -99,7 +168,7 @@ export function evaluateClosedAlphaLaunch(input: {
     ),
     gate(
       "attestation_identity",
-      input.attestation.artifactVersion === 1 &&
+      input.attestation.artifactVersion === 2 &&
         input.attestation.kind === "closed_alpha_operational_attestation",
       "ATTESTATION_IDENTITY_PASS",
       "ATTESTATION_IDENTITY_FAIL",
@@ -135,6 +204,12 @@ export function evaluateClosedAlphaLaunch(input: {
       attestationsComplete,
       "OPERATIONAL_ATTESTATIONS_COMPLETE",
       "OPERATIONAL_ATTESTATION_MISSING",
+    ),
+    gate(
+      "operational_evidence",
+      operationalEvidenceIsComplete(input.attestation, nowMs),
+      "OPERATIONAL_EVIDENCE_COMPLETE",
+      "OPERATIONAL_EVIDENCE_MISSING_OR_PLACEHOLDER",
     ),
     gate(
       "cohort_cap",
@@ -173,13 +248,16 @@ export function buildClosedAlphaLaunchArtifact(input: {
   }
 
   const base = {
-    artifactVersion: 1 as const,
+    artifactVersion: 2 as const,
     kind: "closed_alpha_launch_gate" as const,
     ok: true as const,
     generatedAt,
     gitSha: input.production.gitSha,
     productionEvidenceDigest: input.production.contentDigest,
     operationalReviewAt: input.attestation.reviewedAt,
+    operationalEvidenceDigest: createHash("sha256")
+      .update(JSON.stringify(input.attestation.evidence))
+      .digest("hex"),
     initialCohortCap: input.attestation.initialCohortCap,
     incidentResponseMinutes: input.attestation.incidentResponseMinutes,
     gates: evaluation.gates,

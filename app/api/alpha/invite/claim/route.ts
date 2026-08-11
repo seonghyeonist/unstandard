@@ -7,6 +7,11 @@ import {
   getRegistrationTicketCookieName,
 } from "@/lib/auth/invite-ticket";
 import { privateJson } from "@/lib/http/private-json";
+import {
+  consumeRateLimit,
+  RateLimitUnavailableError,
+  requestIpAddress,
+} from "@/lib/security/rate-limit";
 
 export async function POST(request: Request) {
   if (!isDatabaseAuthConfigured()) {
@@ -30,6 +35,24 @@ export async function POST(request: Request) {
 
   if (!email.includes("@") || code.length < 8) {
     return privateJson({ error: "Invalid invite claim" }, { status: 422 });
+  }
+
+  try {
+    const decision = await consumeRateLimit({
+      scope: "inviteClaim",
+      subject: requestIpAddress(request),
+    });
+    if (!decision.allowed) {
+      return privateJson(
+        { error: "Too many requests" },
+        { status: 429, headers: { "Retry-After": String(decision.retryAfterSeconds) } },
+      );
+    }
+  } catch (error) {
+    if (error instanceof RateLimitUnavailableError) {
+      return privateJson({ error: "Registration unavailable" }, { status: 503 });
+    }
+    throw error;
   }
 
   const claim = await reserveInviteForEmail(code, email);

@@ -10,6 +10,7 @@ import {
   unlockErrorHttpStatus,
 } from "@/lib/unlock/unlock-codes";
 import { createCorrelationId } from "@/lib/server/unlock/unlock-logger";
+import { consumeRateLimit, RateLimitUnavailableError } from "@/lib/security/rate-limit";
 
 function questionForMockProfile(profileId: string): string {
   return candidates.find((candidate) => candidate.id === profileId)?.question ?? "";
@@ -42,6 +43,32 @@ export async function POST(request: Request) {
       { error: unlockErrorClientMessage("UNAUTHORIZED"), code: "UNAUTHORIZED", correlationId },
       { status: 401 },
     );
+  }
+
+  try {
+    const decision = await consumeRateLimit({ scope: "unlockAnswer", subject: user.id });
+    if (!decision.allowed) {
+      return privateJson(
+        {
+          error: "요청이 너무 많습니다. 잠시 후 다시 시도해 주세요.",
+          code: "RATE_LIMITED",
+          correlationId,
+        },
+        { status: 429, headers: { "Retry-After": String(decision.retryAfterSeconds) } },
+      );
+    }
+  } catch (error) {
+    if (error instanceof RateLimitUnavailableError) {
+      return privateJson(
+        {
+          error: unlockErrorClientMessage("UNLOCK_SERVICE_UNAVAILABLE"),
+          code: "UNLOCK_SERVICE_UNAVAILABLE",
+          correlationId,
+        },
+        { status: 503 },
+      );
+    }
+    throw error;
   }
 
   // Database runtime: DB-backed unlock (unlocks table is source of truth).

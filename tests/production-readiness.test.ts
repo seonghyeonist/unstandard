@@ -65,7 +65,7 @@ function attestation(
   overrides: Partial<ClosedAlphaOperationalAttestation> = {},
 ): ClosedAlphaOperationalAttestation {
   return {
-    artifactVersion: 1,
+    artifactVersion: 2,
     kind: "closed_alpha_operational_attestation",
     subjectGitSha: SHA,
     reviewedAt: NOW,
@@ -80,6 +80,30 @@ function attestation(
       accountDeletionProcedureVerified: true,
       moderationOwnerAssigned: true,
       rateLimitPolicyApproved: true,
+      productionDatabaseBranchProtected: true,
+    },
+    evidence: {
+      incidentOwner: "founder-seonghyeonist",
+      supportOwner: "founder-seonghyeonist",
+      moderationOwner: "founder-seonghyeonist",
+      privacyOwner: "founder-seonghyeonist",
+      supportChannel: "in_app_support_requests",
+      supportTestReference: "test-ticket-123",
+      rollbackDeploymentId: "dpl_abc123",
+      productionDatabase: {
+        projectId: "raspy-fog-00907976",
+        branchId: "br-bitter-wave-ajs8dy0u",
+        branchName: "production",
+        protected: true,
+      },
+      restoreDrill: {
+        branchId: "br-restore-drill-123",
+        completedAt: NOW,
+        result: "PASS",
+      },
+      privacyNoticeUrl: "https://alpha.example.com/privacy",
+      accountDeletionTestReference: "delete-integration-123",
+      rateLimitPolicyVersion: "closed-alpha-v1",
     },
     ...overrides,
   };

@@ -17,6 +17,9 @@ export function LandingHero() {
           <p className="text-sm leading-6 text-foreground/70">외모 점수도, 긴 검사도 없어요. 오늘은 그저 “나답게 말할 수 있는 사람”을 찾아봅니다.</p>
         </Card>
       </section>
+      <footer className="pt-8 text-center text-sm text-foreground/60">
+        <Link href="/privacy" className="underline underline-offset-4">개인정보 처리 안내</Link>
+      </footer>
     </main>
   );
 }
