@@ -46,6 +46,7 @@ export function validateReportInput(input: ReportInput): {
 export function validateReportForUser(
   input: ReportInput,
   reporterUserId: string,
+  reporterProfileId?: string,
 ): {
   targetType: ReportTargetType;
   targetId: string;
@@ -53,8 +54,13 @@ export function validateReportForUser(
 } {
   const validated = validateReportInput(input);
 
-  if (validated.targetType === "profile" && validated.targetId === reporterUserId) {
-    throw new Error("Cannot report your own profile");
+  if (validated.targetType === "profile") {
+    if (validated.targetId === reporterUserId) {
+      throw new Error("Cannot report your own profile");
+    }
+    if (reporterProfileId && validated.targetId === reporterProfileId) {
+      throw new Error("Cannot report your own profile");
+    }
   }
 
   return validated;

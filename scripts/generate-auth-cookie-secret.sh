@@ -16,6 +16,6 @@ echo "AUTH_COOKIE_SECRET (copy to Vercel Production + Preview):"
 echo "${SECRET}"
 echo
 echo "Notes:"
-echo "  - Set the same value on Production AND Preview if both use Supabase auth."
+echo "  - Set the same value on Production AND Preview when both use database auth."
 echo "  - Rotating invalidates existing unlock cookies (expected after reset)."
 echo "  - Do not paste this into git, issues, or chat logs."

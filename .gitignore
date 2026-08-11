@@ -1,6 +1,6 @@
 # ========================================
 # Unstandard .gitignore
-# Next.js + Node.js + Supabase MVP
+# Next.js + Node.js monorepo
 # ========================================
 
 # --- Dependencies ---
@@ -62,11 +62,34 @@ next-env.d.ts
 # --- Vercel ---
 .vercel
 
-# --- Supabase ---
-supabase/.temp/
-
 # --- Docker ---
 docker-compose.override.yml
+
+# --- Confidential offline label data (절대 커밋 금지) ---
+# Narrow on purpose. See docs/LOCAL_AI_LABEL_DATASET_GATE.md — a broad *.xlsx
+# rule would also hide legitimate spreadsheets and make a renamed copy of the
+# workbook harder to spot in review.
+project_sources/01-Unstandard_LabelingDataset_v0.1.xlsx
+Unstandard_LabelingDataset_v0.1.xlsx
+01-Unstandard_LabelingDataset_v0.1.xlsx
+private-data/local-ai/
+private-data/local-ai/**
+artifacts/local-ai-labeling/raw/
+artifacts/local-ai/
+artifacts/local-ai/**
+
+# --- Local AI technical PoC (repo-side spill; primary store is /tmp/unstandard-local-ai/) ---
+.cache/huggingface/
+.cache/huggingface/**
+.cache/torch/
+.cache/torch/**
+.huggingface/
+huggingface/hub/
+
+# --- Founder attachment dumps at repo root (never commit) ---
+/Unstandard_*.pdf
+/Unstandard_*.docx
+/Unstandard_*.xlsx
 
 # --- Misc ---
 *.log

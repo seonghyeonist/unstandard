@@ -48,18 +48,20 @@ describe("mapReporterProfileFailure", () => {
 });
 
 describe("reporter profile bootstrap result", () => {
-  it("uses auth user id as profile id on success", () => {
-    const userId = "11111111-1111-1111-1111-111111111111";
-    const result = reporterProfileSuccess(userId);
+  it("returns profile id distinct from auth user id", () => {
+    const authUserId = "11111111-1111-1111-1111-111111111111";
+    const profileId = "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa";
+    const result = reporterProfileSuccess(profileId);
     assert.equal(result.ok, true);
     if (result.ok) {
-      assert.equal(result.profileId, userId);
+      assert.equal(result.profileId, profileId);
+      assert.notEqual(result.profileId, authUserId);
     }
   });
 });
 
 describe("self-report validation with profile id namespace", () => {
-  it("still blocks reporting own profile when target id equals auth user id", () => {
+  it("blocks reporting own profile when target id equals auth user id", () => {
     const reporterId = "11111111-1111-1111-1111-111111111111";
     assert.throws(() =>
       validateReportForUser(
@@ -69,6 +71,22 @@ describe("self-report validation with profile id namespace", () => {
           reason: "spam",
         },
         reporterId,
+      ),
+    );
+  });
+
+  it("blocks reporting own profile when target id equals reporter profile id", () => {
+    const reporterId = "11111111-1111-1111-1111-111111111111";
+    const profileId = "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa";
+    assert.throws(() =>
+      validateReportForUser(
+        {
+          targetType: "profile",
+          targetId: profileId,
+          reason: "spam",
+        },
+        reporterId,
+        profileId,
       ),
     );
   });

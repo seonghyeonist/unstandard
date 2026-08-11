@@ -2,6 +2,9 @@
   "name": "unstandard-alpha-web",
   "version": "0.1.0",
   "private": true,
+  "engines": {
+    "node": "24.x"
+  },
   "scripts": {
     "dev": "next dev",
     "build": "next build",
@@ -9,33 +12,63 @@
     "lint": "eslint . --max-warnings=0",
     "typecheck": "tsc --noEmit",
     "check": "npm run lint && npm run typecheck && npm run test && npm run build",
-    "test": "tsx --test lib/**/*.test.ts tests/*.test.ts"
+    "test": "node --import tsx --test lib/**/*.test.ts tests/*.test.ts",
+    "test:integration": "node --import tsx scripts/test/integration.ts",
+    "db:generate": "drizzle-kit generate",
+    "db:migrate": "node --import tsx scripts/db/migrate.ts",
+    "db:seed": "node --import tsx scripts/db/seed.ts",
+    "db:check": "node --import tsx scripts/db/check.ts",
+    "db:studio": "drizzle-kit studio",
+    "alpha:invite:create": "node --conditions=react-server --import tsx scripts/alpha/invite.ts create",
+    "alpha:invite:revoke": "node --conditions=react-server --import tsx scripts/alpha/invite.ts revoke",
+    "alpha:invite:list": "node --conditions=react-server --import tsx scripts/alpha/invite.ts list",
+    "smoke:authorization": "node --import tsx scripts/smoke/authorization-adversarial.ts",
+    "readiness:evidence:build": "node --import tsx scripts/readiness/build-evidence.ts",
+    "readiness:alpha": "node --import tsx scripts/readiness/alpha.ts",
+    "guard:no-legacy-backend": "node --import tsx scripts/guard/no-legacy-backend.ts",
+    "guard:boundaries": "node --import tsx scripts/guard/boundaries.ts",
+    "poc:local-ai:bge-m3": "bash -c 'PY=\"${UNSTANDARD_LOCAL_AI_PYTHON:-/tmp/unstandard-local-ai/venv/bin/python}\"; if [ ! -x \"$PY\" ]; then echo \"BLOCKED_RUNTIME: missing $PY — create venv and pip install -r scripts/local-ai/requirements-poc.txt\" >&2; exit 2; fi; exec \"$PY\" scripts/local-ai/poc_bge_m3.py \"$@\"' --"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.0.1",
-    "@supabase/ssr": "^0.12.0",
-    "@supabase/supabase-js": "^2.108.2",
+    "@neondatabase/serverless": "^1.1.0",
     "@tanstack/react-query": "^5.76.1",
+    "better-auth": "^1.6.23",
     "clsx": "^2.1.1",
+    "drizzle-orm": "^0.45.2",
+    "https-proxy-agent": "7.0.6",
     "lucide-react": "^0.511.0",
-    "next": "^15.3.2",
-    "react": "^19.0.0",
-    "react-dom": "^19.0.0",
+    "next": "^16.2.12",
+    "react": "^19.2.8",
+    "react-dom": "^19.2.8",
     "react-hook-form": "^7.56.4",
     "server-only": "^0.0.1",
     "tailwind-merge": "^3.3.0",
+    "ws": "^8.18.3",
     "zod": "^3.25.28"
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3.3.1",
     "@tailwindcss/postcss": "^4.1.7",
-    "@types/node": "^22.15.21",
-    "@types/react": "^19.0.14",
-    "@types/react-dom": "^19.0.9",
+    "@types/node": "^24.0.0",
+    "@types/react": "^19.2.18",
+    "@types/react-dom": "^19.2.4",
+    "@types/ws": "^8.18.1",
+    "dotenv": "^17.4.2",
+    "drizzle-kit": "^0.31.10",
     "eslint": "^9.27.0",
-    "eslint-config-next": "^15.3.2",
+    "eslint-config-next": "^16.2.12",
     "tailwindcss": "^4.1.7",
     "tsx": "^4.22.4",
     "typescript": "^5.8.3"
+  },
+  "overrides": {
+    "next": {
+      "postcss": "8.5.25",
+      "sharp": "0.35.3"
+    }
+  },
+  "optionalDependencies": {
+    "bufferutil": "4.1.0"
   }
 }

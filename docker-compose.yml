@@ -17,9 +17,14 @@ services:
       timeout: 3s
       retries: 20
 
+  # tei and depth-service are dormant Local AI PoC scaffolding, not the live
+  # scorer (the app always uses the deterministic mock-local-heuristic-v0.0).
+  # They only start with `docker compose --profile local-ai-poc up`; a plain
+  # `docker compose up` never starts them. See docs/LOCAL_AI_POC_STATUS.md.
   tei:
     image: ghcr.io/huggingface/text-embeddings-inference:latest
     container_name: unstandard-tei-bge-m3
+    profiles: ["local-ai-poc"]
     command: ["--model-id", "BAAI/bge-m3", "--port", "8080"]
     ports:
       - "8080:8080"
@@ -32,11 +37,18 @@ services:
     build:
       context: ./services/depth-service
     container_name: unstandard-depth-service
+    profiles: ["local-ai-poc"]
     environment:
       DATABASE_URL: ${DATABASE_URL:-postgresql://unstandard:localdev@postgres:5432/unstandard}
       TEI_BASE_URL: ${TEI_BASE_URL:-http://tei:8080}
-      QWEN_REVIEW_URL: ${QWEN_REVIEW_URL:-http://qwen-review:8001/internal/qwen/review}
+      # No default remote target: Qwen review stays off unless both
+      # QWEN_REVIEW_URL and app_config qwen_review_enabled are explicitly set.
+      QWEN_REVIEW_URL: ${QWEN_REVIEW_URL:-}
       APP_CONFIG_CACHE_TTL_SECONDS: ${APP_CONFIG_CACHE_TTL_SECONDS:-5}
+      # Server-only opt-in + service auth. Absence keeps /internal/depth/evaluate
+      # fail-closed even if this container were started.
+      UNSTANDARD_LOCAL_AI_POC_ENABLED: ${UNSTANDARD_LOCAL_AI_POC_ENABLED:-}
+      UNSTANDARD_DEPTH_SERVICE_TOKEN: ${UNSTANDARD_DEPTH_SERVICE_TOKEN:-}
     ports:
       - "8000:8000"
     depends_on:

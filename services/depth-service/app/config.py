@@ -15,9 +15,20 @@ class Settings(BaseSettings):
     qwen_review_url: str | None = Field(default=None, alias="QWEN_REVIEW_URL")
     app_config_cache_ttl_seconds: float = Field(default=5.0, alias="APP_CONFIG_CACHE_TTL_SECONDS")
 
+    # Server-only containment gate for the still-dormant PoC. Both of these
+    # must be explicitly set (env, never app_config/DB) before
+    # /internal/depth/evaluate will do anything beyond reject the request.
+    # Absence of either — the default — must never activate scoring.
+    local_ai_poc_enabled: bool = Field(default=False, alias="UNSTANDARD_LOCAL_AI_POC_ENABLED")
+    local_ai_service_token: str | None = Field(
+        default=None, alias="UNSTANDARD_DEPTH_SERVICE_TOKEN"
+    )
+
 
 class RuntimeConfig(BaseModel):
-    local_ai_enabled: bool = True
+    # Fail closed: absence of app_config (no DB pool, empty table, or any
+    # other reason the value can't be loaded) must never enable scoring.
+    local_ai_enabled: bool = False
     embedding_model: str = "BAAI/bge-m3"
     embedding_dim: int = 1024
     depth_model_version: str = "local-v0.1"

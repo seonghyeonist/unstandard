@@ -1,7 +1,8 @@
 export type Candidate = {
   id: string;
   nickname: string;
-  age: number;
+  /** Optional — DB-backed public candidates may omit age. */
+  age?: number;
   city: string;
   teaser: string;
   question: string;

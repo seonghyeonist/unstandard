@@ -1,7 +1,7 @@
 import type { CurrentUser } from "@/types/user";
 
 /**
- * Client session reader — server HttpOnly cookie / Supabase session is the source of truth.
+ * Client session reader — server session is the source of truth.
  * No sessionStorage. No production mock fallback.
  */
 export async function getCurrentUser(): Promise<CurrentUser | null> {

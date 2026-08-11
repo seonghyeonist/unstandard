@@ -7,14 +7,12 @@ export type PublicSessionUser = {
 };
 
 /** Maps server auth user to a client-safe session view — no id, email, or tokens. */
-export function toPublicSessionUser(
-  user: AuthenticatedUser,
-  options: { supabaseAuth: boolean },
-): PublicSessionUser {
+export function toPublicSessionUser(user: AuthenticatedUser): PublicSessionUser {
   const idPrefix = user.id.replace(/-/g, "").slice(0, 8);
+
   return {
     nickname: user.nickname ?? `user-${idPrefix}`,
-    onboarded: user.onboarded ?? (options.supabaseAuth ? true : false),
+    onboarded: user.onboarded ?? false,
     idPrefix,
   };
 }

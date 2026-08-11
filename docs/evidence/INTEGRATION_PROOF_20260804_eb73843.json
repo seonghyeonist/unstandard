@@ -1,0 +1,59 @@
+{
+  "artifactVersion": 1,
+  "verdict": "PASS",
+  "gitSha": "eb738430f2e469af9f6d993794dbfdcd182f10d8",
+  "migrationChecksum": "0998a12f9b95a715",
+  "timestamp": "2026-08-04T06:44:07.550Z",
+  "matrix": "real_postgresql_integration",
+  "cases": [
+    {
+      "name": "report_user_fk",
+      "status": "PASS"
+    },
+    {
+      "name": "invite_consumed_by_user_fk",
+      "status": "PASS"
+    },
+    {
+      "name": "lowercase_report_target_type",
+      "status": "PASS"
+    },
+    {
+      "name": "duplicate_report_idempotency",
+      "status": "PASS"
+    },
+    {
+      "name": "no_duplicate_report_row",
+      "status": "PASS"
+    },
+    {
+      "name": "block_uniqueness",
+      "status": "PASS"
+    },
+    {
+      "name": "unlock_uniqueness",
+      "status": "PASS"
+    },
+    {
+      "name": "invite_concurrency",
+      "status": "PASS"
+    },
+    {
+      "name": "invite_finalization_success",
+      "status": "PASS"
+    },
+    {
+      "name": "invite_finalization_rollback",
+      "status": "PASS"
+    },
+    {
+      "name": "migration_second_run_noop",
+      "status": "PASS"
+    },
+    {
+      "name": "seed_idempotency",
+      "status": "PASS"
+    }
+  ],
+  "kind": "integration"
+}

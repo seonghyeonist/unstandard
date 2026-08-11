@@ -1,0 +1,11 @@
+{
+  "model_id": "BAAI/bge-m3",
+  "device": "cpu",
+  "embedding_dimension": 1024,
+  "download_elapsed_s": 26.32,
+  "cache_file_count": 44,
+  "cache_bytes": 4649577926,
+  "snapshot_digest": "b146e0edcff9db2993a167c7c92ff9a12bf0528f98d1f6172bf7c4fdad805f76",
+  "qwen_status": "INACTIVE_NOT_INSTALLED",
+  "warmup_ok": true
+}

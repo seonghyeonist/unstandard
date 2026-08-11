@@ -1,5 +1,4 @@
-import { getSupabaseOAuthProvider } from "@/lib/config/supabase-config";
-import { isMockAuthAllowed, isSupabaseAuthEnabled } from "@/lib/config/auth-mode";
+import { isDatabaseAuthConfigured, isMockAuthAllowed } from "@/lib/config/auth-mode";
 import LoginClient from "@/app/login/login-client";
 
 export default async function LoginPage({
@@ -12,8 +11,7 @@ export default async function LoginPage({
   return (
     <LoginClient
       mockAllowed={isMockAuthAllowed()}
-      supabaseEnabled={isSupabaseAuthEnabled()}
-      oauthProvider={getSupabaseOAuthProvider()}
+      databaseAuthEnabled={isDatabaseAuthConfigured()}
       errorCode={params.error}
     />
   );

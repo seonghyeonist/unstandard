@@ -1,0 +1,8 @@
+{
+  "alpha_readiness": "NOT_CLAIMED",
+  "detail": "UNSTANDARD_LABELING_WORKBOOK_PATH unset",
+  "generated_at_utc": "2026-08-04T06:45:27Z",
+  "human_label_gate": "NOT_RUN_FOUNDER_DEFERRED",
+  "qwen_status": "INACTIVE_NOT_INSTALLED",
+  "verdict": "BLOCKED_INPUT_FILE_NOT_FOUND"
+}

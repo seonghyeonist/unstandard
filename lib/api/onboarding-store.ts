@@ -7,7 +7,7 @@ import {
  * Local persistence for the onboarding answer.
  *
  * Today this writes to `sessionStorage` (matching the mock auth layer in
- * `lib/api/auth.ts`). The shape is intentionally close to a future Supabase
+ * `lib/api/auth.ts`). The shape is intentionally close to a future persisted
  * row so migration is a storage-adapter swap, not a rewrite. Keep all storage
  * logic here, out of UI components.
  */

@@ -1,0 +1,659 @@
+/**
+ * Deployed Preview adversarial authorization smoke (HTTP boundary).
+ * Required HTTP Alpha surface only — DB-only proofs belong in test:integration.
+ *
+ * Artifact gitSha is the local runner checkout provenance only.
+ * It does not cryptographically attest the remote Vercel deployment SHA;
+ * operators must verify deployment metadata separately.
+ */
+
+import { migrationSetChecksum } from "../../lib/db/migration-guards";
+import { getCurrentGitSha } from "../../lib/readiness/evidence";
+import { REQUIRED_HTTP_SMOKE_CASES } from "../../lib/readiness/proof-constants";
+import {
+  buildSmokeArtifact,
+  writeProofArtifactAtomically,
+  type ProofCase,
+} from "../../lib/readiness/proof-artifact";
+import { extractHostname, validateEvidenceHostname, hostnameFailureMessage } from "../../lib/readiness/hostnames";
+import { CookieJar, collectSetCookieHeaders } from "../../lib/smoke/cookie-jar";
+import {
+  credentialsOwnExpectedProfiles,
+  validateSmokeProfileIds,
+} from "../../lib/smoke/authorization-preflight";
+import {
+  proveClearedCookieDenied,
+  proveLogoutInvalidatesSession,
+  proveRevokedSessionRejected,
+} from "../../lib/smoke/session-revocation";
+import {
+  privateProfileResponseHasSensitiveFields,
+  sessionResponseHasSensitiveFields,
+} from "../../lib/smoke/response-redaction";
+
+const baseUrl = process.env.SMOKE_BASE_URL?.trim();
+const userAEmail = process.env.SMOKE_USER_A_EMAIL?.trim();
+const userAPassword = process.env.SMOKE_USER_A_PASSWORD;
+const userBEmail = process.env.SMOKE_USER_B_EMAIL?.trim();
+const userBPassword = process.env.SMOKE_USER_B_PASSWORD;
+const previewBypass = process.env.SMOKE_VERCEL_PROTECTION_BYPASS?.trim();
+const previewShareUrl = process.env.SMOKE_VERCEL_SHARE_URL?.trim();
+const profileAId = process.env.SMOKE_USER_A_PROFILE_ID?.trim();
+const profileBId = process.env.SMOKE_USER_B_PROFILE_ID?.trim();
+const deploymentGitSha = process.env.SMOKE_DEPLOYMENT_GIT_SHA?.trim();
+const deploymentId = process.env.SMOKE_DEPLOYMENT_ID?.trim();
+const databaseFingerprintSha = process.env.SMOKE_DATABASE_FINGERPRINT_SHA256?.trim();
+const protectionJar = new CookieJar();
+
+type FutureCase = {
+  name: string;
+  reason: string;
+};
+
+function redact(value: string): string {
+  return value
+    .replace(/[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/g, "[email]")
+    .replace(
+      /\b[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\b/gi,
+      "[id]",
+    )
+    .replace(/better-auth\.session_token=[^;]+/gi, "[session-cookie]")
+    .replace(/Bearer\s+[A-Za-z0-9._-]+/gi, "[authorization]");
+}
+
+function blocked(message: string, code = "BLOCKED_EXTERNAL"): never {
+  console.error(`${code}: ${message}`);
+  const out = process.env.UNSTANDARD_SMOKE_EVIDENCE_OUT?.trim();
+  if (out) {
+    console.error(`${code}: no smoke PASS artifact written`);
+  }
+  process.exit(2);
+}
+
+async function fetchJson(
+  path: string,
+  init: RequestInit = {},
+  jar?: CookieJar,
+): Promise<{ status: number; body: unknown; headers: Headers }> {
+  const headers = new Headers(init.headers ?? {});
+  // Better Auth rejects state-changing auth requests without a browser Origin.
+  // The smoke client exercises the deployed browser boundary, so mirror the
+  // Origin header a real same-origin browser request would send.
+  if (baseUrl && !headers.has("origin")) {
+    headers.set("origin", new URL(baseUrl).origin);
+  }
+  if (previewBypass) {
+    headers.set("x-vercel-protection-bypass", previewBypass);
+  }
+  const cookieHeader = [protectionJar.header(), jar?.header()].filter(Boolean).join("; ");
+  if (cookieHeader) {
+    headers.set("cookie", cookieHeader);
+  }
+
+  const response = await fetch(`${baseUrl}${path}`, {
+    ...init,
+    headers,
+  });
+
+  jar?.ingestAll(collectSetCookieHeaders(response.headers));
+
+  const text = await response.text();
+  let body: unknown = null;
+  try {
+    body = text ? JSON.parse(text) : null;
+  } catch {
+    body = { raw: text.slice(0, 120) };
+  }
+
+  return { status: response.status, body, headers: response.headers };
+}
+
+function isPrivateNoStore(headers: Headers): boolean {
+  const cacheControl = headers.get("cache-control") ?? "";
+  return (
+    /\bprivate\b/i.test(cacheControl) &&
+    /\bno-store\b/i.test(cacheControl) &&
+    !/\bpublic\b/i.test(cacheControl)
+  );
+}
+
+async function signIn(
+  email: string,
+  password: string,
+  jar: CookieJar,
+): Promise<{ ok: boolean; status: number }> {
+  const response = await fetchJson(
+    "/api/auth/sign-in/email",
+    {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ email, password }),
+    },
+    jar,
+  );
+
+  return { ok: response.status >= 200 && response.status < 300, status: response.status };
+}
+
+function pushCase(cases: ProofCase[], name: string, pass: boolean): void {
+  cases.push({ name, status: pass ? "PASS" : "FAIL" });
+}
+
+async function main(): Promise<void> {
+  const cases: ProofCase[] = [];
+  const futureNotApplicable: FutureCase[] = [
+    {
+      name: "duplicate_block_rejected",
+      reason: "No HTTP block endpoint in alpha rebuild",
+    },
+    {
+      name: "user_a_cannot_modify_user_b_profile",
+      reason: "No profile mutation HTTP endpoint in alpha rebuild",
+    },
+    {
+      name: "user_a_cannot_update_or_delete_user_b_answer",
+      reason: "No cross-user answer mutation HTTP endpoint in alpha rebuild",
+    },
+  ];
+
+  if (!baseUrl) {
+    blocked("SMOKE_BASE_URL missing");
+  }
+
+  if (!userAEmail || !userAPassword || !userBEmail || !userBPassword) {
+    blocked("SMOKE_USER_A_* and SMOKE_USER_B_* credentials are required");
+  }
+
+  if (!profileAId || !profileBId) {
+    blocked("SMOKE_USER_A_PROFILE_ID and SMOKE_USER_B_PROFILE_ID are required");
+  }
+  const profileIdFailures = validateSmokeProfileIds(profileAId, profileBId);
+  if (profileIdFailures.length > 0) {
+    blocked(profileIdFailures.join("; "));
+  }
+  const runnerGitSha = getCurrentGitSha();
+  if (!deploymentGitSha || !/^[a-f0-9]{40}$/.test(deploymentGitSha)) {
+    blocked("SMOKE_DEPLOYMENT_GIT_SHA must be the full verified Preview commit SHA");
+  }
+  if (deploymentGitSha !== runnerGitSha) {
+    blocked("runner checkout SHA does not match Preview deployment SHA");
+  }
+  if (!deploymentId || !/^dpl_[A-Za-z0-9]+$/.test(deploymentId)) {
+    blocked("SMOKE_DEPLOYMENT_ID must be the verified Preview deployment ID");
+  }
+  if (!databaseFingerprintSha || !/^[a-f0-9]{64}$/.test(databaseFingerprintSha)) {
+    blocked("SMOKE_DATABASE_FINGERPRINT_SHA256 must hash the matched safe fingerprint");
+  }
+
+  const previewHostname = extractHostname(baseUrl);
+  if (!previewHostname) {
+    blocked("SMOKE_BASE_URL must yield a Preview hostname");
+  }
+
+  const hostFailure = validateEvidenceHostname(previewHostname);
+  if (hostFailure) {
+    blocked(hostnameFailureMessage(hostFailure));
+  }
+
+  if (previewShareUrl) {
+    let shareUrl: URL;
+    try {
+      shareUrl = new URL(previewShareUrl);
+    } catch {
+      blocked("SMOKE_VERCEL_SHARE_URL must be a valid URL");
+    }
+    if (
+      shareUrl.protocol !== "https:" ||
+      shareUrl.hostname.toLowerCase() !== previewHostname ||
+      !shareUrl.searchParams.has("_vercel_share")
+    ) {
+      blocked("SMOKE_VERCEL_SHARE_URL must be for the exact Preview hostname");
+    }
+    const shareResponse = await fetch(shareUrl, { redirect: "manual" }).catch(() => null);
+    if (!shareResponse) {
+      blocked("Preview share authentication is not reachable");
+    }
+    protectionJar.ingestAll(collectSetCookieHeaders(shareResponse.headers));
+    if (protectionJar.size() === 0) {
+      blocked("Preview share authentication did not issue a protection cookie");
+    }
+  }
+
+  const reachabilityHeaders = new Headers();
+  if (previewBypass) {
+    reachabilityHeaders.set("x-vercel-protection-bypass", previewBypass);
+  }
+  const protectionCookie = protectionJar.header();
+  if (protectionCookie) {
+    reachabilityHeaders.set("cookie", protectionCookie);
+  }
+  const reachability = await fetch(`${baseUrl}/api/auth/session`, {
+    headers: reachabilityHeaders,
+  }).catch(() => null);
+
+  if (!reachability) {
+    blocked("Preview base URL is not reachable");
+  }
+
+  if (reachability.status === 403) {
+    blocked("Preview protection authentication was rejected");
+  }
+
+  const anonSession = await fetchJson("/api/auth/session");
+  pushCase(
+    cases,
+    "anonymous_denied",
+    anonSession.status === 401 && isPrivateNoStore(anonSession.headers),
+  );
+
+  const jarA = new CookieJar();
+  const loginA = await signIn(userAEmail, userAPassword, jarA);
+  pushCase(cases, "user_a_login", loginA.ok);
+  if (!loginA.ok) {
+    console.error(redact("FAIL: user A login failed — aborting later session proofs"));
+    process.exit(1);
+  }
+
+  const sessionA = await fetchJson("/api/auth/session", {}, jarA);
+  pushCase(cases, "user_a_session", sessionA.status === 200);
+
+  const jarB = new CookieJar();
+  const loginB = await signIn(userBEmail, userBPassword, jarB);
+  pushCase(cases, "user_b_login", loginB.ok);
+  if (!loginB.ok) {
+    console.error(redact("FAIL: user B login failed — aborting later session proofs"));
+    process.exit(1);
+  }
+
+  const sessionB = await fetchJson("/api/auth/session", {}, jarB);
+  pushCase(cases, "user_b_session", sessionB.status === 200);
+
+  const candidatesForA = await fetchJson("/api/candidates", {}, jarA);
+  const candidatesForB = await fetchJson("/api/candidates", {}, jarB);
+  const identityMappingVerified =
+    candidatesForA.status === 200 &&
+    candidatesForB.status === 200 &&
+    credentialsOwnExpectedProfiles({
+      profileAId,
+      profileBId,
+      candidatesForA: candidatesForA.body,
+      candidatesForB: candidatesForB.body,
+    });
+  if (!identityMappingVerified) {
+    blocked(
+      "credential-to-profile ownership could not be proven from database candidate exclusion",
+      "BLOCKED_IDENTITY_MISMATCH",
+    );
+  }
+  pushCase(cases, "credential_profile_mapping_verified", true);
+
+  pushCase(
+    cases,
+    "user_a_owns_session",
+    sessionA.status === 200 &&
+      typeof (sessionA.body as { user?: { nickname?: string } })?.user?.nickname === "string",
+  );
+  pushCase(
+    cases,
+    "user_b_owns_session",
+    sessionB.status === 200 &&
+      typeof (sessionB.body as { user?: { nickname?: string } })?.user?.nickname === "string",
+  );
+
+  // Mock private-profile route is NOT exercised as DB ownership proof.
+  // See futureNotApplicable: db_backed_cross_user_private_profile_denial.
+
+  const forgedReport = await fetchJson(
+    "/api/reports",
+    {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        targetType: "profile",
+        targetId: profileBId,
+        reason: "forged reporter attempt",
+        reporterUserId: "00000000-0000-4000-8000-000000000000",
+      }),
+    },
+    jarA,
+  );
+  pushCase(cases, "forged_reporter_id_rejected", forgedReport.status === 400);
+
+  const selfReport = await fetchJson(
+    "/api/reports",
+    {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        targetType: "profile",
+        targetId: profileAId,
+        reason: "self report attempt",
+      }),
+    },
+    jarA,
+  );
+  pushCase(cases, "self_report_rejected", selfReport.status === 400);
+
+  const firstReport = await fetchJson(
+    "/api/reports",
+    {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        targetType: "profile",
+        targetId: profileBId,
+        reason: "duplicate-open-report",
+      }),
+    },
+    jarA,
+  );
+  const duplicateReport = await fetchJson(
+    "/api/reports",
+    {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        targetType: "profile",
+        targetId: profileBId,
+        reason: "duplicate-open-report-2",
+      }),
+    },
+    jarA,
+  );
+  const firstId = (firstReport.body as { id?: string })?.id;
+  const duplicateId = (duplicateReport.body as { id?: string })?.id;
+  pushCase(
+    cases,
+    "duplicate_open_report_is_idempotent",
+    firstReport.status === 201 &&
+      duplicateReport.status === 200 &&
+      Boolean(firstId) &&
+      firstId === duplicateId,
+  );
+
+  const redactionCheck = await fetchJson("/api/auth/session", {}, jarA);
+  pushCase(
+    cases,
+    "session_response_redacted",
+    redactionCheck.status === 200 && !sessionResponseHasSensitiveFields(redactionCheck.body),
+  );
+  pushCase(
+    cases,
+    "session_response_no_store",
+    redactionCheck.status === 200 && isPrivateNoStore(redactionCheck.headers),
+  );
+
+  // DB-backed unlock proof. Pair state must be cleaned by the operator before this run.
+  const initialAStatus = await fetchJson(`/api/unlock/${profileBId}`, {}, jarA);
+  const initialBStatus = await fetchJson(`/api/unlock/${profileAId}`, {}, jarB);
+  pushCase(
+    cases,
+    "initial_unlock_pair_state_clean",
+    initialAStatus.status === 200 &&
+      initialBStatus.status === 200 &&
+      (initialAStatus.body as { unlocked?: boolean; unlockRowCount?: number }).unlocked === false &&
+      (initialAStatus.body as { unlockRowCount?: number }).unlockRowCount === 0 &&
+      (initialBStatus.body as { unlocked?: boolean; unlockRowCount?: number }).unlocked === false &&
+      (initialBStatus.body as { unlockRowCount?: number }).unlockRowCount === 0,
+  );
+
+  const beforePrivate = await fetchJson(`/api/profile/${profileBId}/private`, {}, jarA);
+  pushCase(
+    cases,
+    "a_to_b_private_before_unlock_forbidden",
+    beforePrivate.status === 403 && isPrivateNoStore(beforePrivate.headers),
+  );
+
+  const unlockAnswer =
+    "어제 비 오는 골목에서 따뜻한 국물을 마시며 마음이 조금 풀렸어요. 창밖 빗소리가 선명했어요.";
+  const unlockPass = await fetchJson(
+    "/api/answers/unlock",
+    {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ profileId: profileBId, answer: unlockAnswer }),
+    },
+    jarA,
+  );
+  const unlockBody = unlockPass.body as { verdict?: string; unlocked?: boolean };
+  pushCase(
+    cases,
+    "a_to_b_unlock_pass",
+    unlockPass.status === 200 && unlockBody.verdict === "PASS" && unlockBody.unlocked === true,
+  );
+
+  const unlockStatus = await fetchJson(`/api/unlock/${profileBId}`, {}, jarA);
+  const aStatusBody = unlockStatus.body as {
+    unlocked?: boolean;
+    unlockRowCount?: number;
+  };
+  pushCase(
+    cases,
+    "a_to_b_unlock_status_true",
+    unlockStatus.status === 200 && aStatusBody.unlocked === true,
+  );
+  pushCase(
+    cases,
+    "a_to_b_unlock_row_exactly_one",
+    unlockStatus.status === 200 && aStatusBody.unlockRowCount === 1,
+  );
+
+  const afterPrivate = await fetchJson(`/api/profile/${profileBId}/private`, {}, jarA);
+  pushCase(
+    cases,
+    "a_to_b_private_after_unlock_ok",
+    afterPrivate.status === 200 &&
+      isPrivateNoStore(afterPrivate.headers) &&
+      !privateProfileResponseHasSensitiveFields(afterPrivate.body),
+  );
+
+  const unlockAgain = await fetchJson(
+    "/api/answers/unlock",
+    {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ profileId: profileBId, answer: unlockAnswer }),
+    },
+    jarA,
+  );
+  const duplicateBody = unlockAgain.body as {
+    verdict?: string;
+    unlocked?: boolean;
+    idempotent?: boolean;
+  };
+  const statusAfterDuplicate = await fetchJson(`/api/unlock/${profileBId}`, {}, jarA);
+  pushCase(
+    cases,
+    "duplicate_unlock_idempotent",
+    unlockAgain.status === 200 &&
+      duplicateBody.verdict === "PASS" &&
+      duplicateBody.unlocked === true &&
+      duplicateBody.idempotent === true &&
+      (statusAfterDuplicate.body as { unlockRowCount?: number }).unlockRowCount === 1,
+  );
+
+  const bBeforeOwnUnlock = await fetchJson(`/api/profile/${profileAId}/private`, {}, jarB);
+  pushCase(cases, "b_does_not_inherit_a_to_b_permission", bBeforeOwnUnlock.status === 403);
+  pushCase(
+    cases,
+    "b_to_a_private_before_unlock_forbidden",
+    bBeforeOwnUnlock.status === 403 && isPrivateNoStore(bBeforeOwnUnlock.headers),
+  );
+
+  const forgedJarB = jarB.clone();
+  forgedJarB.ingest(`unstandard_unlock_${profileAId}=forged; Path=/; HttpOnly`);
+  const forgedCookiePrivate = await fetchJson(
+    `/api/profile/${profileAId}/private`,
+    {},
+    forgedJarB,
+  );
+  pushCase(cases, "forged_unlock_cookie_no_authority", forgedCookiePrivate.status === 403);
+
+  const bUnlockPass = await fetchJson(
+    "/api/answers/unlock",
+    {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ profileId: profileAId, answer: unlockAnswer }),
+    },
+    jarB,
+  );
+  const bUnlockBody = bUnlockPass.body as { verdict?: string; unlocked?: boolean };
+  pushCase(
+    cases,
+    "b_to_a_unlock_pass",
+    bUnlockPass.status === 200 &&
+      bUnlockBody.verdict === "PASS" &&
+      bUnlockBody.unlocked === true,
+  );
+
+  const bUnlockStatus = await fetchJson(`/api/unlock/${profileAId}`, {}, jarB);
+  const bStatusBody = bUnlockStatus.body as {
+    unlocked?: boolean;
+    unlockRowCount?: number;
+  };
+  pushCase(
+    cases,
+    "b_to_a_unlock_status_true",
+    bUnlockStatus.status === 200 && bStatusBody.unlocked === true,
+  );
+  pushCase(
+    cases,
+    "b_to_a_unlock_row_exactly_one",
+    bUnlockStatus.status === 200 && bStatusBody.unlockRowCount === 1,
+  );
+
+  const bAfterPrivate = await fetchJson(`/api/profile/${profileAId}/private`, {}, jarB);
+  pushCase(
+    cases,
+    "b_to_a_private_after_unlock_ok",
+    bAfterPrivate.status === 200 &&
+      isPrivateNoStore(bAfterPrivate.headers) &&
+      !privateProfileResponseHasSensitiveFields(bAfterPrivate.body),
+  );
+
+  const finalAStatus = await fetchJson(`/api/unlock/${profileBId}`, {}, jarA);
+  const finalBStatus = await fetchJson(`/api/unlock/${profileAId}`, {}, jarB);
+  pushCase(
+    cases,
+    "bidirectional_viewer_isolation",
+    (finalAStatus.body as { unlockRowCount?: number }).unlockRowCount === 1 &&
+      (finalBStatus.body as { unlockRowCount?: number }).unlockRowCount === 1,
+  );
+  pushCase(
+    cases,
+    "private_response_no_store",
+    afterPrivate.status === 200 &&
+      bAfterPrivate.status === 200 &&
+      isPrivateNoStore(afterPrivate.headers) &&
+      isPrivateNoStore(bAfterPrivate.headers),
+  );
+
+  const getSession = async (jar: CookieJar) => {
+    const result = await fetchJson("/api/auth/session", {}, jar);
+    return { status: result.status };
+  };
+  const logout = async (jar: CookieJar) => {
+    const result = await fetchJson("/api/auth/logout", { method: "POST" }, jar);
+    return { status: result.status };
+  };
+
+  const logoutPass = await proveLogoutInvalidatesSession({ jar: jarA, getSession, logout });
+  pushCase(cases, "logout_invalidates_session", logoutPass);
+
+  // cleared_cookie_denied — distinct from revocation
+  const clearedJar = new CookieJar();
+  const clearedLogin = await signIn(userAEmail, userAPassword, clearedJar);
+  if (!clearedLogin.ok) {
+    pushCase(cases, "cleared_cookie_denied", false);
+  } else {
+    const clearedPass = await proveClearedCookieDenied({ jar: clearedJar, getSession });
+    pushCase(cases, "cleared_cookie_denied", clearedPass);
+  }
+
+  // revoked_session_rejected — stale pre-logout CookieJar replay only
+  const revokedJar = new CookieJar();
+  const revokedLogin = await signIn(userAEmail, userAPassword, revokedJar);
+  if (!revokedLogin.ok) {
+    pushCase(cases, "revoked_session_rejected", false);
+  } else {
+    const revoked = await proveRevokedSessionRejected({ jar: revokedJar, getSession, logout });
+    pushCase(cases, "revoked_session_rejected", revoked.pass && revoked.usedStaleClone);
+  }
+
+  const requiredSet = new Set<string>(REQUIRED_HTTP_SMOKE_CASES);
+  for (const name of REQUIRED_HTTP_SMOKE_CASES) {
+    if (!cases.some((item) => item.name === name)) {
+      pushCase(cases, name, false);
+    }
+  }
+
+  // Drop any accidental non-required extras from pass aggregation (keep observed)
+  const activeRequired = cases.filter((item) => requiredSet.has(item.name));
+  const allRequiredPass =
+    activeRequired.length === REQUIRED_HTTP_SMOKE_CASES.length &&
+    activeRequired.every((item) => item.status === "PASS") &&
+    new Set(activeRequired.map((item) => item.name)).size === REQUIRED_HTTP_SMOKE_CASES.length;
+
+  const verdict = allRequiredPass ? "PASS" : "FAIL";
+
+  const built = buildSmokeArtifact({
+    verdict,
+    subjectGitSha: runnerGitSha,
+    runnerGitSha,
+    deploymentGitSha,
+    deploymentId,
+    databaseFingerprintSha,
+    migrationChecksum: migrationSetChecksum(),
+    previewHostname,
+    cases: activeRequired,
+    futureNotApplicable,
+  });
+
+  if (!built.ok) {
+    console.error(redact(`FAIL: smoke artifact validation failed: ${built.failures.join("; ")}`));
+    process.exit(1);
+  }
+
+  console.log(
+    JSON.stringify(
+      {
+        verdict,
+        kind: "smoke",
+        matrix: "deployed_http_alpha_surface",
+        previewHostname,
+        subjectGitSha: runnerGitSha,
+        runnerGitSha,
+        deploymentGitSha,
+        deploymentId,
+        caseNames: activeRequired.map((item) => item.name),
+        futureNotApplicable: futureNotApplicable.map((item) => item.name),
+        timestamp: built.artifact.timestamp,
+      },
+      null,
+      2,
+    ),
+  );
+
+  if (!allRequiredPass) {
+    console.error("FAIL: one or more required smoke cases failed");
+    process.exit(1);
+  }
+
+  const out = process.env.UNSTANDARD_SMOKE_EVIDENCE_OUT?.trim();
+  if (out) {
+    writeProofArtifactAtomically({
+      outputPath: out,
+      artifact: built.artifact,
+      allowOverwriteDifferentSha: process.env.UNSTANDARD_PROOF_OVERWRITE_DIFFERENT_SHA === "yes",
+    });
+    console.log(`smoke:authorization PASS artifact written`);
+  } else {
+    console.log("smoke:authorization PASS (no UNSTANDARD_SMOKE_EVIDENCE_OUT — artifact not written)");
+  }
+}
+
+main().catch((error) => {
+  console.error(redact(error instanceof Error ? error.message : "smoke failed"));
+  process.exit(1);
+});

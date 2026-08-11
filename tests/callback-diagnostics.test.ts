@@ -93,7 +93,7 @@ describe("sanitizeAuthErrorMessage", () => {
 });
 
 describe("extractSafeAuthErrorFields", () => {
-  it("extracts safe fields from a Supabase-like auth error", () => {
+  it("extracts safe fields from an auth provider error", () => {
     const fields = extractSafeAuthErrorFields({
       name: "AuthApiError",
       message: "Email link is invalid or has expired",
