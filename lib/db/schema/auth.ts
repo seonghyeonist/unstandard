@@ -1,6 +1,10 @@
+import { sql } from "drizzle-orm";
 import {
+  bigint,
   boolean,
+  check,
   index,
+  integer,
   pgTable,
   text,
   timestamp,
@@ -76,3 +80,19 @@ export const verifications = pgTable("verifications", {
     .$onUpdate(() => new Date())
     .notNull(),
 });
+
+/**
+ * Shared, database-backed limiter state for Better Auth and application
+ * endpoints. Database storage is required because Vercel functions do not
+ * share process memory.
+ */
+export const rateLimits = pgTable(
+  "rate_limits",
+  {
+    id: text("id").primaryKey(),
+    key: text("key").notNull().unique(),
+    count: integer("count").notNull(),
+    lastRequest: bigint("last_request", { mode: "number" }).notNull(),
+  },
+  (table) => [check("rate_limits_count_nonnegative", sql`${table.count} >= 0`)],
+);

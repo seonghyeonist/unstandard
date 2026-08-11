@@ -25,6 +25,11 @@
     "smoke:authorization": "node --import tsx scripts/smoke/authorization-adversarial.ts",
     "readiness:evidence:build": "node --import tsx scripts/readiness/build-evidence.ts",
     "readiness:alpha": "node --import tsx scripts/readiness/alpha.ts",
+    "audit:production": "npm audit --omit=dev --audit-level=moderate",
+    "audit:tooling": "npm audit --audit-level=high",
+    "audit:security": "npm run audit:production && npm run audit:tooling",
+    "operations:production:verify": "node --import tsx scripts/operations/verify-production-readiness.ts",
+    "operations:closed-alpha:gate": "node --import tsx scripts/operations/closed-alpha-gate.ts",
     "guard:no-legacy-backend": "node --import tsx scripts/guard/no-legacy-backend.ts",
     "guard:boundaries": "node --import tsx scripts/guard/boundaries.ts",
     "poc:local-ai:bge-m3": "bash -c 'PY=\"${UNSTANDARD_LOCAL_AI_PYTHON:-/tmp/unstandard-local-ai/venv/bin/python}\"; if [ ! -x \"$PY\" ]; then echo \"BLOCKED_RUNTIME: missing $PY — create venv and pip install -r scripts/local-ai/requirements-poc.txt\" >&2; exit 2; fi; exec \"$PY\" scripts/local-ai/poc_bge_m3.py \"$@\"' --"
@@ -63,8 +68,14 @@
     "typescript": "^5.8.3"
   },
   "overrides": {
+    "@esbuild-kit/core-utils": {
+      "esbuild": "0.25.12"
+    },
+    "brace-expansion@1.1.15": "1.1.18",
+    "js-yaml@4.2.0": "4.3.1",
+    "nanoid@3.3.16": "3.3.18",
+    "postcss": "8.5.26",
     "next": {
-      "postcss": "8.5.25",
       "sharp": "0.35.3"
     }
   },

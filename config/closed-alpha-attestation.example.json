@@ -1,0 +1,60 @@
+{
+  "artifactVersion": 3,
+  "kind": "closed_alpha_operational_attestation",
+  "subjectGitSha": "REPLACE_WITH_40_HEX_PRODUCTION_SHA",
+  "reviewedAt": "REPLACE_WITH_ISO_8601_TIMESTAMP",
+  "initialCohortCap": 30,
+  "incidentResponseMinutes": 240,
+  "attestations": {
+    "incidentOwnerAssigned": false,
+    "supportChannelReady": false,
+    "rollbackProcedureReviewed": false,
+    "restoreDrillCompleted": false,
+    "privacyNoticePublished": false,
+    "accountDeletionProcedureVerified": false,
+    "moderationOwnerAssigned": false,
+    "rateLimitPolicyApproved": false,
+    "productionDatabaseSafetyControlsApproved": false
+  },
+  "evidence": {
+    "incidentOwner": "REPLACE_WITH_OWNER",
+    "supportOwner": "REPLACE_WITH_OWNER",
+    "moderationOwner": "REPLACE_WITH_OWNER",
+    "privacyOwner": "REPLACE_WITH_OWNER",
+    "supportChannel": "in_app_support_requests",
+    "supportTestReference": "REPLACE_WITH_TEST_TICKET_ID",
+    "rollbackDeploymentId": "dpl_REPLACE_WITH_READY_DEPLOYMENT",
+    "productionDatabase": {
+      "projectId": "REPLACE_WITH_NEON_PROJECT_ID",
+      "branchId": "br-replace-with-approved-branch-id",
+      "branchName": "REPLACE_WITH_BRANCH_NAME",
+      "plan": "Free",
+      "protected": false,
+      "safetyMode": "free_plan_closed_alpha_exception_v1",
+      "freePlanException": {
+        "policyVersion": "neon-free-closed-alpha-v1",
+        "acceptedBy": "REPLACE_WITH_OWNER",
+        "acceptedAt": "REPLACE_WITH_ISO_8601_TIMESTAMP",
+        "expiresAt": "REPLACE_WITH_ISO_8601_TIMESTAMP_WITHIN_30_DAYS",
+        "maximumCohortSize": 30,
+        "approvedProjectId": "REPLACE_WITH_NEON_PROJECT_ID",
+        "approvedBranchId": "br-replace-with-approved-branch-id",
+        "migrationDrillReference": "REPLACE_WITH_DISPOSABLE_MIGRATION_DRILL_REFERENCE",
+        "productionBranchResetDeleteDropTableTruncateProhibited": true,
+        "perChangeManualApprovalRequired": true,
+        "invitationsPausedOnQuotaOrRecoveryDegradation": true
+      }
+    },
+    "restoreDrill": {
+      "branchId": "br-replace-with-drill-branch-id",
+      "completedAt": "REPLACE_WITH_ISO_8601_TIMESTAMP",
+      "result": "PASS"
+    },
+    "privacyNoticeUrl": "https://REPLACE_WITH_PRODUCTION_HOST/privacy",
+    "accountDeletionTestReference": "REPLACE_WITH_TEST_REFERENCE",
+    "rateLimitPolicyVersion": "closed-alpha-v1"
+  },
+  "notes": [
+    "Example only. Keep the completed attestation operator-local unless an explicit review approves publication."
+  ]
+}

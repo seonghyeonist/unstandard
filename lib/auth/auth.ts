@@ -116,6 +116,18 @@ const inviteGatePlugin = () => ({
           }
         }),
       },
+      {
+        matcher: (context: { path?: string }) => context.path === "/delete-user",
+        handler: createAuthMiddleware(async (ctx) => {
+          const password = String(ctx.body?.password ?? "");
+          if (password.length < 10) {
+            throw APIError.from("BAD_REQUEST", {
+              code: "PASSWORD_REQUIRED",
+              message: "Current password is required",
+            });
+          }
+        }),
+      },
     ],
   },
 });
@@ -139,6 +151,28 @@ export function getAuth(): ReturnType<typeof betterAuth> {
     emailAndPassword: {
       enabled: true,
       minPasswordLength: 10,
+    },
+    user: {
+      deleteUser: {
+        enabled: true,
+      },
+    },
+    rateLimit: {
+      enabled: true,
+      storage: "database",
+      window: 10,
+      max: 100,
+      customRules: {
+        "/sign-in/email": { window: 60, max: 5 },
+        "/sign-up/email": { window: 60, max: 5 },
+        "/delete-user": { window: 3_600, max: 3 },
+      },
+    },
+    advanced: {
+      ipAddress: {
+        // Vercel overwrites this header with the public client IP.
+        ipAddressHeaders: ["x-forwarded-for"],
+      },
     },
     plugins: [inviteGatePlugin(), nextCookies()],
     databaseHooks: {

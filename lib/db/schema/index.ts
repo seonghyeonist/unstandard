@@ -8,6 +8,7 @@ export * from "@/lib/db/schema/unlocks";
 export * from "@/lib/db/schema/unlock-attempts";
 export * from "@/lib/db/schema/invites";
 export * from "@/lib/db/schema/app-config";
+export * from "@/lib/db/schema/support";
 
 import * as authSchema from "@/lib/db/schema/auth";
 import * as profilesSchema from "@/lib/db/schema/profiles";
@@ -19,6 +20,7 @@ import * as unlocksSchema from "@/lib/db/schema/unlocks";
 import * as unlockAttemptsSchema from "@/lib/db/schema/unlock-attempts";
 import * as invitesSchema from "@/lib/db/schema/invites";
 import * as appConfigSchema from "@/lib/db/schema/app-config";
+import * as supportSchema from "@/lib/db/schema/support";
 
 export const schema = {
   ...authSchema,
@@ -31,4 +33,5 @@ export const schema = {
   ...unlockAttemptsSchema,
   ...invitesSchema,
   ...appConfigSchema,
+  ...supportSchema,
 };
