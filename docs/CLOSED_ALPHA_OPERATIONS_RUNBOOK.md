@@ -202,6 +202,8 @@ Official references:
 - [Neon recovery workflows](https://neon.com/branching/recovery-workflows)
 - [Neon instant restore](https://neon.com/docs/introduction/branch-restore)
 - [Neon connection pooling](https://neon.com/docs/connect/connection-pooling)
+- [Neon protected branches](https://neon.com/docs/guides/protected-branches)
+- [Neon branch management and plan boundary](https://neon.com/docs/manage/branches)
 
 ## Production database identity (2026-08-11)
 
@@ -209,6 +211,8 @@ Official references:
 - Production source branch: `br-bitter-wave-ajs8dy0u` (`main`)
 - Region: AWS `us-east-2`
 - History retention: 6 hours
+- Organization plan observed in Console: Free
+- Protection observed through Console and Neon metadata: `protected=false`
 - The `disposable-unlock-integration-20260805` child contains integration/A/B
   data and is explicitly excluded from Production.
 
@@ -216,3 +220,17 @@ Identification is not protection. The v2 gate remains `NOT_READY` until the
 Neon branch observation returns `protected=true`, the isolated restore drill
 passes, the exact-SHA Production preflight passes, and all evidence references
 are populated.
+
+Protected branches are a Neon paid-plan feature. On the observed Free plan,
+the exact `main` row exposes `Set as protected` as disabled. Do not weaken the
+gate or record a compensating `true` value. The release sequence stops before
+Production migration, merge, and deployment until a human upgrades the plan
+and the same project/branch is re-observed as protected.
+
+After the plan upgrade:
+
+1. Open project `raspy-fog-00907976` → Branches.
+2. Select only `main` / `br-bitter-wave-ajs8dy0u`.
+3. Choose `Set as protected` and confirm the branch action.
+4. Re-read branch metadata and require `protected=true` before applying any
+   Production migration.

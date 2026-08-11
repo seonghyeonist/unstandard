@@ -1,175 +1,179 @@
-# Closed-alpha operations and security handoff — 2026-08-11
+# Closed-alpha operations closure handoff — 2026-08-11
 
 ## Executive verdict
 
 | Decision surface | Verdict | Evidence |
 |---|---|---|
-| Previously merged P0 code | `PASS` | Production remains on merge SHA `2cc3e88a12db316e4a0a5c94981de297e0420328`; this work does not reopen or redefine that decision. |
-| Dependency security cleanup | `PASS` | Local full-tree and Production-only npm audit gates report 0 vulnerabilities; the Vercel Preview `npm ci` log also reports 0. |
-| New readiness/gate implementation | `PASS` | 230/230 tests, 17/17 static pages, both GitHub Actions workflows, boundary guards, and exact remote-tree comparison passed. |
-| Vercel Production readiness | `NOT_VERIFIED` | The new read-only operations endpoint is not deployed to Production and the Production Neon branch identity has not been proven. |
-| Overall closed-alpha launch | `CLOSED_ALPHA_NOT_READY` | Production evidence and the independent operator attestation are both mandatory; neither may be inferred from a code/CI PASS. |
+| Previously merged P0 code | `PASS` | `main` and Production remain on merge SHA `2cc3e88a12db316e4a0a5c94981de297e0420328`; this work does not reopen that decision. |
+| Dependency security cleanup | `PASS` | Production-only and full-tree npm audit gates report 0 vulnerabilities; the exact implementation Preview reproduced `found 0 vulnerabilities`. |
+| Closed-alpha blocker implementation | `PASS` | DB-backed rate limits, authenticated self-deletion, support queue, privacy notice, v2 operational attestation, and Production readiness evidence are implemented and tested. |
+| Isolated Neon drills | `PASS` | Account-deletion cascade, parent reset recovery, fresh 0000→0004 migration application, and both limiter update shapes passed on disposable child branches that were then deleted. |
+| GitHub/Preview validation | `PASS` | PR head `6ff374049582f075ff810d8de3f09a5639bf6c34`, tree `d59a0e315d081c8d1365226bfd7a607d910038b8`, CI #124, Rebuild CI #70, and Vercel Preview build all passed. |
+| Production Neon protection | `BLOCKED_EXTERNAL` | Project `raspy-fog-00907976`, branch `br-bitter-wave-ajs8dy0u` is confirmed `protected=false`. The organization is on Neon Free, where the Console disables `Set as protected`; Neon documents protection as paid-plan only. |
+| Overall closed-alpha launch | `CLOSED_ALPHA_NOT_READY` | Protection is a mandatory predecessor of Production migration, merge, deployment, and attestation. None of those downstream actions was performed after the blocker was observed. |
 
-No Production deployment, Production database write, migration, seed, alias change,
-or branch-protection mutation was performed in this work.
+Final stop reason:
+
+```text
+BLOCKED_EXTERNAL_NEON_PAID_PLAN_REQUIRED
+```
+
+No Production database write, migration, seed, PR merge, Production deployment,
+alias change, or completed attestation was performed in this closure pass.
 
 ## Published review surface
 
 - Draft PR: <https://github.com/seonghyeonist/unstandard/pull/67>
 - Branch: `agent/closed-alpha-operational-readiness-20260811`
-- Validated implementation commit: `b56bb5318b4faced9173533c29c24c4815a7d476`
-- Validated Git tree: `c9fc3651e7fabd912c95291e6bd7cf0ed84ab39d`
-- Preview deployment: `dpl_FQgb4fFAjpcgTyxvSyn2HQGpM2qF`
-- Preview URL: <https://unstandard-m9qj-fjuxbwnp9-unstandard.vercel.app>
+- Exact implementation PR head: `6ff374049582f075ff810d8de3f09a5639bf6c34`
+- Exact implementation Git tree: `d59a0e315d081c8d1365226bfd7a607d910038b8`
+- GitHub CI: run #124 — success
+- GitHub Rebuild CI: run #70 — success
+- Preview deployment: `dpl_Crr3NiAagLCYy933rSc4Qg6A9WQQ`
+- Preview URL: <https://unstandard-m9qj-2y1ir29ns-unstandard.vercel.app>
 
-The Preview was created through the Vercel deployment API from the validated
-runtime source set because this project did not automatically create a Git-linked
-Preview for the API-updated branch. Vercel therefore does not expose a Git SHA in
-that deployment's metadata. Source provenance is the local/remote tree equality
-check recorded above; the deployment is suitable for build/UI verification, but
-it is not a substitute for the exact-SHA Production evidence gate.
+The Preview was created from 197 tracked runtime/build files belonging to the
+validated implementation tree. Vercel does not expose Git metadata for this
+files-API deployment, so it is build/UI evidence only and is not accepted as an
+exact-SHA Production release artifact.
 
-## Problems defined and resolved
+## What was implemented
 
-### 1. P0 and launch authorization were conflated
+### Database-backed abuse controls
 
-Resolution:
+- Better Auth uses the database limiter adapter with an `id` primary key and a
+  unique `key`, matching Better Auth 1.6.23's update contract.
+- Invite claims, onboarding answers, unlock attempts, reports, support requests,
+  sign-in/sign-up, and account deletion have closed-alpha-v1 limits.
+- Subjects are HMAC-pseudonymized; storage failure is fail-closed `503` and
+  over-limit responses are `429` with `Retry-After`.
 
-- Added a read-only, authenticated Production readiness endpoint.
-- Added a verifier that accepts only fresh, exact-SHA, exact-host Production
-  evidence and writes a non-overwriting `0600` artifact.
-- Added a second, independent closed-alpha gate for human operational checks.
-- Corrected the readiness and security checklists so a repository PASS cannot
-  authorize a launch.
+### Self-service account deletion
 
-### 2. Technical evidence was not bound to the deployed database
+- Settings requires the current password and exact confirmation text before
+  Better Auth deletes the user.
+- Cascades and the deletion trigger remove sessions, accounts, profiles,
+  private profile data, answers/evaluations, unlock data, blocks, submitted and
+  targeted reports, support requests, invite links, and verification values in
+  the same transaction.
+- No real user was used for the drill.
 
-Resolution:
+### Support, moderation, and privacy
 
-- The Production endpoint checks the Vercel/Node target, runtime/database modes,
-  canonical origins, required server secrets, exact 40-hex release SHA, Neon
-  connectivity, redacted DB host fingerprint, exact migration ledger, all 15
-  application tables, `alpha.closed`, and the active unlock question.
-- Responses and logs exclude connection strings, secrets, emails, user/profile
-  identifiers, URLs, and application-row counts.
-- The endpoint never migrates, seeds, or writes.
+- Authenticated in-app support requests are stored in `support_requests`.
+- Founder · seonghyeonist is the documented initial incident, support,
+  moderation, and privacy owner with a 240-minute response target.
+- `/privacy` discloses the actually implemented collection, storage, retention,
+  deletion, Vercel/Neon processing, and in-app rights-request channel.
 
-### 3. The observed npm audit debt had no independent gate
+### Fail-closed release evidence
 
-Resolution:
-
-- Added narrow dependency overrides for affected transitive packages.
-- Added separate Production and full tooling audit scripts.
-- Added both audit gates to CI and rebuild CI.
-- Added weekly npm and GitHub Actions Dependabot checks.
-
-### 4. Closed-alpha operator obligations were implicit
-
-Resolution:
-
-- Added a fail-closed attestation schema for incident owner, support, rollback,
-  restore, privacy, account deletion, moderation, rate-limit policy, cohort cap,
-  and response time.
-- Added evidence expiry, SHA matching, digest binding, and non-overwriting output.
-- Checked-in example values are deliberately false; they are not an approval.
+- The operator-only Production endpoint checks runtime mode, exact release SHA,
+  required secrets, canonical origins, redacted Neon host fingerprint, exact
+  five-entry migration ledger, 17 required tables, `alpha.closed`, and the
+  active unlock question without writing data.
+- The v2 attestation requires real project/branch IDs, `protected=true`, restore
+  drill evidence, deletion and support references, privacy URL, rollback
+  deployment ID, assigned owners, policy version, SHA match, freshness, and a
+  digest-bound output.
+- Placeholders and incomplete evidence fail closed.
 
 ## Strict verification record
 
 | Check | Result |
 |---|---|
-| `npm run check` | `PASS` — 230/230 tests, 52 suites, Next build 17/17 pages |
-| `npm run audit:security` | `PASS` — 0 Production and 0 full-tree vulnerabilities |
-| Vercel Preview `npm ci` audit | `PASS` — 425 packages installed, 426 audited, 0 vulnerabilities |
-| Vercel Preview build | `PASS` — compile, TypeScript, 17/17 pages, readiness route present |
-| GitHub `CI` run 122 | `PASS` on implementation commit |
-| GitHub `Rebuild CI` run 68 | `PASS` on implementation commit |
-| `npm run guard:no-legacy-backend` | `PASS` |
-| `npm run guard:boundaries` | `PASS` |
-| `npm run db:generate` | `PASS` — no schema delta |
-| `git diff --check` | `PASS` |
-| Local vs GitHub remote tree | `PASS` — both `c9fc3651e7fabd912c95291e6bd7cf0ed84ab39d` |
-| Missing Production evidence/attestation | `PASS` — CLIs fail closed with exit 2 and create no artifact |
-| Preview home page | `PASS` — browser rendered the closed-alpha landing page and login link |
-| Preview unauthenticated readiness HTTP | `NOT_OBSERVED` — Preview Protection intercepted the request; fail-closed behavior is covered by unit tests, not claimed as deployed HTTP proof |
+| Local full gate before publish | `PASS` — lint, TypeScript, 232 tests, Production build, audit 0 |
+| GitHub CI #124 | `PASS` on `6ff3740…` |
+| GitHub Rebuild CI #70 | `PASS` on `6ff3740…` |
+| Local vs GitHub implementation tree | `PASS` — both `d59a0e315d081c8d1365226bfd7a607d910038b8` |
+| Vercel Preview install | `PASS` — 425 packages installed, 426 audited, 0 vulnerabilities |
+| Vercel Preview build | `PASS` — compile, TypeScript, 19/19 page generation, new routes present |
+| Preview landing page | `PASS` — authenticated Preview browser session rendered landing/login |
+| Preview `/privacy` | `PASS` — HTTP 200 and rendered current notice |
+| Preview unauthenticated readiness | `PASS` — Vercel runtime log recorded `GET /api/operations/readiness 404` |
+| Preview runtime error scan | `PASS` — no runtime error clusters in the observed 30-minute window |
+| Disposable deletion drill | `PASS` — seven dependent fixtures created; user deletion left zero dependent rows |
+| Disposable restore drill | `PASS` — mutated `alpha.closed` returned to parent state; test schema/user residue zero |
+| Fresh migration drill | `PASS` — migrations 0000 through 0004 applied in order on a fresh child branch |
+| Limiter database contract | `PASS` — Better Auth-style and application-style atomic 1→2 updates |
+| Production branch identity | `PASS` — exact project/branch identified |
+| Production branch protection | `FAIL/BLOCKED` — confirmed `protected=false`; paid plan required |
 
-## Neon read-only observation
+## Neon evidence and boundaries
 
-The non-default Preview branch `br-holy-sunset-ajo5h07n` in project
-`raspy-fog-00907976` was queried read-only. No database mutation was performed.
+Production candidate:
 
-- exact 2-entry Drizzle migration ledger present;
-- 15 required public application tables present;
-- `alpha.closed.enabled=true` present;
-- expected unlock question active.
+- project: `raspy-fog-00907976` (`unstandard-alpha-preview-app-db`)
+- branch: `br-bitter-wave-ajs8dy0u` (`main`)
+- root/default: `true`
+- region: AWS `us-east-2`
+- history retention: 6 hours
+- protected: `false`
 
-Observed migration content hashes:
+The child `br-holy-sunset-ajo5h07n`
+(`disposable-unlock-integration-20260805`) contains integration/A/B test data
+and is explicitly excluded from Production.
 
-- `0000_initial`: `6bd0717436006604b97990051420698cc9ccb43f222d695b5c1bfab750b3e39a`
-- `0001_unlock_attempts`: `477391851311ec2dab554f806c953be5ec2e5d13859782fed2327f2ae01dc1d`
+Disposable drills already cleaned up:
 
-This Preview observation proves the query/check implementation against Neon; it
-does not prove which branch Production uses. The observed Neon default branches
-were also unprotected, which remains a launch blocker until the actual Production
-root branch is explicitly identified and protected.
+- `br-silent-grass-ajbykag9` — deletion + parent-reset recovery drill; deleted
+- `br-fragrant-sunset-ajf5nddl` — fresh migration + limiter contract drill; deleted
 
-## Remaining launch blockers and owners
+The Free-plan Console exposes `Set as protected` as a disabled action. Neon's
+current `Manage branches` documentation states that protected branches are
+available on paid plans. This is a platform capability/cost boundary, not an
+application bug.
 
-| Blocker | Required completion evidence | Suggested owner |
+## Operational gate status
+
+| Attestation item | Current evidence | Status before Production |
 |---|---|---|
-| PR not merged/deployed to Production | Approved merge and a Vercel Production deployment ID bound to the merged SHA | Engineering release owner |
-| Production Neon identity unknown | Approved DB host fingerprint and explicit protected Production root branch | Database owner |
-| Production preflight missing | Fresh `operations:production:verify` artifact for exact SHA/host/DB fingerprint | Release operator |
-| Restore drill missing | Non-Production Neon point-in-time/history-branch recovery drill record | Database owner |
-| Account deletion unproven | End-to-end verified user flow or documented operator procedure | Product/privacy owner |
-| Rate-limit/abuse policy open | Implemented limits or explicitly reviewed cohort-bound alternative | Security/engineering owner |
-| Support and moderation unassigned | Reachable channel, test message, named responder, response rule/SLA | Operations owner |
-| Privacy notice not attested | Published current collection/retention/deletion notice | Product/privacy owner |
-| Low real-traffic evidence | Post-first-user and per-batch Vercel error/5xx review | Release operator |
+| Incident owner | Founder · seonghyeonist; 240-minute target documented | implemented; operator attestation still required |
+| Support channel | in-app queue and endpoint implemented | Production migration + test ticket required |
+| Rollback | previous READY Production deployment exists | exact rollback candidate/review must be recorded after final release SHA is known |
+| Restore | isolated Neon parent-reset drill passed | evidence available; must be copied into operator-local attestation |
+| Privacy notice | Preview `/privacy` returns 200 | Production publication required |
+| Account deletion | isolated transactional deletion drill passed | evidence available; Production UI/API smoke still required |
+| Moderation owner | Founder · seonghyeonist and response rules documented | operator attestation still required |
+| Rate-limit policy | closed-alpha-v1 implemented and DB-tested | operator approval still required |
+| Production database | exact branch identified | blocked on `protected=true` |
 
-## Exact continuation procedure
+No checked-in example was flipped to `true`, and no final launch artifact was
+created.
 
-1. Review Draft PR #67, including dependency overrides, endpoint redaction,
-   evidence expiry, and the operator attestation contract.
-2. Merge only after required review; record the resulting merge SHA.
-3. Confirm the Vercel Production deployment ID and canonical hostname for that
-   exact SHA. Do not run migration/seed from the build.
-4. Identify and protect the actual Production Neon root branch. Record only its
-   redacted host SHA-12 fingerprint in the readiness evidence.
-5. Supply the operator token through the secret manager, then run:
+## Exact continuation procedure after plan upgrade
 
-   ```bash
-   export UNSTANDARD_PRODUCTION_BASE_URL=https://unstandard-m9qj.vercel.app
-   export UNSTANDARD_EXPECTED_PRODUCTION_GIT_SHA=<40-hex-production-sha>
-   export UNSTANDARD_EXPECTED_PRODUCTION_DB_HOST_SHA12=<approved-sha12>
-   export UNSTANDARD_PRODUCTION_READINESS_EVIDENCE_OUT=/tmp/unstandard-production-readiness.json
-   npm run operations:production:verify
-   ```
+1. Upgrade the Neon organization from Free to a paid plan. This is a human
+   billing decision; do not place payment data or credentials in chat.
+2. In the exact project/branch above, select `Set as protected`, then verify via
+   the Neon API/MCP that `protected=true`. Stop if the IDs differ.
+3. Re-run the pre-migration read-only ledger/table/count baseline on
+   `br-bitter-wave-ajs8dy0u`.
+4. Apply only migrations 0002, 0003, and 0004 to that branch using the explicit
+   migration guard. Do not seed. Verify the five exact migration hashes, 17
+   tables, limiter keys, deletion trigger, and unchanged user/profile counts.
+5. Create and receive one opaque support test ticket and run one disposable
+   account-deletion test. Do not use a real user.
+6. Re-run final PR checks. Merge PR #67 only with its exact expected head SHA.
+7. Confirm the Vercel Git-linked Production deployment maps to the resulting
+   merge SHA and is READY. Verify required Production env names without printing
+   secret values.
+8. Run `operations:production:verify` against the canonical Production host and
+   exact redacted DB fingerprint.
+9. Complete an operator-local v2 attestation with the real evidence above and
+   run `operations:closed-alpha:gate`.
+10. Launch only if both fresh artifacts PASS. Start below the attested cohort
+    cap and inspect Vercel errors/5xx after the first user and every invite batch.
 
-6. Complete an operator-local copy of
-   `config/closed-alpha-attestation.example.json` using real evidence. Keep it
-   false until each item is proven.
-7. Run the independent launch gate:
+## Do not infer
 
-   ```bash
-   export UNSTANDARD_PRODUCTION_READINESS_EVIDENCE_PATH=/tmp/unstandard-production-readiness.json
-   export UNSTANDARD_CLOSED_ALPHA_ATTESTATION_PATH=/secure/operator/closed-alpha-attestation.json
-   export UNSTANDARD_CLOSED_ALPHA_GATE_OUT=/tmp/unstandard-closed-alpha-gate.json
-   npm run operations:closed-alpha:gate
-   ```
+- CI PASS is not Production readiness.
+- The files-API Preview is not exact-SHA Production proof.
+- A default/root Neon branch is not protected merely because it cannot be
+  deleted like a normal child branch.
+- The isolated drills do not apply migrations to Production.
+- A Preview privacy page is not a published Production notice.
+- Documented owners and policies are not a completed operator attestation.
 
-8. Launch only if both artifacts PASS and remain within their expiry windows.
-   Start below the attested cohort cap, stop invitations first on degradation,
-   and inspect Vercel runtime errors/5xx after the first real user and every batch.
-
-## Rollback and recovery boundary
-
-- Roll back only to a previously verified READY Vercel deployment, then rerun
-  the Production preflight for the rolled-back SHA.
-- For Neon recovery, create/query an isolated history branch first and prefer
-  row-level recovery. Full restore overwrites schema/data and interrupts
-  connections; it requires separate human approval and an incident record.
-- Use pooled Neon connections for Vercel request workloads and direct
-  connections only for migration/admin workflows that require session state.
-
-The complete operator procedure is maintained in
+The detailed procedure remains in
 `docs/CLOSED_ALPHA_OPERATIONS_RUNBOOK.md`.
