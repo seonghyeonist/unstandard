@@ -1,0 +1,21 @@
+{
+  "artifactVersion": 1,
+  "kind": "closed_alpha_operational_attestation",
+  "subjectGitSha": "REPLACE_WITH_40_HEX_PRODUCTION_SHA",
+  "reviewedAt": "REPLACE_WITH_ISO_8601_TIMESTAMP",
+  "initialCohortCap": 20,
+  "incidentResponseMinutes": 240,
+  "attestations": {
+    "incidentOwnerAssigned": false,
+    "supportChannelReady": false,
+    "rollbackProcedureReviewed": false,
+    "restoreDrillCompleted": false,
+    "privacyNoticePublished": false,
+    "accountDeletionProcedureVerified": false,
+    "moderationOwnerAssigned": false,
+    "rateLimitPolicyApproved": false
+  },
+  "notes": [
+    "Example only. Keep the completed attestation operator-local unless an explicit review approves publication."
+  ]
+}

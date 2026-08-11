@@ -1,18 +1,21 @@
 # Alpha Readiness Checklist
 
-## Verdict: NOT_READY (proof harness previously PASS)
+## Verdict: CLOSED_ALPHA_NOT_READY (P0 proof PASS / merged)
 
 Alpha is **not** ready. Static quality gates alone never equal Alpha readiness.
 A proof-harness combined readiness PASS is **not** the same as
 overall closed-alpha launch readiness while other checklist gates remain open.
 
-The runtime-tested parent `2d8203e5d81275030955c81d477b39d59e6d29b7`
-has exact-SHA PASS evidence for real PostgreSQL integration (`21/21`), deployed
-Preview authorization smoke (`32/32` required), and combined readiness. The
-later snapshot-only head `a46bca48de20c8f28e852d32cac7b64660685b12` is
-CI-green, but those parent artifacts are not relabeled as current-head proof.
-After this documentation reconciliation, the final PR head must be deployed and
-all three machine artifacts regenerated before the P0 merge decision.
+P0 was proven at exact PR head
+`8223aca251d981965fea6fd1ef7de251bb5bbc5b` and merged by commit
+`2cc3e88a12db316e4a0a5c94981de297e0420328`. The evidence recorded integration
+`21/21`, deployed Preview authorization smoke `32/32`, combined readiness, and
+`readiness:alpha` PASS. That closes the P0 proof harness; it does not prove the
+merge commit's Production runtime or authorize a closed-alpha launch.
+
+Separate launch controls are implemented in
+`docs/CLOSED_ALPHA_OPERATIONS_RUNBOOK.md`. Until fresh Production evidence and
+every operational attestation pass, the product remains `CLOSED_ALPHA_NOT_READY`.
 
 ## Founder data/identity decision
 
@@ -21,7 +24,8 @@ all three machine artifacts regenerated before the P0 merge decision.
 - Do not migrate legacy hosted-BaaS application rows into the closed-alpha runtime.
 - Do not delete legacy data in this workstream; archive separately if retention is required.
 - Do not migrate legacy identities into Better Auth; new accounts + new invites only.
-- Production cutover remains `NOT_STARTED`.
+- Vercel automatically deployed the merge commit to Production; Production DB
+  identity/readiness and operational cutover approval remain unproven.
 - See `docs/LEGACY_BACKEND_RETIREMENT.md` (points to the allowlisted P0.3A cutover audit).
 
 This decision does **not** mark export, Preview bootstrap, smoke, or Production complete.
@@ -39,17 +43,19 @@ This decision does **not** mark export, Preview bootstrap, smoke, or Production 
 - [x] Founder Option B+ data/identity decision recorded (docs only; does not unblock external proofs)
 - [x] Separate non-production Preview application DB and disposable integration DB observed
 - [x] `npm run db:migrate` + `npm run db:seed` exercised on non-production targets
-- [x] Runtime-tested parent: `npm run test:integration` PASS artifact (`21/21`)
-- [x] Runtime-tested parent: `npm run smoke:authorization` PASS artifact (`32/32` required)
-- [x] Runtime-tested parent: combined evidence build + `readiness:alpha` PASS
-- [x] Runtime-tested parent: Vercel Preview deployment metadata maps to the subject SHA (`unstandard-m9qj`)
-- [ ] Final PR head after documentation reconciliation repeats every exact-SHA proof above
+- [x] Exact P0 head: `npm run test:integration` PASS artifact (`21/21`)
+- [x] Exact P0 head: `npm run smoke:authorization` PASS artifact (`32/32` required)
+- [x] Exact P0 head: combined evidence build + `readiness:alpha` PASS
+- [x] Exact P0 head: Vercel Preview metadata maps to the subject SHA (`unstandard-m9qj`)
 - [x] Invite-only registration verified end-to-end with Preview A/B accounts
 - [x] DB-backed reports and unlock/private-profile authorization verified by integration + deployed HTTP smoke
 - [x] DB-backed block persistence/uniqueness verified by PostgreSQL integration (no deployed block HTTP route claim)
 - [ ] Legacy read-only archive created and verified **only if** retention is required (otherwise N/A; do not claim complete)
 - [x] `npm run guard:no-legacy-backend` PASS at the snapshot-only head
-- [ ] Production cutover — `NOT_STARTED` (must remain so until explicitly authorized)
+- [ ] Fresh exact-SHA Production readiness artifact (`operations:production:verify`)
+- [ ] Production Neon branch identity confirmed and branch protected
+- [ ] Restore drill, incident/rollback/support/moderation/privacy/deletion/abuse attestations complete
+- [ ] Closed-alpha operational gate PASS (`operations:closed-alpha:gate`)
 
 ## Honest limitations (P0.2 / P0.2.1 / P0.2.2 / P0.2.3 / P0.3A)
 
