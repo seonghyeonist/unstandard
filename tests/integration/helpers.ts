@@ -1,13 +1,13 @@
-import { Pool, neonConfig } from "@neondatabase/serverless";
+import { Pool } from "@neondatabase/serverless";
 import { drizzle } from "drizzle-orm/neon-serverless";
-import ws from "ws";
 import { assertTestDatabaseEnv } from "@/lib/config/database-env";
+import { configureNeonWebSocket } from "@/lib/db/neon-websocket";
 import { requireDestructiveTestConfirmation, requireTestDatabaseUrl } from "@/lib/db/migration-guards";
 import { schema } from "@/lib/db/schema";
 import { assertDatabaseReachable } from "@/lib/readiness/integration-database";
 import type { DbExecutor } from "@/lib/db/types";
 
-neonConfig.webSocketConstructor = ws;
+configureNeonWebSocket();
 
 export type IntegrationDb = DbExecutor;
 

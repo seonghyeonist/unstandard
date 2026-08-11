@@ -2,12 +2,12 @@ import "server-only";
 
 import { Pool, neonConfig } from "@neondatabase/serverless";
 import { drizzle } from "drizzle-orm/neon-serverless";
-import ws from "ws";
 import { requireDatabaseUrl } from "@/lib/db/config";
+import { configureNeonWebSocket } from "@/lib/db/neon-websocket";
 import { schema } from "@/lib/db/schema";
 import type { DbExecutor } from "@/lib/db/types";
 
-neonConfig.webSocketConstructor = ws;
+configureNeonWebSocket();
 neonConfig.poolQueryViaFetch = true;
 
 export type AppDatabase = DbExecutor;
