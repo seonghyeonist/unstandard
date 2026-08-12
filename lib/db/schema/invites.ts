@@ -1,10 +1,7 @@
 import { sql } from "drizzle-orm";
 import { check, index, pgTable, text, timestamp, uniqueIndex, uuid } from "drizzle-orm/pg-core";
 import { users } from "@/lib/db/schema/auth";
-import {
-  ALPHA_STAGE_1_PHASE,
-  LEGACY_PRE_STAGE_1_PHASE,
-} from "@/lib/alpha/stage1-policy";
+import { ALPHA_STAGE_1_PHASE } from "@/lib/alpha/stage1-policy";
 
 export const alphaInvites = pgTable(
   "alpha_invites",
@@ -33,9 +30,10 @@ export const alphaInvites = pgTable(
     index("alpha_invites_claim_idx").on(table.codeHash, table.emailNormalized, table.status),
     index("alpha_invites_phase_status_idx").on(table.targetPhase, table.status),
     index("alpha_invites_cohort_idx").on(table.recruitmentCohort),
+    // Keep these as SQL literals: drizzle-kit serializes interpolated strings as $1/$2 drift.
     check(
       "alpha_invites_target_phase_check",
-      sql`${table.targetPhase} IN (${ALPHA_STAGE_1_PHASE}, ${LEGACY_PRE_STAGE_1_PHASE})`,
+      sql`${table.targetPhase} IN ('alpha_stage_1', 'legacy_pre_stage1')`,
     ),
     check(
       "alpha_invites_recruitment_cohort_check",
