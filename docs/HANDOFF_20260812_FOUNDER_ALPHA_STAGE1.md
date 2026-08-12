@@ -7,8 +7,8 @@
 | Founder 제안의 실행 계약화 | `PASS` |
 | 로컬 정적·단위·빌드 | `PASS` |
 | 최신 소스의 격리 Neon 검증 | `PASS_DIAGNOSTIC` — 17/17 tests, 27/27 required cases |
-| GitHub exact-head CI | `PENDING_PUBLICATION` |
-| Vercel exact-head Preview full-flow | `PENDING_PUBLICATION` |
+| GitHub exact-head CI | `PUBLISHED / PENDING_CI` |
+| Vercel exact-head Preview full-flow | `PENDING_DEPLOYMENT` |
 | 실제 시장 가설 | `COLLECTING_NOT_STARTED` |
 | Closed Alpha Stage 1 출시 | `STAGE1_NOT_READY` |
 
@@ -223,8 +223,10 @@ Closed Alpha의 monetization mode는 `disabled`다. fake-door도 이번 변경�
 
 - Local branch: `agent/founder-resolution-alpha-stage1-20260812`
 - Baseline `main`: `da90853d28eaa77e71019f28f8f7e00cc3be7be4`
-- Draft PR: `PENDING_PUBLICATION`
-- Vercel Preview: `PENDING_PUBLICATION`
+- Draft PR: <https://github.com/seonghyeonist/unstandard/pull/75>
+- Published implementation commit: `399677d821157a13d596f7d15c5e6e8d9981320d`
+- Published implementation tree: `3ae1442d7be38a415e33157abd0ea7bb8ad1cae0`
+- Vercel Preview: `PENDING_DEPLOYMENT`
 - Vercel Production baseline: `dpl_HaswwnRTj85dUp4sRaLiZFrycJza` (historical
   baseline SHA; this Stage 1 implementation 아님)
 
