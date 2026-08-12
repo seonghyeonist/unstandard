@@ -26,6 +26,14 @@ export const EXPECTED_MIGRATION_LEDGER = [
     file: "0004_vengeful_marvex.sql",
     hash: "da78c7b40704470b9fe02078141ea5c8944d4bb277eae3042635f326b968978c",
   },
+  {
+    file: "0005_alpha_stage1_measurement.sql",
+    hash: "0f0575bae676144d2b70b27f74e3f04b8c8d0faa4a708dc93e6494670183f608",
+  },
+  {
+    file: "0006_alpha_funnel_waitlist.sql",
+    hash: "d2d1054723b2674651206d89939c952162c02ed2e00b636fddbed8a73320667a",
+  },
 ] as const;
 
 export const EXPECTED_MIGRATION_HASHES = EXPECTED_MIGRATION_LEDGER.map(

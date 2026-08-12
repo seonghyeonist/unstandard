@@ -1,6 +1,6 @@
 import "server-only";
 
-import { eq } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import { cookies } from "next/headers";
 import { getDb } from "@/lib/db/client";
 import type { DbExecutor } from "@/lib/db/types";
@@ -60,7 +60,14 @@ export async function markUserInviteFinalized(
 export async function compensateFailedRegistration(userId: string): Promise<void> {
   const db = getDb();
   try {
-    await db.delete(users).where(eq(users.id, userId));
+    await db.transaction(async (tx) => {
+      // Account-deletion cleanup normally removes the invite email link. A
+      // failed Better Auth finalization is different: the reservation must
+      // survive so the user can retry. The transaction-local flag is visible
+      // only to the deletion trigger on this connection.
+      await tx.execute(sql`SELECT set_config('unstandard.registration_compensation', 'on', true)`);
+      await tx.delete(users).where(eq(users.id, userId));
+    });
   } catch {
     logSanitizedFinalizationFailure("COMPENSATION_DELETE_FAILED");
   }

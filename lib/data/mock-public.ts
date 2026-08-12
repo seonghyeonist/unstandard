@@ -51,7 +51,7 @@ export const matches: Match[] = [
 export const messages: Message[] = [
   {
     id: "msg1",
-    matchId: "m1",
+    profileId: "c1",
     author: "them",
     body: "그 장면, 조금 더 듣고 싶어요.",
     createdAt: new Date().toISOString(),

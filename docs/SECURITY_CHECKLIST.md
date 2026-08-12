@@ -6,7 +6,8 @@
 - [x] Mock auth blocked in Preview/Production
 - [x] Invite-only registration gate
 - [x] Session API redacts email / full user id / tokens
-- [x] Deployed adversarial Preview smoke PASS (`32/32` at P0 exact head)
+- [x] Historical deployed adversarial Preview smoke PASS (`32/32` at P0 exact head)
+- [ ] Current Stage 1 deployed Preview smoke PASS (`37/37` at exact head)
 
 ## Data
 
@@ -17,7 +18,7 @@
 - [x] Weekly npm and GitHub Actions Dependabot policy
 - [ ] Production Neon branch identity + protection verified
 - [ ] Production restore drill recorded
-- [ ] Rate limiting / abuse guards (backlog)
+- [x] Database-backed sensitive-route rate limits, including message and waitlist limits
 
 ## Authorization
 
@@ -31,5 +32,6 @@
 - [x] Operator-only, read-only Production readiness endpoint (fail closed)
 - [x] Exact-SHA/hostname/DB-fingerprint Production evidence verifier
 - [x] Separate closed-alpha operational attestation gate
-- [ ] Account deletion procedure implemented and verified
+- [x] Account deletion procedure implemented and disposable-DB residual checks pass
+- [ ] Current exact-head deployed deletion/support/moderation drill recorded
 - [ ] Incident, rollback, support, moderation, privacy, restore, and abuse attestations complete

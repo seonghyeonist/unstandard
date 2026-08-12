@@ -23,7 +23,11 @@
 
 ## 알파 상태
 
-**BLOCKED** — Neon staging DB, migration apply, `test:integration`, `smoke:authorization` 증거 필요.
+**STAGE1_NOT_READY** — 과거 Production SHA `da90853d…`의 기술 readiness는
+PASS였지만, 50석 Stage 1 변경은 아직 미배포다. 새 migration의 disposable
+Neon 검증, exact-head Preview/Production 증거, domain 확보, v4 운영 attestation이
+모두 PASS하기 전 초대를 확대하지 않는다. 현재 절차는
+[`docs/CLOSED_ALPHA_STAGE1_RUNBOOK.md`](./docs/CLOSED_ALPHA_STAGE1_RUNBOOK.md)를 따른다.
 
 ## do-not-build-yet
 

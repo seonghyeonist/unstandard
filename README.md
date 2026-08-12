@@ -33,8 +33,17 @@ npm run dev
 Create an invite:
 
 ```bash
-npm run alpha:invite:create -- --email user@example.com
+npm run alpha:invite:create -- \
+  --email user@example.com \
+  --cohort founder_network \
+  --channel founder_direct \
+  --balance-bucket not_counted
 ```
+
+Invitation issuance is atomically capped at 50 active/consumed Stage 1 seats by
+PostgreSQL. Inspect the privacy-minimized experiment snapshot with
+`npm run alpha:metrics`; samples below the declared minimum stay
+`INSUFFICIENT_DATA` and cannot become `GO`.
 
 ## Quality gates
 
@@ -82,8 +91,9 @@ Integration proof suites run serially against one DB + one observation log; obse
 
 See `docs/NEON_BOOTSTRAP_RUNBOOK.md`, `docs/BETTER_AUTH_SECURITY_MODEL.md`, and `docs/AUTHORIZATION_ADVERSARIAL_SMOKE.md`.
 
-**Closed-alpha launch verdict: NOT_READY.** The proof harness has passed on an
-exact tested parent, but that is narrower than launch readiness. Production
-cutover, remaining operational checklist items, and a separate merge decision
-remain open. The authoritative exact-head evidence boundary is recorded in PR
-#65 and its machine artifacts for Vercel project `unstandard-m9qj`.
+**Closed-alpha Stage 1 launch verdict: NOT_READY.** Production was technically
+verified on historical SHA `da90853d28eaa77e71019f28f8f7e00cc3be7be4`, but
+the 50-seat experiment contract changes schema, runtime, privacy, and the
+operational attestation. It requires new exact-head Neon/Preview/Production
+evidence and founder domain/supply sign-off. The current runbook is
+[`docs/CLOSED_ALPHA_STAGE1_RUNBOOK.md`](./docs/CLOSED_ALPHA_STAGE1_RUNBOOK.md).

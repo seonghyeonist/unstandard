@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { eq } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import { createIntegrationDb, getIntegrationDatabaseUrl } from "../helpers";
 import { runDrizzleMigrations } from "../../../lib/db/run-migrations";
 import { alphaInvites } from "../../../lib/db/schema/invites";
@@ -23,6 +23,7 @@ import {
 } from "../../../lib/auth/invite-crypto";
 import { createRegistrationTicket, verifyRegistrationTicket } from "../../../lib/auth/invite-ticket";
 import { observeIntegrationCase } from "../../../lib/readiness/integration-case-log";
+import { extractPgErrorCode } from "../../../lib/db/errors";
 
 const PEPPER = "integration-test-pepper";
 const AUTH_SECRET = "integration-test-auth-secret-32chars";
@@ -39,6 +40,99 @@ async function insertAuthUser(db: ReturnType<typeof createIntegrationDb>, suffix
 }
 
 describe("integration: invite reservation lifecycle", () => {
+  it("legacy_invite_excluded_from_stage1", async () => {
+    process.env.ALPHA_INVITE_PEPPER = PEPPER;
+    const url = getIntegrationDatabaseUrl();
+    await runDrizzleMigrations(url);
+    const db = createIntegrationDb(url);
+    const rawCode = generateInviteCode();
+    const email = `legacy-invite-${Date.now()}@example.com`;
+
+    const [legacy] = await db
+      .insert(alphaInvites)
+      .values({
+        emailNormalized: normalizeEmail(email),
+        codeHash: hashInviteCode(rawCode, PEPPER),
+        status: "pending",
+        expiresAt: new Date(Date.now() + 60 * 60 * 1000),
+        targetPhase: "legacy_pre_stage1",
+      })
+      .returning({ id: alphaInvites.id });
+
+    await observeIntegrationCase("legacy_invite_excluded_from_stage1", async () => {
+      assert.deepEqual(await reserveInviteForEmail(rawCode, email), {
+        ok: false,
+        code: "INVALID",
+      });
+      const active = await db.execute<{ count: number }>(sql`
+        SELECT count(*)::int AS count
+        FROM alpha_invites
+        WHERE id = ${legacy.id} AND target_phase = 'alpha_stage_1'
+      `);
+      assert.equal(Number(active.rows[0]?.count), 0);
+    });
+
+    await db.delete(alphaInvites).where(eq(alphaInvites.id, legacy.id));
+  });
+
+  it("alpha_stage1_capacity_concurrency", async () => {
+    const url = getIntegrationDatabaseUrl();
+    await runDrizzleMigrations(url);
+    const db = createIntegrationDb(url);
+    const marker = `capacity-${Date.now()}`;
+
+    await observeIntegrationCase("alpha_stage1_capacity_concurrency", async () => {
+      const observed = await db.execute<{ count: number }>(sql`
+        SELECT count(*)::int AS count
+        FROM alpha_invites
+        WHERE target_phase = 'alpha_stage_1'
+          AND (status = 'consumed' OR (status IN ('pending', 'reserved') AND expires_at > now()))
+      `);
+      const active = Number(observed.rows[0]?.count ?? 0);
+      assert.ok(active < 50, "test branch must start below the Stage 1 cap");
+
+      for (let index = active; index < 49; index += 1) {
+        await db.insert(alphaInvites).values({
+          emailNormalized: `${marker}-${index}@example.com`,
+          codeHash: hashInviteCode(`${marker}-${index}`, PEPPER),
+          status: "pending",
+          expiresAt: new Date(Date.now() + 60 * 60 * 1000),
+        });
+      }
+
+      const attempts = await Promise.allSettled([
+        db.insert(alphaInvites).values({
+          emailNormalized: `${marker}-race-a@example.com`,
+          codeHash: hashInviteCode(`${marker}-race-a`, PEPPER),
+          status: "pending",
+          expiresAt: new Date(Date.now() + 60 * 60 * 1000),
+        }),
+        db.insert(alphaInvites).values({
+          emailNormalized: `${marker}-race-b@example.com`,
+          codeHash: hashInviteCode(`${marker}-race-b`, PEPPER),
+          status: "pending",
+          expiresAt: new Date(Date.now() + 60 * 60 * 1000),
+        }),
+      ]);
+      assert.equal(attempts.filter((attempt) => attempt.status === "fulfilled").length, 1);
+      const rejection = attempts.find((attempt) => attempt.status === "rejected");
+      assert.equal(rejection?.status, "rejected");
+      if (rejection?.status === "rejected") {
+        assert.equal(extractPgErrorCode(rejection.reason), "23514");
+      }
+
+      const final = await db.execute<{ count: number }>(sql`
+        SELECT count(*)::int AS count
+        FROM alpha_invites
+        WHERE target_phase = 'alpha_stage_1'
+          AND (status = 'consumed' OR (status IN ('pending', 'reserved') AND expires_at > now()))
+      `);
+      assert.equal(Number(final.rows[0]?.count), 50);
+    });
+
+    await db.execute(sql`DELETE FROM alpha_invites WHERE email_normalized LIKE ${`${marker}%`}`);
+  });
+
   it("invite_concurrency", async () => {
     process.env.ALPHA_INVITE_PEPPER = PEPPER;
     const url = getIntegrationDatabaseUrl();

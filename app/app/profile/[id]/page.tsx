@@ -36,7 +36,7 @@ export default function ProfilePage() {
               privateContent={privateContent.data}
             />
             {unlock.data?.unlocked ? (
-              <Link className="inline-flex min-h-11 w-full items-center justify-center rounded-full bg-accent px-5 py-3 text-sm font-semibold text-white" href="/app/chat/m1">첫 메시지 쓰기</Link>
+              <Link className="inline-flex min-h-11 w-full items-center justify-center rounded-full bg-accent px-5 py-3 text-sm font-semibold text-white" href={`/app/chat/${profile.data.id}`}>첫 메시지 쓰기</Link>
             ) : (
               <Link className="inline-flex min-h-11 w-full items-center justify-center rounded-full bg-accent px-5 py-3 text-sm font-semibold text-white" href={`/app/answer/${profile.data.id}`}>질문에 답하고 열기</Link>
             )}

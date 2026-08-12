@@ -2,6 +2,7 @@ import { getAuthenticatedUser, ServiceUnavailableError } from "@/lib/auth/server
 import { isDatabaseRuntime } from "@/lib/config/runtime-mode";
 import { publicProfiles } from "@/lib/data/mock-public";
 import { getPublicProfileById } from "@/lib/db/repositories/candidates.repository";
+import { recordProfileExposure } from "@/lib/db/repositories/alpha-exposures.repository";
 import { privateJson } from "@/lib/http/private-json";
 import {
   createCorrelationId,
@@ -66,6 +67,8 @@ export async function GET(_request: Request, context: { params: Promise<{ id: st
       viewerUserIdPrefix: idPrefix(user.id),
       targetProfileIdPrefix: idPrefix(result.id),
     });
+
+    await recordProfileExposure(user.id, result.id);
 
     return privateJson({
       id: result.id,

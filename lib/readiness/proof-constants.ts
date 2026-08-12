@@ -25,6 +25,8 @@ export const REQUIRED_INTEGRATION_CASES = [
   "block_uniqueness",
   "unlock_uniqueness",
   "invite_concurrency",
+  "alpha_stage1_capacity_concurrency",
+  "legacy_invite_excluded_from_stage1",
   "invite_finalization_success",
   "invite_finalization_rollback",
   "migration_second_run_noop",
@@ -38,12 +40,18 @@ export const REQUIRED_INTEGRATION_CASES = [
   "db_private_profile_gate",
   "db_unlock_self_denied",
   "db_unlock_invalid_uuid",
+  "message_unlock_block_authorization",
+  "message_deletion_residuals",
+  "waitlist_revisit_and_delete",
+  "alpha_metrics_fail_closed_maturity",
 ] as const;
 
 export type RequiredIntegrationCase = (typeof REQUIRED_INTEGRATION_CASES)[number];
 
 export const REQUIRED_HTTP_SMOKE_CASES = [
   "anonymous_denied",
+  "anonymous_message_denied",
+  "waitlist_join_state_delete",
   "user_a_login",
   "user_b_login",
   "user_a_session",
@@ -65,6 +73,9 @@ export const REQUIRED_HTTP_SMOKE_CASES = [
   "a_to_b_unlock_status_true",
   "a_to_b_unlock_row_exactly_one",
   "a_to_b_private_after_unlock_ok",
+  "a_to_b_message_persisted",
+  "b_reads_a_to_b_message",
+  "message_response_no_store",
   "duplicate_unlock_idempotent",
   "b_does_not_inherit_a_to_b_permission",
   "b_to_a_private_before_unlock_forbidden",

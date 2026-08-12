@@ -1,5 +1,9 @@
 # Closed-alpha operations closure handoff — 2026-08-11
 
+> **SUPERSEDED 2026-08-12:** preserved as dated evidence. The current handoff
+> is `HANDOFF_20260812_FOUNDER_ALPHA_STAGE1.md`; do not reuse this document's
+> 30-seat/v3 attestation as launch authority.
+
 ## Executive verdict
 
 | Decision surface | Verdict | Evidence |

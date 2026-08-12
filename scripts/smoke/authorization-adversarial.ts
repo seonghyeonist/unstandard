@@ -246,6 +246,43 @@ async function main(): Promise<void> {
     anonSession.status === 401 && isPrivateNoStore(anonSession.headers),
   );
 
+  const anonymousMessage = await fetchJson(`/api/messages/${profileBId}`);
+  pushCase(
+    cases,
+    "anonymous_message_denied",
+    anonymousMessage.status === 401 && isPrivateNoStore(anonymousMessage.headers),
+  );
+
+  const waitlistJar = new CookieJar();
+  const waitlistEmail = `smoke-${Date.now()}@example.com`;
+  const waitlistJoin = await fetchJson(
+    "/api/waitlist",
+    {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        email: waitlistEmail,
+        consent: true,
+        acquisitionChannel: "organic",
+      }),
+    },
+    waitlistJar,
+  );
+  const waitlistState = await fetchJson("/api/waitlist", {}, waitlistJar);
+  const waitlistDelete = await fetchJson("/api/waitlist", { method: "DELETE" }, waitlistJar);
+  const waitlistAfterDelete = await fetchJson("/api/waitlist", {}, waitlistJar);
+  pushCase(
+    cases,
+    "waitlist_join_state_delete",
+    waitlistJoin.status === 202 &&
+      (waitlistState.body as { joined?: boolean }).joined === true &&
+      (waitlistDelete.body as { deleted?: boolean }).deleted === true &&
+      (waitlistAfterDelete.body as { joined?: boolean }).joined === false &&
+      [waitlistJoin, waitlistState, waitlistDelete, waitlistAfterDelete].every((result) =>
+        isPrivateNoStore(result.headers),
+      ),
+  );
+
   const jarA = new CookieJar();
   const loginA = await signIn(userAEmail, userAPassword, jarA);
   pushCase(cases, "user_a_login", loginA.ok);
@@ -445,6 +482,42 @@ async function main(): Promise<void> {
     afterPrivate.status === 200 &&
       isPrivateNoStore(afterPrivate.headers) &&
       !privateProfileResponseHasSensitiveFields(afterPrivate.body),
+  );
+
+  const sentMessage = await fetchJson(
+    `/api/messages/${profileBId}`,
+    {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        body: "방금 열린 장면의 빗소리가 오래 기억에 남을 것 같아요.",
+      }),
+    },
+    jarA,
+  );
+  const sentMessageId = (sentMessage.body as { message?: { id?: string } })?.message?.id;
+  pushCase(
+    cases,
+    "a_to_b_message_persisted",
+    sentMessage.status === 201 && Boolean(sentMessageId),
+  );
+  const recipientConversation = await fetchJson(`/api/messages/${profileAId}`, {}, jarB);
+  const recipientMessages = (recipientConversation.body as {
+    messages?: Array<{ id?: string; author?: string }>;
+  })?.messages;
+  pushCase(
+    cases,
+    "b_reads_a_to_b_message",
+    recipientConversation.status === 200 &&
+      Array.isArray(recipientMessages) &&
+      recipientMessages.some(
+        (message) => message.id === sentMessageId && message.author === "them",
+      ),
+  );
+  pushCase(
+    cases,
+    "message_response_no_store",
+    isPrivateNoStore(sentMessage.headers) && isPrivateNoStore(recipientConversation.headers),
   );
 
   const unlockAgain = await fetchJson(

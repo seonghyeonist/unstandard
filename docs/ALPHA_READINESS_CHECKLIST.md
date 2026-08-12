@@ -1,8 +1,8 @@
 # Alpha Readiness Checklist
 
-## Verdict: CLOSED_ALPHA_NOT_READY (P0 proof PASS / merged)
+## Verdict: STAGE1_NOT_READY (historical Production technical PASS; new contract unproved)
 
-Alpha is **not** ready. Static quality gates alone never equal Alpha readiness.
+Alpha Stage 1 is **not** ready. Static quality gates alone never equal Alpha readiness.
 A proof-harness combined readiness PASS is **not** the same as
 overall closed-alpha launch readiness while other checklist gates remain open.
 
@@ -13,9 +13,29 @@ P0 was proven at exact PR head
 `readiness:alpha` PASS. That closes the P0 proof harness; it does not prove the
 merge commit's Production runtime or authorize a closed-alpha launch.
 
-Separate launch controls are implemented in
-`docs/CLOSED_ALPHA_OPERATIONS_RUNBOOK.md`. Until fresh Production evidence and
-every operational attestation pass, the product remains `CLOSED_ALPHA_NOT_READY`.
+The historical P0 and 30-seat controls below are retained as provenance. The
+authoritative current controls are in
+`docs/CLOSED_ALPHA_STAGE1_RUNBOOK.md`. Until fresh exact-head evidence and every
+v4 operational attestation pass, the product remains `STAGE1_NOT_READY`.
+
+## Current 50-seat Stage 1 gates (2026-08-12)
+
+- [x] Founder resolution translated into executable acceptance criteria
+- [x] PostgreSQL-enforced 50-seat cap and five-cohort/acquisition metadata implemented
+- [x] Persistent minimal messaging, question exposure, D7 activity, and waitlist revisit implemented
+- [x] Privacy notice and account-deletion residual scope updated in code
+- [x] KPI snapshot fails closed for immature samples and encodes Go / Conditional / No-Go reasons
+- [x] Neon Capacity / Reliability / Operations / Data Risk trigger contract implemented
+- [x] Alpha payment/subscription scope guard implemented
+- [x] Diagnostic disposable Neon child `br-winter-haze-aj639yoy`: current migrations `0005`/`0006`, legacy-population isolation, second-run no-op, 27/27 integration cases (pre-commit; not launch authority)
+- [ ] Exact-head GitHub CI and Vercel Preview full-flow verification
+- [ ] Canonical domain four-part audit, acquisition, and DNS decision
+- [ ] Founder-approved comparable A/B supply definition and consent procedure, or explicit `not_counted`/blocked decision
+- [ ] Explicit Production migration approval; no seed; before/after count and seven-hash ledger proof
+- [ ] Exact-head Vercel Production runtime/readiness evidence
+- [ ] Current support, message/deletion, privacy, restore, rollback, moderation, and trigger evidence
+- [ ] Operator-local attestation v4 and `operations:closed-alpha:gate` PASS
+- [ ] Small-batch founder launch decision; never bulk-fill the 50-seat ceiling
 
 ## Founder data/identity decision
 

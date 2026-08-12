@@ -1,9 +1,11 @@
 import { createHash } from "node:crypto";
+import { ALPHA_STAGE_1_CAP } from "@/lib/alpha/stage1-policy";
+import { ALPHA_METRICS_CONTRACT_VERSION } from "@/lib/alpha/metrics";
 import type { VerifiedProductionReadinessEvidence } from "@/lib/operations/production-evidence";
 
 export const CLOSED_ALPHA_TECHNICAL_MAX_AGE_MS = 6 * 60 * 60 * 1000;
 export const CLOSED_ALPHA_ATTESTATION_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000;
-export const FREE_PLAN_EXCEPTION_MAX_COHORT = 30;
+export const FREE_PLAN_EXCEPTION_MAX_COHORT = ALPHA_STAGE_1_CAP;
 export const FREE_PLAN_EXCEPTION_MAX_AGE_MS = 30 * 24 * 60 * 60 * 1000;
 
 export const REQUIRED_OPERATIONAL_ATTESTATIONS = [
@@ -16,12 +18,16 @@ export const REQUIRED_OPERATIONAL_ATTESTATIONS = [
   "moderationOwnerAssigned",
   "rateLimitPolicyApproved",
   "productionDatabaseSafetyControlsApproved",
+  "experimentMeasurementReady",
+  "supplyBalanceProcedureApproved",
+  "domainAcquired",
+  "monetizationDisabled",
 ] as const;
 
 export type OperationalAttestationKey = (typeof REQUIRED_OPERATIONAL_ATTESTATIONS)[number];
 
 export type ClosedAlphaOperationalAttestation = {
-  artifactVersion: 3;
+  artifactVersion: 4;
   kind: "closed_alpha_operational_attestation";
   subjectGitSha: string;
   reviewedAt: string;
@@ -42,9 +48,16 @@ export type ClosedAlphaOperationalAttestation = {
       branchName: string;
       plan: "Free" | "Launch" | "Scale";
       protected: boolean;
-      safetyMode: "protected_branch" | "free_plan_closed_alpha_exception_v1";
+      safetyMode: "protected_branch" | "free_plan_closed_alpha_exception_v2";
+      upgradeTriggers: {
+        observedAt: string;
+        capacity: boolean;
+        reliability: boolean;
+        operations: boolean;
+        dataRisk: boolean;
+      };
       freePlanException?: {
-        policyVersion: "neon-free-closed-alpha-v1";
+        policyVersion: "neon-free-closed-alpha-v2";
         acceptedBy: string;
         acceptedAt: string;
         expiresAt: string;
@@ -64,7 +77,20 @@ export type ClosedAlphaOperationalAttestation = {
     };
     privacyNoticeUrl: string;
     accountDeletionTestReference: string;
-    rateLimitPolicyVersion: "closed-alpha-v1";
+    rateLimitPolicyVersion: "closed-alpha-v2";
+    measurementContractVersion: typeof ALPHA_METRICS_CONTRACT_VERSION;
+    metricsCommand: "npm run alpha:metrics";
+    supplyBalanceProcedureReference: string;
+    monetizationMode: "disabled";
+    domain: {
+      canonicalDomain: string;
+      acquisitionStatus: "ACQUIRED";
+      trademarkReview: "NO_BLOCKING_CONFLICT_FOUND";
+      availabilityEvidenceReference: string;
+      socialHandleEvidenceReference: string;
+      pronunciationSpellingReview: "PASS";
+      reviewedAt: string;
+    };
   };
   notes?: string[];
 };
@@ -76,7 +102,7 @@ export type ClosedAlphaLaunchGate = {
 };
 
 export type ClosedAlphaLaunchArtifact = {
-  artifactVersion: 3;
+  artifactVersion: 4;
   kind: "closed_alpha_launch_gate";
   ok: true;
   generatedAt: string;
@@ -104,10 +130,18 @@ function isSubstantive(value: string): boolean {
   );
 }
 
-function isHttpsPrivacyUrl(value: string): boolean {
+function isHttpsPrivacyUrl(value: string, canonicalDomain: string): boolean {
   try {
     const url = new URL(value);
-    return url.protocol === "https:" && url.pathname === "/privacy";
+    return (
+      url.protocol === "https:" &&
+      url.hostname.toLowerCase() === canonicalDomain.trim().toLowerCase() &&
+      url.pathname === "/privacy" &&
+      !url.username &&
+      !url.password &&
+      !url.search &&
+      !url.hash
+    );
   } catch {
     return false;
   }
@@ -122,9 +156,9 @@ function freePlanExceptionIsValid(
   if (
     database.plan !== "Free" ||
     database.protected !== false ||
-    database.safetyMode !== "free_plan_closed_alpha_exception_v1" ||
+    database.safetyMode !== "free_plan_closed_alpha_exception_v2" ||
     !exception ||
-    exception.policyVersion !== "neon-free-closed-alpha-v1"
+    exception.policyVersion !== "neon-free-closed-alpha-v2"
   ) {
     return false;
   }
@@ -153,6 +187,21 @@ function freePlanExceptionIsValid(
   );
 }
 
+function upgradeTriggersAreClear(
+  attestation: ClosedAlphaOperationalAttestation,
+  nowMs: number,
+): boolean {
+  const triggers = attestation.evidence.productionDatabase.upgradeTriggers;
+  return Boolean(
+    triggers &&
+      timestampIsFresh(triggers.observedAt, CLOSED_ALPHA_ATTESTATION_MAX_AGE_MS, nowMs) &&
+      triggers.capacity === false &&
+      triggers.reliability === false &&
+      triggers.operations === false &&
+      triggers.dataRisk === false,
+  );
+}
+
 function productionDatabaseSafetyIsValid(
   attestation: ClosedAlphaOperationalAttestation,
   nowMs: number,
@@ -165,12 +214,32 @@ function productionDatabaseSafetyIsValid(
   ) {
     return true;
   }
-  return freePlanExceptionIsValid(attestation, nowMs);
+  return freePlanExceptionIsValid(attestation, nowMs) && upgradeTriggersAreClear(attestation, nowMs);
+}
+
+function domainEvidenceIsComplete(
+  attestation: ClosedAlphaOperationalAttestation,
+  nowMs: number,
+): boolean {
+  const domain = attestation.evidence.domain;
+  if (!domain) return false;
+  const hostname = domain.canonicalDomain.trim().toLowerCase();
+  return (
+    /^(?=.{4,253}$)(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}$/u.test(hostname) &&
+    !hostname.endsWith(".vercel.app") &&
+    domain.acquisitionStatus === "ACQUIRED" &&
+    domain.trademarkReview === "NO_BLOCKING_CONFLICT_FOUND" &&
+    domain.pronunciationSpellingReview === "PASS" &&
+    isSubstantive(domain.availabilityEvidenceReference) &&
+    isSubstantive(domain.socialHandleEvidenceReference) &&
+    timestampIsFresh(domain.reviewedAt, CLOSED_ALPHA_ATTESTATION_MAX_AGE_MS, nowMs)
+  );
 }
 
 function operationalEvidenceIsComplete(
   attestation: ClosedAlphaOperationalAttestation,
   nowMs: number,
+  productionHostname: string,
 ): boolean {
   const evidence = attestation.evidence;
   if (!evidence) return false;
@@ -182,6 +251,7 @@ function operationalEvidenceIsComplete(
       evidence.privacyOwner,
       evidence.supportTestReference,
       evidence.accountDeletionTestReference,
+      evidence.supplyBalanceProcedureReference,
     ].every(isSubstantive) &&
     evidence.supportChannel === "in_app_support_requests" &&
     /^dpl_[A-Za-z0-9]+$/u.test(evidence.rollbackDeploymentId) &&
@@ -191,8 +261,13 @@ function operationalEvidenceIsComplete(
     /^br-[a-z0-9-]+$/u.test(evidence.restoreDrill.branchId) &&
     evidence.restoreDrill.result === "PASS" &&
     timestampIsFresh(evidence.restoreDrill.completedAt, CLOSED_ALPHA_ATTESTATION_MAX_AGE_MS, nowMs) &&
-    isHttpsPrivacyUrl(evidence.privacyNoticeUrl) &&
-    evidence.rateLimitPolicyVersion === "closed-alpha-v1"
+    evidence.domain.canonicalDomain.trim().toLowerCase() === productionHostname.toLowerCase() &&
+    isHttpsPrivacyUrl(evidence.privacyNoticeUrl, evidence.domain.canonicalDomain) &&
+    evidence.rateLimitPolicyVersion === "closed-alpha-v2" &&
+    evidence.measurementContractVersion === ALPHA_METRICS_CONTRACT_VERSION &&
+    evidence.metricsCommand === "npm run alpha:metrics" &&
+    evidence.monetizationMode === "disabled" &&
+    domainEvidenceIsComplete(attestation, nowMs)
   );
 }
 
@@ -239,7 +314,7 @@ export function evaluateClosedAlphaLaunch(input: {
     ),
     gate(
       "attestation_identity",
-      input.attestation.artifactVersion === 3 &&
+      input.attestation.artifactVersion === 4 &&
         input.attestation.kind === "closed_alpha_operational_attestation",
       "ATTESTATION_IDENTITY_PASS",
       "ATTESTATION_IDENTITY_FAIL",
@@ -278,7 +353,7 @@ export function evaluateClosedAlphaLaunch(input: {
     ),
     gate(
       "operational_evidence",
-      operationalEvidenceIsComplete(input.attestation, nowMs),
+      operationalEvidenceIsComplete(input.attestation, nowMs, input.production.hostname),
       "OPERATIONAL_EVIDENCE_COMPLETE",
       "OPERATIONAL_EVIDENCE_MISSING_OR_PLACEHOLDER",
     ),
@@ -291,8 +366,7 @@ export function evaluateClosedAlphaLaunch(input: {
     gate(
       "cohort_cap",
       Number.isInteger(input.attestation.initialCohortCap) &&
-        input.attestation.initialCohortCap >= 1 &&
-        input.attestation.initialCohortCap <= 100,
+        input.attestation.initialCohortCap === ALPHA_STAGE_1_CAP,
       "COHORT_CAP_APPROVED",
       "COHORT_CAP_INVALID",
     ),
@@ -325,7 +399,7 @@ export function buildClosedAlphaLaunchArtifact(input: {
   }
 
   const base = {
-    artifactVersion: 3 as const,
+    artifactVersion: 4 as const,
     kind: "closed_alpha_launch_gate" as const,
     ok: true as const,
     generatedAt,

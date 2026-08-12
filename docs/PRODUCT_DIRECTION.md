@@ -1,6 +1,6 @@
 # Product Direction — Unstandard
 
-> 마지막 업데이트: 2026-06-24  
+> 마지막 업데이트: 2026-08-12
 > 목적: 제품 정체성·알파/베타 전략·비목표를 한 곳에 고정해, 코드·카피·에이전트 작업이 드리프트하지 않게 한다.
 
 ---
@@ -69,6 +69,8 @@ Unstandard는 **철학적으로 차별화된 관계/소개 웹앱**이다.
    → 상세 게이트: [`ALPHA_READINESS_CHECKLIST.md`](./ALPHA_READINESS_CHECKLIST.md)
 4. **`sessionStorage` / `localStorage`**는 알파-safe 인증·중재·신고의 source of truth가 될 수 없다. (온보딩 데모 영속은 임시)
 5. **P0 안전 게이트 통과 전** 고급 AI·매칭·사진 reveal·개인화를 구현하지 않는다.
+6. **Stage 1 실험 계약**은 50석/최대 6주이며, 작은 표본은 PASS로 승격하지 않는다. 상세 정의는 [`CLOSED_ALPHA_STAGE1_RUNBOOK.md`](./CLOSED_ALPHA_STAGE1_RUNBOOK.md)다.
+7. **수익화 순서**는 retention → willingness-to-pay → 제한 실험 → 실결제다. Closed Alpha에 결제를 넣지 않는다.
 
 ---
 

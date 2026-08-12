@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { Card } from "@/components/ui/card";
+import { WaitlistForm } from "@/components/waitlist/waitlist-form";
 
 export function LandingHero() {
   return (
@@ -15,6 +16,9 @@ export function LandingHero() {
         <Link href="/login" className="mt-8 inline-flex min-h-11 w-full items-center justify-center rounded-full bg-accent px-5 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-[#ad392c]">알파 들어가기</Link>
         <Card className="mt-8 bg-white/55">
           <p className="text-sm leading-6 text-foreground/70">외모 점수도, 긴 검사도 없어요. 오늘은 그저 “나답게 말할 수 있는 사람”을 찾아봅니다.</p>
+        </Card>
+        <Card className="mt-4 bg-white/55">
+          <WaitlistForm />
         </Card>
       </section>
       <footer className="pt-8 text-center text-sm text-foreground/60">
