@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
-import { describe, it } from "node:test";
-import { sql } from "drizzle-orm";
+import { after, describe, it } from "node:test";
+import { inArray, sql } from "drizzle-orm";
 import { createIntegrationDb, getIntegrationDatabaseUrl } from "../helpers";
 import { runDrizzleMigrations } from "../../../lib/db/run-migrations";
 import { extractPgErrorCode } from "../../../lib/db/errors";
@@ -23,8 +23,11 @@ import {
 } from "../../../lib/waitlist/waitlist.repository";
 import { buildAlphaMetricsSnapshot } from "../../../lib/alpha/metrics-snapshot";
 
+const fixtureUserIds = new Set<string>();
+
 async function insertUserWithProfile(db: ReturnType<typeof createIntegrationDb>, suffix: string) {
   const userId = `user-${suffix}`;
+  fixtureUserIds.add(userId);
   await db.insert(users).values({
     id: userId,
     name: `User ${suffix}`,
@@ -44,6 +47,19 @@ async function insertUserWithProfile(db: ReturnType<typeof createIntegrationDb>,
 
   return { userId, profileId: profile.id };
 }
+
+after(async () => {
+  const db = createIntegrationDb(getIntegrationDatabaseUrl());
+  const userIds = [...fixtureUserIds];
+  if (userIds.length === 0) return;
+
+  await db.delete(users).where(inArray(users.id, userIds));
+  const remaining = await db
+    .select({ id: users.id })
+    .from(users)
+    .where(inArray(users.id, userIds));
+  assert.equal(remaining.length, 0, "persistence integration users must be removed");
+});
 
 describe("integration: persistence invariants", () => {
   it("message_unlock_block_authorization + message_deletion_residuals", async () => {
