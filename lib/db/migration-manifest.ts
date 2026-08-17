@@ -34,6 +34,10 @@ export const EXPECTED_MIGRATION_LEDGER = [
     file: "0006_alpha_funnel_waitlist.sql",
     hash: "d2d1054723b2674651206d89939c952162c02ed2e00b636fddbed8a73320667a",
   },
+  {
+    file: "0007_alpha_balance_consent.sql",
+    hash: "9a636c8b474ce6aeb81b20bc53a529d9cccc46df3b0d02db4e095abbdad8380b",
+  },
 ] as const;
 
 export const EXPECTED_MIGRATION_HASHES = EXPECTED_MIGRATION_LEDGER.map(

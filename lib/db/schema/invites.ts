@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { check, index, pgTable, text, timestamp, uniqueIndex, uuid } from "drizzle-orm/pg-core";
+import { check, date, index, pgTable, text, timestamp, uniqueIndex, uuid } from "drizzle-orm/pg-core";
 import { users } from "@/lib/db/schema/auth";
 import { ALPHA_STAGE_1_PHASE } from "@/lib/alpha/stage1-policy";
 
@@ -21,6 +21,8 @@ export const alphaInvites = pgTable(
     recruitmentCohort: text("recruitment_cohort").notNull().default("legacy_unassigned"),
     acquisitionChannel: text("acquisition_channel").notNull().default("legacy_unknown"),
     balanceBucket: text("balance_bucket").notNull().default("not_counted"),
+    balanceConsentVersion: text("balance_consent_version"),
+    balanceConsentedOn: date("balance_consented_on"),
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   },
   (table) => [
@@ -46,6 +48,18 @@ export const alphaInvites = pgTable(
     check(
       "alpha_invites_balance_bucket_check",
       sql`${table.balanceBucket} IN ('bucket_a', 'bucket_b', 'not_counted')`,
+    ),
+    check(
+      "alpha_invites_balance_consent_check",
+      sql`(
+        (${table.balanceBucket} IN ('bucket_a', 'bucket_b')
+          AND ${table.balanceConsentVersion} = 'stage1-role-preference-v1'
+          AND ${table.balanceConsentedOn} IS NOT NULL)
+        OR
+        (${table.balanceBucket} = 'not_counted'
+          AND ${table.balanceConsentVersion} IS NULL
+          AND ${table.balanceConsentedOn} IS NULL)
+      )`,
     ),
   ],
 );

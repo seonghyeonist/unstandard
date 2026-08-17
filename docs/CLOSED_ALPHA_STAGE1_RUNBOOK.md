@@ -76,7 +76,9 @@ npm run alpha:invite:create -- \
   --email person@example.com \
   --cohort founder_network \
   --channel founder_direct \
-  --balance-bucket bucket_a
+  --balance-bucket bucket_a \
+  --balance-consent-version stage1-role-preference-v1 \
+  --balance-consented-on 2026-08-17
 ```
 
 Valid recruitment cohorts:
@@ -94,11 +96,23 @@ instead of fabricating its provenance.
 
 ### 4.2 Supply balance
 
-`balance_bucket` is deliberately opaque: `bucket_a`, `bucket_b`, or
-`not_counted`. It is not a claim about gender or sexuality. Before using A/B,
-the founder must define one comparable matching market, document lawful and
-consented collection, and avoid mixing markets. If that cannot be done, keep
-`not_counted` and treat supply balance as `INSUFFICIENT_DATA`.
+The founder-approved comparable market is consenting adults in the Seoul metro
+area seeking one-to-one romantic conversation. The role question is separate
+from signup and optional: A means “I prefer to initiate the first conversation”;
+B means “I prefer to receive a first conversation before responding.” Both,
+neither, skipped, withdrawn, inferred, or ambiguous answers are `not_counted`.
+Do not infer gender, sexuality, or identity and do not use these roles outside
+this one market.
+
+For `bucket_a` or `bucket_b`, the operator must first show the role question and
+record affirmative use of that answer for Stage-1 supply balancing. The CLI
+requires consent contract `stage1-role-preference-v1` and the UTC consent date;
+PostgreSQL rejects a counted bucket without both. `not_counted` rejects consent
+metadata so absence cannot masquerade as consent. Store no answer prose or
+precise consent time. A participant may withdraw by pausing/revoking an
+unconsumed invite and reissuing it as `not_counted`; after consumption, pause
+recruitment and handle correction through the privacy owner before using later
+metrics.
 
 For the declared A/B market, v4.2 thresholds are:
 
@@ -262,7 +276,7 @@ new implementation authorization.
    child by name without verifying its ownership and contents.
 3. Set `DATABASE_ENV=test`, explicit destructive-test confirmation, and both
    `TEST_DATABASE_URL` and repository `DATABASE_URL` to that disposable branch.
-4. Run migrations `0005` and `0006` through the canonical migrator; run the
+4. Run migrations `0005` through `0007` through the canonical migrator; run the
    real integration proof. Re-run migrations and prove ledger/schema no-op.
 5. Test legacy-invite exclusion, seat-51 concurrency, message
    authorization/blocking/deletion, waitlist revisit/deletion, KPI immaturity,
@@ -275,7 +289,7 @@ new implementation authorization.
    invite states, ledger, table count, trigger/function identity, and database
    fingerprint without selecting content.
 9. Apply only the reviewed migrations to `br-bitter-wave-ajs8dy0u`; do not seed.
-   Prove user/profile counts unchanged and ledger now has seven exact hashes.
+   Prove user/profile counts unchanged and ledger now has eight exact hashes.
 10. Merge/promote only the verified commit. Confirm Vercel Production READY and
     exact SHA; run `operations:production:verify`.
 11. Complete operator-local v4 attestation including acquired domain, current
@@ -307,7 +321,7 @@ Build and Vercel deploy must never run migrations automatically.
   but a fresh exact-SHA machine artifact is still required;
 - no exact-head Vercel Preview/Production evidence;
 - canonical domain not selected/acquired/audited;
-- A/B supply-market definition and consent procedure not founder-approved;
+- role-based A/B market and separate consent are founder-approved and enforced;
 - v4 Free exception/upgrade-trigger observation not signed;
 - Production migration not authorized or applied;
 - new support, deletion, restore, and runtime evidence not captured.

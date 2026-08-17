@@ -5,6 +5,7 @@ loadEnv();
 
 import { and, eq, inArray } from "drizzle-orm";
 import {
+  ALPHA_BALANCE_CONSENT_VERSION,
   isAlphaAcquisitionChannel,
   isAlphaBalanceBucket,
   isAlphaRecruitmentCohort,
@@ -21,7 +22,8 @@ function parseCommand(): Command {
   if (arg === "create" || arg === "revoke" || arg === "list") return arg;
   throw new Error(
     "Usage: npm run alpha:invite:<create|revoke|list> -- --email user@example.com " +
-      "--cohort <cohort> --channel <channel> --balance-bucket <bucket_a|bucket_b|not_counted>",
+      "--cohort <cohort> --channel <channel> --balance-bucket <bucket_a|bucket_b|not_counted> " +
+      "[--balance-consent-version stage1-role-preference-v1 --balance-consented-on YYYY-MM-DD]",
   );
 }
 
@@ -46,12 +48,29 @@ async function createInvite(email: string): Promise<void> {
   if (!isAlphaRecruitmentCohort(recruitmentCohort)) throw new Error("invalid --cohort");
   if (!isAlphaAcquisitionChannel(acquisitionChannel)) throw new Error("invalid --channel");
   if (!isAlphaBalanceBucket(balanceBucket)) throw new Error("invalid --balance-bucket");
+  const consentVersionIndex = process.argv.indexOf("--balance-consent-version");
+  const consentDateIndex = process.argv.indexOf("--balance-consented-on");
+  const suppliedConsentVersion =
+    consentVersionIndex === -1 ? undefined : process.argv[consentVersionIndex + 1];
+  const suppliedConsentDate =
+    consentDateIndex === -1 ? undefined : process.argv[consentDateIndex + 1];
+  const hasConsentFlag = consentVersionIndex !== -1 || consentDateIndex !== -1;
+  if (
+    hasConsentFlag &&
+    (suppliedConsentVersion !== ALPHA_BALANCE_CONSENT_VERSION || !suppliedConsentDate)
+  ) {
+    throw new Error("invalid balance consent flags");
+  }
+  const balanceConsent = hasConsentFlag
+    ? { version: ALPHA_BALANCE_CONSENT_VERSION, consentedOn: suppliedConsentDate! }
+    : null;
 
   const created = await createStage1Invite({
     email,
     recruitmentCohort,
     acquisitionChannel,
     balanceBucket,
+    balanceConsent,
   });
 
   console.log("INVITE_CREATED");
@@ -91,6 +110,8 @@ async function listInvites(): Promise<void> {
       recruitmentCohort: alphaInvites.recruitmentCohort,
       acquisitionChannel: alphaInvites.acquisitionChannel,
       balanceBucket: alphaInvites.balanceBucket,
+      balanceConsentVersion: alphaInvites.balanceConsentVersion,
+      balanceConsentedOn: alphaInvites.balanceConsentedOn,
     })
     .from(alphaInvites);
 
@@ -100,7 +121,8 @@ async function listInvites(): Promise<void> {
       `id=${row.id.slice(0, 8)} email=${email} status=${row.status} ` +
         `phase=${row.targetPhase} ` +
         `cohort=${row.recruitmentCohort} channel=${row.acquisitionChannel} ` +
-        `balance=${row.balanceBucket} expires=${row.expiresAt.toISOString()}`,
+        `balance=${row.balanceBucket} balance_consent=${row.balanceConsentVersion ?? "none"}` +
+        `/${row.balanceConsentedOn ?? "none"} expires=${row.expiresAt.toISOString()}`,
     );
   }
 }

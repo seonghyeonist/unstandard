@@ -27,12 +27,17 @@ v4 operational attestation pass, the product remains `STAGE1_NOT_READY`.
 - [x] KPI snapshot fails closed for immature samples and encodes Go / Conditional / No-Go reasons
 - [x] Neon Capacity / Reliability / Operations / Data Risk trigger contract implemented
 - [x] Alpha payment/subscription scope guard implemented
-- [x] Diagnostic disposable Neon child `br-winter-haze-aj639yoy`: current migrations `0005`/`0006`, legacy-population isolation, second-run no-op, 27/27 integration cases (pre-commit; not launch authority)
-- [ ] Exact-head GitHub CI and Vercel Preview full-flow verification
+- [x] Exact-head Neon child proof on `br-wild-smoke-ajcejshw`: 17/17 tests, 27/27 required integration cases, seven-hash ledger, second-run no-op, fixture restoration, and Production-parent counts unchanged
+- [x] Exact-head GitHub CI verified for `c85176dc580136e4677f90d5b91e75e118f7a009`: CI #140 and Rebuild CI #85 PASS
+- [x] Branch-scoped Preview DB binding and redacted DB fingerprint match (`hostSha12=4041a24c7b12`)
+- [x] Exact-head Vercel Preview `dpl_Fnv2B73EFR7XFuw5Vu6MWe3DmoE9` and 37/37 deployed HTTP smoke
+- [x] Combined exact-head readiness artifact PASS (`27/27 + 37/37`; content digest `97b458d4c40f58de`)
+- [x] Credentialed exact-Preview browser journey: A/B login, locked/unlocked profile rendering, one browser message, one new report, logout, and same-browser synthetic waitlist deletion; child reconciliation `messages 1→2`, `reports 1→2`, waitlist rows `0`
 - [ ] Canonical domain four-part audit, acquisition, and DNS decision
-- [ ] Founder-approved comparable A/B supply definition and consent procedure, or explicit `not_counted`/blocked decision
-- [ ] Explicit Production migration approval; no seed; before/after count and seven-hash ledger proof
-- [ ] Exact-head Vercel Production runtime/readiness evidence
+- [x] Founder-approved role-based A/B definition and separate consent procedure (`stage1-role-preference-v1`); CLI + DB constraint implemented in migration `0007`
+- [x] Migration `0007` diagnostic rehearsal on child `br-empty-rain-aj48sl58`; `5/5/12` preserved, ledger 8, constraint adversarial cases PASS (not exact-SHA launch authority)
+- [x] Explicit Production migration approval and application on `br-bitter-wave-ajs8dy0u`; no seed; users/profiles/invites unchanged at `5/5/12`; seven exact hashes and empty rehearsal-child schema diff
+- [ ] Git-linked Production deployment `dpl_6CADPoid6N3J6sHMMXUybejRMjYP` is READY at merge SHA `7198921788986aa954cecce6f0ac7aaeeeb35497`, browser/API/runtime observation passed, but operator-token-bound `operations:production:verify` artifact remains pending
 - [ ] Current support, message/deletion, privacy, restore, rollback, moderation, and trigger evidence
 - [ ] Operator-local attestation v4 and `operations:closed-alpha:gate` PASS
 - [ ] Small-batch founder launch decision; never bulk-fill the 50-seat ceiling
