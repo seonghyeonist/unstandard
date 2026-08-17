@@ -5,6 +5,8 @@
 ## 핵심 규칙
 
 - **한 기능 = 한 브랜치 = 한 에이전트.**
+- **자동 merge 금지.** PR merge, auto-merge, ready 상태 변경은 사람의 명시 지시 없이는 하지 않는다.
+- **파괴적 Git 금지.** `git reset --hard`, `git clean -fd`, force push, branch deletion, history rewrite는 사전 사람 승인 없이 실행하지 않는다.
 - **영속성은 repository interface 뒤에 둔다** — [`docs/PERSISTENCE_BOUNDARY.md`](./docs/PERSISTENCE_BOUNDARY.md).
 - **`sessionStorage` / `localStorage`를 알파-safe source of truth로 쓰지 말 것.**
 - **데이터베이스 접근은 server-only.** 클라이언트 번들에 Drizzle/Neon/비밀 env 금지.
