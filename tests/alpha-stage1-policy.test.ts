@@ -3,7 +3,9 @@ import { describe, it } from "node:test";
 import {
   ALPHA_STAGE_1_CAP,
   ALPHA_STAGE_1_MAX_DAYS,
+  ALPHA_BALANCE_CONSENT_VERSION,
   evaluateBalanceGate,
+  validateAlphaBalanceConsent,
 } from "../lib/alpha/stage1-policy";
 
 describe("alpha Stage 1 policy", () => {
@@ -23,5 +25,32 @@ describe("alpha Stage 1 policy", () => {
   it("rejects invalid counts instead of manufacturing a ratio", () => {
     assert.throws(() => evaluateBalanceGate(-1, 2));
     assert.throws(() => evaluateBalanceGate(1.5, 2));
+  });
+
+  it("counts A/B only with the exact consent contract and a valid UTC date", () => {
+    assert.doesNotThrow(() =>
+      validateAlphaBalanceConsent("bucket_a", {
+        version: ALPHA_BALANCE_CONSENT_VERSION,
+        consentedOn: "2026-08-17",
+      }),
+    );
+    assert.throws(() => validateAlphaBalanceConsent("bucket_b", null), /BALANCE_CONSENT_REQUIRED/u);
+    assert.throws(
+      () =>
+        validateAlphaBalanceConsent("bucket_a", {
+          version: ALPHA_BALANCE_CONSENT_VERSION,
+          consentedOn: "2026-02-30",
+        }),
+      /BALANCE_CONSENT_DATE_INVALID/u,
+    );
+    assert.throws(
+      () =>
+        validateAlphaBalanceConsent("not_counted", {
+          version: ALPHA_BALANCE_CONSENT_VERSION,
+          consentedOn: "2026-08-17",
+        }),
+      /NOT_COUNTED_MUST_NOT_HAVE_BALANCE_CONSENT/u,
+    );
+    assert.doesNotThrow(() => validateAlphaBalanceConsent("not_counted", null));
   });
 });

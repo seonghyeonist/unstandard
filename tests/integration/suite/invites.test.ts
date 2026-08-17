@@ -74,6 +74,46 @@ after(async () => {
 });
 
 describe("integration: invite reservation lifecycle", () => {
+  it("requires separate versioned consent before counting an A/B role", async () => {
+    const url = getIntegrationDatabaseUrl();
+    await runDrizzleMigrations(url);
+    const db = createIntegrationDb(url);
+    const marker = `balance-consent-${Date.now()}`;
+
+    const missingConsent = db.insert(alphaInvites).values({
+      emailNormalized: trackInviteEmail(`${marker}-missing@example.com`),
+      codeHash: hashInviteCode(`${marker}-missing`, PEPPER),
+      status: "pending",
+      expiresAt: new Date(Date.now() + 60 * 60 * 1000),
+      balanceBucket: "bucket_a",
+    });
+    await assert.rejects(missingConsent, (error) => extractPgErrorCode(error) === "23514");
+
+    await db.insert(alphaInvites).values({
+      emailNormalized: trackInviteEmail(`${marker}-valid@example.com`),
+      codeHash: hashInviteCode(`${marker}-valid`, PEPPER),
+      status: "pending",
+      expiresAt: new Date(Date.now() + 60 * 60 * 1000),
+      balanceBucket: "bucket_b",
+      balanceConsentVersion: "stage1-role-preference-v1",
+      balanceConsentedOn: "2026-08-17",
+    });
+
+    const notCountedWithConsent = db.insert(alphaInvites).values({
+      emailNormalized: trackInviteEmail(`${marker}-not-counted@example.com`),
+      codeHash: hashInviteCode(`${marker}-not-counted`, PEPPER),
+      status: "pending",
+      expiresAt: new Date(Date.now() + 60 * 60 * 1000),
+      balanceBucket: "not_counted",
+      balanceConsentVersion: "stage1-role-preference-v1",
+      balanceConsentedOn: "2026-08-17",
+    });
+    await assert.rejects(
+      notCountedWithConsent,
+      (error) => extractPgErrorCode(error) === "23514",
+    );
+  });
+
   it("legacy_invite_excluded_from_stage1", async () => {
     process.env.ALPHA_INVITE_PEPPER = PEPPER;
     const url = getIntegrationDatabaseUrl();

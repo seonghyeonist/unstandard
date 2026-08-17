@@ -218,6 +218,9 @@ export async function buildAlphaMetricsSnapshot(asOf = new Date()) {
       FROM alpha_invites
       WHERE target_phase = ${ALPHA_STAGE_1_PHASE}
         AND status = 'consumed' AND consumed_at IS NOT NULL
+        AND balance_bucket IN ('bucket_a', 'bucket_b')
+        AND balance_consent_version = 'stage1-role-preference-v1'
+        AND balance_consented_on IS NOT NULL
       GROUP BY timezone('UTC', consumed_at)::date, balance_bucket
       ORDER BY day, bucket
     `),

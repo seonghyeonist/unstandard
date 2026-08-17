@@ -50,6 +50,13 @@
       "when": 1786515780530,
       "tag": "0006_alpha_funnel_waitlist",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1786941878231,
+      "tag": "0007_alpha_balance_consent",
+      "breakpoints": true
     }
   ]
 }

@@ -5,8 +5,10 @@ import {
   ALPHA_STAGE_1_CAP,
   ALPHA_STAGE_1_PHASE,
   evaluateBalanceGate,
+  validateAlphaBalanceConsent,
   type AlphaAcquisitionChannel,
   type AlphaBalanceBucket,
+  type AlphaBalanceConsent,
   type AlphaRecruitmentCohort,
 } from "@/lib/alpha/stage1-policy";
 import {
@@ -23,6 +25,7 @@ export type CreateStage1InviteInput = {
   recruitmentCohort: AlphaRecruitmentCohort;
   acquisitionChannel: AlphaAcquisitionChannel;
   balanceBucket: AlphaBalanceBucket;
+  balanceConsent: AlphaBalanceConsent | null;
   now?: Date;
 };
 
@@ -72,6 +75,7 @@ export async function createStage1Invite(
 ): Promise<CreateStage1InviteResult> {
   const email = normalizeEmail(input.email);
   const now = input.now ?? new Date();
+  validateAlphaBalanceConsent(input.balanceBucket, input.balanceConsent);
   const expiresAt = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1_000);
   const rawCode = generateInviteCode();
   const codeHash = hashInviteCode(rawCode, requireInvitePepper());
@@ -144,6 +148,8 @@ export async function createStage1Invite(
         recruitmentCohort: input.recruitmentCohort,
         acquisitionChannel: input.acquisitionChannel,
         balanceBucket: input.balanceBucket,
+        balanceConsentVersion: input.balanceConsent?.version ?? null,
+        balanceConsentedOn: input.balanceConsent?.consentedOn ?? null,
       })
       .returning({ id: alphaInvites.id });
 
