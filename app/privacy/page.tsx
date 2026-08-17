@@ -10,10 +10,11 @@ const sections = [
           <li>계정: 이메일, 이름 또는 닉네임, 비밀번호 해시, 이메일 확인 상태</li>
           <li>서비스: 도시, 공개·비공개 프로필 문장, 질문 답변, 평가 결과, 고유 질문 노출 관계, UTC 일별 접속일, 메시지, 해제·차단·신고·지원 기록</li>
           <li>자동 생성: 세션, IP 주소, 사용자 에이전트, 접속·rate-limit 시각과 횟수</li>
-          <li>알파 운영: 초대 이메일, 모집 cohort·유입 채널·불투명 수급 bucket, 초대 상태와 코드 해시</li>
+          <li>알파 운영: 초대 이메일, 모집 cohort·유입 채널·선택한 첫 대화 역할의 불투명 수급 bucket, 동의 계약 버전·UTC 동의 날짜, 초대 상태와 코드 해시</li>
           <li>대기 명단: 동의한 이메일, 유입 채널, 삭제용 capability 해시, 고유 재방문 날짜</li>
         </ul>
         <p className="mt-3">사진, 결제정보, 정밀 위치정보는 현재 Closed Alpha에서 수집하지 않습니다.</p>
+        <p className="mt-3">첫 대화 역할은 서울 수도권에서 일대일 로맨틱 대화를 원하는 성인의 Stage-1 수급 균형에만 사용합니다. 별도 질문에 선택적으로 답하고 해당 사용에 동의한 경우만 A/B로 집계하며, 성별·성적 지향·정체성을 추론하거나 수집하지 않습니다. 양쪽 모두·어느 쪽도 아님·건너뛰기·불명확·미동의·철회는 집계하지 않습니다.</p>
       </>
     ),
   },
@@ -47,6 +48,7 @@ const sections = [
       <>
         <p>설정에서 계정과 연결 데이터를 직접 삭제할 수 있습니다. 열람·정정·삭제·처리정지, 신고 후속조치 또는 개인정보 문의는 로그인 후 설정의 ‘지원·안전 요청’에서 접수해 주세요.</p>
         <p className="mt-3">계정 삭제에는 현재 비밀번호와 명시적 확인 문구가 필요하며, 완료 후 복구할 수 없습니다.</p>
+        <p className="mt-3">첫 대화 역할 사용 동의는 선택 사항입니다. 초대 사용 전에는 철회 후 집계 제외 초대로 재발급할 수 있고, 사용 후에는 개인정보 담당자에게 정정·처리정지를 요청할 수 있습니다.</p>
       </>
     ),
   },
@@ -69,7 +71,7 @@ export default function PrivacyPage() {
         <Link href="/" className="text-xl font-black tracking-[-0.04em]">unstandard</Link>
         <Link href="/app/settings" className="text-sm font-semibold text-accent">설정</Link>
       </nav>
-      <p className="text-xs font-bold uppercase tracking-[0.2em] text-accent">effective 2026-08-12</p>
+      <p className="text-xs font-bold uppercase tracking-[0.2em] text-accent">effective 2026-08-17</p>
       <h1 className="mt-3 text-4xl font-black tracking-[-0.06em]">개인정보 처리 안내</h1>
       <p className="mt-5 text-base leading-7 text-foreground/75">
         Unstandard Closed Alpha의 실제 수집·보유·삭제 범위를 설명합니다. 처리 항목이나 수탁자가 바뀌면 시행 전에 이 페이지를 갱신합니다.
