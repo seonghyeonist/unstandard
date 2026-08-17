@@ -7,7 +7,7 @@ export type Match = {
 
 export type Message = {
   id: string;
-  matchId: string;
+  profileId: string;
   author: "me" | "them";
   body: string;
   createdAt: string;

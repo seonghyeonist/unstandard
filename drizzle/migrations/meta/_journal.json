@@ -36,6 +36,20 @@
       "when": 1786440443435,
       "tag": "0004_vengeful_marvex",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1786515470623,
+      "tag": "0005_alpha_stage1_measurement",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1786515780530,
+      "tag": "0006_alpha_funnel_waitlist",
+      "breakpoints": true
     }
   ]
 }

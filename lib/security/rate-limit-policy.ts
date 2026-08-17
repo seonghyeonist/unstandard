@@ -1,6 +1,6 @@
 import { createHmac } from "node:crypto";
 
-export const RATE_LIMIT_POLICY_VERSION = "closed-alpha-v1" as const;
+export const RATE_LIMIT_POLICY_VERSION = "closed-alpha-v2" as const;
 
 export const RATE_LIMIT_POLICIES = {
   inviteClaim: { limit: 10, windowMs: 15 * 60 * 1_000 },
@@ -8,6 +8,8 @@ export const RATE_LIMIT_POLICIES = {
   unlockAnswer: { limit: 20, windowMs: 10 * 60 * 1_000 },
   reportCreate: { limit: 5, windowMs: 60 * 60 * 1_000 },
   supportCreate: { limit: 3, windowMs: 24 * 60 * 60 * 1_000 },
+  messageSend: { limit: 20, windowMs: 10 * 60 * 1_000 },
+  waitlistJoin: { limit: 5, windowMs: 24 * 60 * 60 * 1_000 },
 } as const;
 
 export type RateLimitScope = keyof typeof RATE_LIMIT_POLICIES;

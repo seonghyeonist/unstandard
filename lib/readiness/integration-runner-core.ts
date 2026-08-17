@@ -32,6 +32,11 @@ import {
   aggregateIntegrationObservations,
   clearIntegrationCaseLog,
 } from "../../lib/readiness/integration-case-log";
+import {
+  proveIntegrationFixtureBaselineRestored,
+  readIntegrationFixtureBaseline,
+  type IntegrationFixtureBaseline,
+} from "../../lib/readiness/integration-fixture-baseline";
 
 export const INTEGRATION_SUITE_DIR = "tests/integration/suite";
 
@@ -86,6 +91,11 @@ export type IntegrationRunnerDeps = {
   buildArtifact?: typeof buildIntegrationArtifact;
   getGitSha?: () => string;
   migrationChecksum?: () => string;
+  readFixtureBaseline?: (url: string) => Promise<IntegrationFixtureBaseline>;
+  proveFixtureRestored?: (
+    url: string,
+    before: IntegrationFixtureBaseline,
+  ) => Promise<void>;
   skipPrerequisiteGuards?: boolean;
 };
 
@@ -218,6 +228,20 @@ export async function runIntegrationProofCore(
     await deps.assertReachable(testUrl);
   }
 
+  const fixtureGuardEnabled =
+    !deps.skipPrerequisiteGuards ||
+    Boolean(deps.readFixtureBaseline || deps.proveFixtureRestored);
+  const readFixtureBaseline =
+    deps.readFixtureBaseline ?? readIntegrationFixtureBaseline;
+  let fixtureBaseline: IntegrationFixtureBaseline | null = null;
+  if (fixtureGuardEnabled) {
+    try {
+      fixtureBaseline = await readFixtureBaseline(testUrl);
+    } catch {
+      throw new IntegrationExecutionError("unable to capture integration fixture baseline");
+    }
+  }
+
   const caseLogPath = deps.caseLogPath ?? createUniqueObservationLogPath();
   clearIntegrationCaseLog(caseLogPath);
 
@@ -241,6 +265,17 @@ export async function runIntegrationProofCore(
       throw new IntegrationExecutionError(
         `integration suite failed (exit ${suiteResult.status ?? "null"})`,
       );
+    }
+
+    if (fixtureBaseline) {
+      const proveFixtureRestored =
+        deps.proveFixtureRestored ?? proveIntegrationFixtureBaselineRestored;
+      try {
+        await proveFixtureRestored(testUrl, fixtureBaseline);
+      } catch (error) {
+        const message = error instanceof Error ? error.message : "fixture cleanup failed";
+        throw new IntegrationExecutionError(`integration fixture cleanup failed: ${message}`);
+      }
     }
 
     const aggregated = aggregateIntegrationObservations(caseLogPath, REQUIRED_INTEGRATION_CASES);

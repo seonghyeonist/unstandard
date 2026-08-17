@@ -9,6 +9,10 @@ export * from "@/lib/db/schema/unlock-attempts";
 export * from "@/lib/db/schema/invites";
 export * from "@/lib/db/schema/app-config";
 export * from "@/lib/db/schema/support";
+export * from "@/lib/db/schema/messages";
+export * from "@/lib/db/schema/alpha-activity";
+export * from "@/lib/db/schema/alpha-exposures";
+export * from "@/lib/db/schema/waitlist";
 
 import * as authSchema from "@/lib/db/schema/auth";
 import * as profilesSchema from "@/lib/db/schema/profiles";
@@ -21,6 +25,10 @@ import * as unlockAttemptsSchema from "@/lib/db/schema/unlock-attempts";
 import * as invitesSchema from "@/lib/db/schema/invites";
 import * as appConfigSchema from "@/lib/db/schema/app-config";
 import * as supportSchema from "@/lib/db/schema/support";
+import * as messagesSchema from "@/lib/db/schema/messages";
+import * as alphaActivitySchema from "@/lib/db/schema/alpha-activity";
+import * as alphaExposuresSchema from "@/lib/db/schema/alpha-exposures";
+import * as waitlistSchema from "@/lib/db/schema/waitlist";
 
 export const schema = {
   ...authSchema,
@@ -34,4 +42,8 @@ export const schema = {
   ...invitesSchema,
   ...appConfigSchema,
   ...supportSchema,
+  ...messagesSchema,
+  ...alphaActivitySchema,
+  ...alphaExposuresSchema,
+  ...waitlistSchema,
 };

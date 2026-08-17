@@ -13,6 +13,7 @@ import {
 } from "@/lib/auth/invite-crypto";
 import type { RegistrationTicket } from "@/lib/auth/invite-ticket";
 import { INVITE_RESERVATION_TTL_MS } from "@/lib/auth/invite-ticket";
+import { ALPHA_STAGE_1_PHASE } from "@/lib/alpha/stage1-policy";
 
 export type InviteReserveResult =
   | { ok: true; inviteId: string; email: string; reservationCapability: string }
@@ -47,6 +48,7 @@ export async function reserveInviteForEmail(
       and(
         eq(alphaInvites.codeHash, codeHash),
         eq(alphaInvites.emailNormalized, emailNormalized),
+        eq(alphaInvites.targetPhase, ALPHA_STAGE_1_PHASE),
         eq(alphaInvites.status, "pending"),
         gt(alphaInvites.expiresAt, now),
       ),
@@ -67,6 +69,7 @@ export async function reserveInviteForEmail(
       status: alphaInvites.status,
       emailNormalized: alphaInvites.emailNormalized,
       expiresAt: alphaInvites.expiresAt,
+      targetPhase: alphaInvites.targetPhase,
     })
     .from(alphaInvites)
     .where(eq(alphaInvites.codeHash, codeHash))
@@ -77,6 +80,9 @@ export async function reserveInviteForEmail(
   }
   if (existing.emailNormalized !== emailNormalized) {
     return { ok: false, code: "EMAIL_MISMATCH" };
+  }
+  if (existing.targetPhase !== ALPHA_STAGE_1_PHASE) {
+    return { ok: false, code: "INVALID" };
   }
   if (existing.status === "revoked") {
     return { ok: false, code: "REVOKED" };
@@ -106,12 +112,14 @@ export async function verifyInviteReservation(ticket: RegistrationTicket): Promi
       emailNormalized: alphaInvites.emailNormalized,
       reservationNonceHash: alphaInvites.reservationNonceHash,
       expiresAt: alphaInvites.expiresAt,
+      targetPhase: alphaInvites.targetPhase,
     })
     .from(alphaInvites)
     .where(eq(alphaInvites.id, ticket.inviteId))
     .limit(1);
 
   if (!invite) return false;
+  if (invite.targetPhase !== ALPHA_STAGE_1_PHASE) return false;
   if (invite.status !== "reserved") return false;
   if (invite.emailNormalized !== ticket.email) return false;
   if (invite.reservationNonceHash !== nonceHash) return false;
@@ -139,6 +147,7 @@ export async function consumeReservedInvite(
     .where(
       and(
         eq(alphaInvites.id, inviteId),
+        eq(alphaInvites.targetPhase, ALPHA_STAGE_1_PHASE),
         eq(alphaInvites.status, "reserved"),
         eq(alphaInvites.reservationNonceHash, nonceHash),
         gt(alphaInvites.expiresAt, now),
@@ -176,7 +185,13 @@ export async function releaseStaleReservedInvites(): Promise<number> {
       reservedAt: null,
       reservationNonceHash: null,
     })
-    .where(and(eq(alphaInvites.status, "reserved"), lt(alphaInvites.reservedAt, cutoff)))
+    .where(
+      and(
+        eq(alphaInvites.targetPhase, ALPHA_STAGE_1_PHASE),
+        eq(alphaInvites.status, "reserved"),
+        lt(alphaInvites.reservedAt, cutoff),
+      ),
+    )
     .returning({ id: alphaInvites.id });
 
   return released.length;

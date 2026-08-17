@@ -1,9 +1,9 @@
 {
-  "artifactVersion": 3,
+  "artifactVersion": 4,
   "kind": "closed_alpha_operational_attestation",
   "subjectGitSha": "REPLACE_WITH_40_HEX_PRODUCTION_SHA",
   "reviewedAt": "REPLACE_WITH_ISO_8601_TIMESTAMP",
-  "initialCohortCap": 30,
+  "initialCohortCap": 50,
   "incidentResponseMinutes": 240,
   "attestations": {
     "incidentOwnerAssigned": false,
@@ -14,7 +14,11 @@
     "accountDeletionProcedureVerified": false,
     "moderationOwnerAssigned": false,
     "rateLimitPolicyApproved": false,
-    "productionDatabaseSafetyControlsApproved": false
+    "productionDatabaseSafetyControlsApproved": false,
+    "experimentMeasurementReady": false,
+    "supplyBalanceProcedureApproved": false,
+    "domainAcquired": false,
+    "monetizationDisabled": false
   },
   "evidence": {
     "incidentOwner": "REPLACE_WITH_OWNER",
@@ -30,13 +34,20 @@
       "branchName": "REPLACE_WITH_BRANCH_NAME",
       "plan": "Free",
       "protected": false,
-      "safetyMode": "free_plan_closed_alpha_exception_v1",
+      "safetyMode": "free_plan_closed_alpha_exception_v2",
+      "upgradeTriggers": {
+        "observedAt": "REPLACE_WITH_ISO_8601_TIMESTAMP",
+        "capacity": false,
+        "reliability": false,
+        "operations": false,
+        "dataRisk": false
+      },
       "freePlanException": {
-        "policyVersion": "neon-free-closed-alpha-v1",
+        "policyVersion": "neon-free-closed-alpha-v2",
         "acceptedBy": "REPLACE_WITH_OWNER",
         "acceptedAt": "REPLACE_WITH_ISO_8601_TIMESTAMP",
         "expiresAt": "REPLACE_WITH_ISO_8601_TIMESTAMP_WITHIN_30_DAYS",
-        "maximumCohortSize": 30,
+        "maximumCohortSize": 50,
         "approvedProjectId": "REPLACE_WITH_NEON_PROJECT_ID",
         "approvedBranchId": "br-replace-with-approved-branch-id",
         "migrationDrillReference": "REPLACE_WITH_DISPOSABLE_MIGRATION_DRILL_REFERENCE",
@@ -52,7 +63,20 @@
     },
     "privacyNoticeUrl": "https://REPLACE_WITH_PRODUCTION_HOST/privacy",
     "accountDeletionTestReference": "REPLACE_WITH_TEST_REFERENCE",
-    "rateLimitPolicyVersion": "closed-alpha-v1"
+    "rateLimitPolicyVersion": "closed-alpha-v2",
+    "measurementContractVersion": "alpha-stage1-kpi-v1",
+    "metricsCommand": "npm run alpha:metrics",
+    "supplyBalanceProcedureReference": "REPLACE_WITH_APPROVED_PROCEDURE_REFERENCE",
+    "monetizationMode": "disabled",
+    "domain": {
+      "canonicalDomain": "REPLACE_WITH_ACQUIRED_DOMAIN",
+      "acquisitionStatus": "ACQUIRED",
+      "trademarkReview": "NO_BLOCKING_CONFLICT_FOUND",
+      "availabilityEvidenceReference": "REPLACE_WITH_DOMAIN_EVIDENCE",
+      "socialHandleEvidenceReference": "REPLACE_WITH_HANDLE_EVIDENCE",
+      "pronunciationSpellingReview": "PASS",
+      "reviewedAt": "REPLACE_WITH_ISO_8601_TIMESTAMP"
+    }
   },
   "notes": [
     "Example only. Keep the completed attestation operator-local unless an explicit review approves publication."

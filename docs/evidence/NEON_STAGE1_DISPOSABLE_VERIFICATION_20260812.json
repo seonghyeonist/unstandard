@@ -1,0 +1,65 @@
+{
+  "evidenceVersion": 3,
+  "observedDate": "2026-08-12",
+  "authority": "DIAGNOSTIC_ONLY",
+  "launchAuthority": false,
+  "reasonNotAuthoritative": "The successful current-source run preceded a committed subject Git SHA and no machine-generated evidence artifact was retained. Exact-SHA proof is still required.",
+  "projectId": "raspy-fog-00907976",
+  "productionParent": {
+    "branchId": "br-bitter-wave-ajs8dy0u",
+    "writesPerformed": false,
+    "postTestReadOnlyCounts": {
+      "migrationCount": 5,
+      "publicTableCount": 17,
+      "userCount": 5,
+      "profileCount": 5,
+      "inviteCount": 12
+    }
+  },
+  "failedDisposableAttempt": {
+    "branchId": "br-calm-sky-aj308axi",
+    "deletedAfterDiagnosis": true,
+    "failure": "The failed-registration compensation deleted the provisional user; the normal user-deletion trigger then deleted the reserved invite by email, so retry could not succeed.",
+    "correctiveAction": "The compensation now runs in a transaction with the transaction-local unstandard.registration_compensation flag. The deletion trigger preserves the reserved invite only under that flag; ordinary account deletion still removes invite-linked data."
+  },
+  "supersededBranchesDeleted": [
+    "br-floral-math-ajlshsfe",
+    "br-lively-bar-ajgvk01n"
+  ],
+  "currentSourceSuccessfulAttempt": {
+    "branchId": "br-winter-haze-aj639yoy",
+    "branchName": "disposable-founder-alpha-stage1-r4-20260812",
+    "parentBranchId": "br-bitter-wave-ajs8dy0u",
+    "retainedForExactShaRerun": true,
+    "migrationCount": 7,
+    "publicTableCount": 22,
+    "migrationHashes": [
+      "6bd0bb0c021a800c043b409f1d69311bb689a0578133d3fd60829f7220a2e39a",
+      "4773cee53b87161c60eb4e83eb0ffd484972d3f8b001e1c71acf72bcb3fb2c1d",
+      "d580b386b12e8c05e8ceacb474e7ee418222500da30805ecbd6e01cc7790fbf2",
+      "f65c7895fb277e3a68d4792e163ed83208b705a0f33f1d336c5b41715c08cfd0",
+      "da78c7b40704470b9fe02078141ea5c8944d4bb277eae3042635f326b968978c",
+      "0f0575bae676144d2b70b27f74e3f04b8c8d0faa4a708dc93e6494670183f608",
+      "d2d1054723b2674651206d89939c952162c02ed2e00b636fddbed8a73320667a"
+    ],
+    "databaseObjects": {
+      "capacityTriggerCount": 1,
+      "capacityFunctionCount": 1,
+      "compensationGuardFunctionCount": 1,
+      "legacyPreStage1InviteCount": 12
+    },
+    "privacyMinimization": {
+      "activityExactTimeColumnCount": 0,
+      "exposureRepeatOrExactTimeColumnCount": 0,
+      "waitlistExactTimeColumnCount": 0
+    },
+    "integration": {
+      "testCount": 17,
+      "passedTestCount": 17,
+      "requiredCaseCount": 27,
+      "passedRequiredCaseCount": 27,
+      "migrationSecondRunNoOp": true
+    }
+  },
+  "dialecticalConclusion": "The first run falsified retry safety. Code review then falsified four more assumptions: legacy cohorts could contaminate No-Go, domain evidence was not host-bound, excess measurement timestamps/counts were stored, and pre-migration technical accounts would contaminate the new market population. The corrected current-source run passed on an isolated branch, while the missing exact-SHA artifact still prevents launch authorization."
+}

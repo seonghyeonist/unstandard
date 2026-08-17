@@ -123,6 +123,48 @@ describe("integration runner-core termination and serial execution", () => {
     assert.equal(existsSync(caseLogPath), false);
   });
 
+  it("fixture drift blocks PASS artifact creation and deletes the log", async () => {
+    const caseLogPath = createUniqueObservationLogPath();
+    const lines = REQUIRED_INTEGRATION_CASES.map((name) =>
+      JSON.stringify({ name, status: "PASS" }),
+    );
+    let artifactWritten = false;
+
+    await assert.rejects(
+      () =>
+        runIntegrationProofCore({
+          caseLogPath,
+          env: {
+            ...process.env,
+            TEST_DATABASE_URL: "postgresql://example.invalid/db",
+            UNSTANDARD_INTEGRATION_EVIDENCE_OUT: join(tmpdir(), "must-not-exist.json"),
+          },
+          skipPrerequisiteGuards: true,
+          readFixtureBaseline: async () => ({
+            users: 5,
+            profiles: 5,
+            alpha_invites: 12,
+          }),
+          proveFixtureRestored: async () => {
+            throw new Error("users before=5 after=12");
+          },
+          suiteExecutor: ({ env }) => {
+            writeFileSync(env.UNSTANDARD_INTEGRATION_CASE_LOG!, `${lines.join("\n")}\n`, "utf8");
+            return { status: 0 };
+          },
+          writeArtifact: () => {
+            artifactWritten = true;
+          },
+        }),
+      (error: unknown) =>
+        error instanceof IntegrationExecutionError &&
+        /integration fixture cleanup failed: users before=5 after=12/u.test(error.message),
+    );
+
+    assert.equal(artifactWritten, false);
+    assert.equal(existsSync(caseLogPath), false);
+  });
+
   it("artifact validation failure deletes the log", async () => {
     const caseLogPath = createUniqueObservationLogPath();
     const lines = REQUIRED_INTEGRATION_CASES.map((name) =>

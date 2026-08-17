@@ -1,5 +1,10 @@
 # Closed-alpha operations runbook
 
+> **SUPERSEDED 2026-08-12:** this v3 / 30-seat exception record is retained as
+> historical context only. Do not execute its rollout instructions. The
+> authoritative 50-seat Stage 1 procedure is
+> [`CLOSED_ALPHA_STAGE1_RUNBOOK.md`](./CLOSED_ALPHA_STAGE1_RUNBOOK.md).
+
 ## Verdict boundary
 
 `npm run readiness:alpha` proves the P0 integration + deployed Preview smoke

@@ -31,6 +31,11 @@ export const REQUIRED_APPLICATION_TABLES = [
   "app_config",
   "rate_limits",
   "support_requests",
+  "messages",
+  "alpha_activity_days",
+  "alpha_profile_exposures",
+  "waitlist_entries",
+  "waitlist_visit_days",
 ] as const;
 
 export function getDrizzleMigrationsFolder(cwd = process.cwd()): string {

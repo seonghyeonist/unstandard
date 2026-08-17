@@ -86,25 +86,42 @@ export UNSTANDARD_READINESS_EVIDENCE_PATH=./tmp/readiness-proof.json
 npm run readiness:alpha
 ```
 
-## Required deployed HTTP cases (must all PASS)
+## Required deployed HTTP cases (37; must all PASS)
 
-- `anonymous_denied`
-- `user_a_login`, `user_b_login`
-- `user_a_session`, `user_b_session`
-- `user_a_owns_session`, `user_b_owns_session`
-- `forged_reporter_id_rejected`
-- `self_report_rejected`
-- `duplicate_open_report_is_idempotent`
-- `session_response_redacted`
-- `session_response_no_store` (authenticated session Cache-Control must include `private` + `no-store` and must not include `public`; anonymous 401 is checked under `anonymous_denied` with the same no-store contract)
-- `logout_invalidates_session`
-- `cleared_cookie_denied`
-- `revoked_session_rejected`
-- credential/profile ownership mapping from self-excluding DB candidates
-- clean A↔B initial row state
-- A→B and B→A PASS, private access, and exact row count `1`
-- duplicate A→B submission returns `idempotent=true` and remains one row
-- cross-viewer isolation and forged-cookie denial
+The executable source of truth is `REQUIRED_HTTP_SMOKE_CASES`. The cases are
+listed explicitly so a shortened narrative cannot hide a missing proof:
+
+- anonymous/privacy: `anonymous_denied`, `anonymous_message_denied`,
+  `waitlist_join_state_delete`
+- login/session identity: `user_a_login`, `user_b_login`, `user_a_session`,
+  `user_b_session`, `user_a_owns_session`, `user_b_owns_session`,
+  `credential_profile_mapping_verified`
+- report boundary: `forged_reporter_id_rejected`, `self_report_rejected`,
+  `duplicate_open_report_is_idempotent`
+- session privacy/revocation: `session_response_redacted`,
+  `session_response_no_store`, `logout_invalidates_session`,
+  `cleared_cookie_denied`, `revoked_session_rejected`
+- initial relationship: `initial_unlock_pair_state_clean`,
+  `a_to_b_private_before_unlock_forbidden`
+- A→B unlock/private profile: `a_to_b_unlock_pass`,
+  `a_to_b_unlock_status_true`, `a_to_b_unlock_row_exactly_one`,
+  `a_to_b_private_after_unlock_ok`
+- persisted messaging: `a_to_b_message_persisted`,
+  `b_reads_a_to_b_message`, `message_response_no_store`
+- idempotency/isolation: `duplicate_unlock_idempotent`,
+  `b_does_not_inherit_a_to_b_permission`,
+  `b_to_a_private_before_unlock_forbidden`,
+  `forged_unlock_cookie_no_authority`
+- B→A unlock/private profile: `b_to_a_unlock_pass`,
+  `b_to_a_unlock_status_true`, `b_to_a_unlock_row_exactly_one`,
+  `b_to_a_private_after_unlock_ok`
+- final privacy/isolation: `bidirectional_viewer_isolation`,
+  `private_response_no_store`
+
+The waitlist case uses a unique synthetic address, verifies join and same-browser
+capability deletion, and must leave the final state unjoined. The messaging
+cases prove database persistence, recipient visibility, and private/no-store
+HTTP caching; they do not claim notifications or a full inbox product.
 
 ## Hostname restrictions
 

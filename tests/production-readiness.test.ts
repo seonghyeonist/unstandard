@@ -65,11 +65,11 @@ function attestation(
   overrides: Partial<ClosedAlphaOperationalAttestation> = {},
 ): ClosedAlphaOperationalAttestation {
   return {
-    artifactVersion: 3,
+    artifactVersion: 4,
     kind: "closed_alpha_operational_attestation",
     subjectGitSha: SHA,
     reviewedAt: NOW,
-    initialCohortCap: 20,
+    initialCohortCap: 50,
     incidentResponseMinutes: 240,
     attestations: {
       incidentOwnerAssigned: true,
@@ -81,6 +81,10 @@ function attestation(
       moderationOwnerAssigned: true,
       rateLimitPolicyApproved: true,
       productionDatabaseSafetyControlsApproved: true,
+      experimentMeasurementReady: true,
+      supplyBalanceProcedureApproved: true,
+      domainAcquired: true,
+      monetizationDisabled: true,
     },
     evidence: {
       incidentOwner: "founder-seonghyeonist",
@@ -97,6 +101,13 @@ function attestation(
         plan: "Launch",
         protected: true,
         safetyMode: "protected_branch",
+        upgradeTriggers: {
+          observedAt: NOW,
+          capacity: false,
+          reliability: false,
+          operations: false,
+          dataRisk: false,
+        },
       },
       restoreDrill: {
         branchId: "br-restore-drill-123",
@@ -105,7 +116,20 @@ function attestation(
       },
       privacyNoticeUrl: "https://alpha.example.com/privacy",
       accountDeletionTestReference: "delete-integration-123",
-      rateLimitPolicyVersion: "closed-alpha-v1",
+      rateLimitPolicyVersion: "closed-alpha-v2",
+      measurementContractVersion: "alpha-stage1-kpi-v1",
+      metricsCommand: "npm run alpha:metrics",
+      supplyBalanceProcedureReference: "docs/CLOSED_ALPHA_OPERATIONS_RUNBOOK.md#supply",
+      monetizationMode: "disabled",
+      domain: {
+        canonicalDomain: "alpha.example.com",
+        acquisitionStatus: "ACQUIRED",
+        trademarkReview: "NO_BLOCKING_CONFLICT_FOUND",
+        availabilityEvidenceReference: "domain-check-123",
+        socialHandleEvidenceReference: "handle-check-123",
+        pronunciationSpellingReview: "PASS",
+        reviewedAt: NOW,
+      },
     },
     ...overrides,
   };
@@ -115,7 +139,7 @@ function freePlanAttestation(
   overrides: Partial<ClosedAlphaOperationalAttestation> = {},
 ): ClosedAlphaOperationalAttestation {
   return attestation({
-    initialCohortCap: 30,
+    initialCohortCap: 50,
     evidence: {
       ...attestation().evidence,
       productionDatabase: {
@@ -124,13 +148,20 @@ function freePlanAttestation(
         branchName: "main",
         plan: "Free",
         protected: false,
-        safetyMode: "free_plan_closed_alpha_exception_v1",
+        safetyMode: "free_plan_closed_alpha_exception_v2",
+        upgradeTriggers: {
+          observedAt: NOW,
+          capacity: false,
+          reliability: false,
+          operations: false,
+          dataRisk: false,
+        },
         freePlanException: {
-          policyVersion: "neon-free-closed-alpha-v1",
+          policyVersion: "neon-free-closed-alpha-v2",
           acceptedBy: "founder-seonghyeonist",
           acceptedAt: NOW,
           expiresAt: "2026-09-10T08:00:00.000Z",
-          maximumCohortSize: 30,
+          maximumCohortSize: 50,
           approvedProjectId: "raspy-fog-00907976",
           approvedBranchId: "br-bitter-wave-ajs8dy0u",
           migrationDrillReference: "br-fragrant-sunset-ajf5nddl-pass",
@@ -303,7 +334,7 @@ describe("Closed-alpha launch separation", () => {
     const base = freePlanAttestation();
 
     for (const invalid of [
-      freePlanAttestation({ initialCohortCap: 31 }),
+      freePlanAttestation({ initialCohortCap: 51 }),
       freePlanAttestation({
         evidence: {
           ...base.evidence,
@@ -340,5 +371,72 @@ describe("Closed-alpha launch separation", () => {
         "FAIL",
       );
     }
+  });
+
+  it("rejects a Free-plan attestation when any approved upgrade trigger is active", () => {
+    const report = buildProductionReadinessReport({
+      environment: environment(),
+      database: database(),
+      requestUrl: "https://alpha.example.com/api/operations/readiness",
+      generatedAt: NOW,
+    });
+    const production = buildVerifiedProductionEvidence({
+      report,
+      hostname: "alpha.example.com",
+      verifiedAt: NOW,
+    });
+    const base = freePlanAttestation();
+    const result = evaluateClosedAlphaLaunch({
+      production,
+      attestation: freePlanAttestation({
+        evidence: {
+          ...base.evidence,
+          productionDatabase: {
+            ...base.evidence.productionDatabase,
+            upgradeTriggers: {
+              ...base.evidence.productionDatabase.upgradeTriggers,
+              dataRisk: true,
+            },
+          },
+        },
+      }),
+      nowMs: Date.parse(NOW) + 60_000,
+    });
+
+    assert.equal(result.ok, false);
+    assert.equal(
+      result.gates.find((item) => item.name === "production_database_safety")?.status,
+      "FAIL",
+    );
+  });
+
+  it("rejects privacy or canonical-domain evidence from a different host", () => {
+    const report = buildProductionReadinessReport({
+      environment: environment(),
+      database: database(),
+      requestUrl: "https://alpha.example.com/api/operations/readiness",
+      generatedAt: NOW,
+    });
+    const production = buildVerifiedProductionEvidence({
+      report,
+      hostname: "alpha.example.com",
+      verifiedAt: NOW,
+    });
+    const base = attestation();
+    const result = evaluateClosedAlphaLaunch({
+      production,
+      attestation: attestation({
+        evidence: {
+          ...base.evidence,
+          privacyNoticeUrl: "https://lookalike.example/privacy",
+        },
+      }),
+      nowMs: Date.parse(NOW) + 60_000,
+    });
+    assert.equal(result.ok, false);
+    assert.equal(
+      result.gates.find((item) => item.name === "operational_evidence")?.status,
+      "FAIL",
+    );
   });
 });

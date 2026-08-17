@@ -156,7 +156,7 @@ export default function SettingsPage() {
         <Card className="mt-5 border-danger/30">
           <h2 className="text-lg font-black tracking-[-0.03em] text-danger">계정과 데이터 삭제</h2>
           <p className="mt-2 text-sm leading-6 text-foreground/70">
-            삭제하면 프로필, 답변, 해제 기록, 신고·지원 요청과 인증 데이터가 즉시 삭제되며 되돌릴 수 없습니다.
+            삭제하면 프로필, 답변, 질문 노출, 일별 접속, 메시지, 해제 기록, 신고·지원 요청과 인증 데이터가 즉시 삭제되며 되돌릴 수 없습니다.
             Neon 복구 이력에서는 최대 6시간 뒤 만료됩니다.
           </p>
           <label className="mt-4 block text-sm font-semibold" htmlFor="delete-password">

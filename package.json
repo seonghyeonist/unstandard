@@ -22,6 +22,7 @@
     "alpha:invite:create": "node --conditions=react-server --import tsx scripts/alpha/invite.ts create",
     "alpha:invite:revoke": "node --conditions=react-server --import tsx scripts/alpha/invite.ts revoke",
     "alpha:invite:list": "node --conditions=react-server --import tsx scripts/alpha/invite.ts list",
+    "alpha:metrics": "node --conditions=react-server --import tsx scripts/alpha/metrics.ts",
     "smoke:authorization": "node --import tsx scripts/smoke/authorization-adversarial.ts",
     "readiness:evidence:build": "node --import tsx scripts/readiness/build-evidence.ts",
     "readiness:alpha": "node --import tsx scripts/readiness/alpha.ts",

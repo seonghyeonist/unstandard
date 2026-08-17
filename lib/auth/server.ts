@@ -7,6 +7,7 @@ import { clearMockSessionUser, getMockSessionUser } from "@/lib/auth/mock-sessio
 import { isUserInviteFinalized } from "@/lib/auth/invite-finalization";
 import { ensureProfileForUser } from "@/lib/db/repositories/profile-bootstrap";
 import { DatabaseError, translateDatabaseError } from "@/lib/db/errors";
+import { recordAlphaActivityDay } from "@/lib/db/repositories/alpha-activity.repository";
 
 export type AuthenticatedUser = {
   id: string;
@@ -86,6 +87,7 @@ export async function getAuthenticatedUser(): Promise<AuthenticatedUser | null> 
       id: session.user.id,
       email: session.user.email,
     });
+    await recordAlphaActivityDay(session.user.id);
     return {
       id: session.user.id,
       email: session.user.email,

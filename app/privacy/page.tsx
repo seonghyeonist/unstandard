@@ -8,9 +8,10 @@ const sections = [
         <p>초대제 계정 인증, 프로필·답변·매칭 해제 기능, 신고·차단·지원 처리, 보안과 오남용 방지를 위해 다음 정보를 처리합니다.</p>
         <ul className="mt-3 list-disc space-y-2 pl-5">
           <li>계정: 이메일, 이름 또는 닉네임, 비밀번호 해시, 이메일 확인 상태</li>
-          <li>서비스: 도시, 공개·비공개 프로필 문장, 질문 답변, 평가 결과, 해제·차단·신고·지원 기록</li>
+          <li>서비스: 도시, 공개·비공개 프로필 문장, 질문 답변, 평가 결과, 고유 질문 노출 관계, UTC 일별 접속일, 메시지, 해제·차단·신고·지원 기록</li>
           <li>자동 생성: 세션, IP 주소, 사용자 에이전트, 접속·rate-limit 시각과 횟수</li>
-          <li>알파 운영: 초대 이메일, 초대 상태와 코드 해시</li>
+          <li>알파 운영: 초대 이메일, 모집 cohort·유입 채널·불투명 수급 bucket, 초대 상태와 코드 해시</li>
+          <li>대기 명단: 동의한 이메일, 유입 채널, 삭제용 capability 해시, 고유 재방문 날짜</li>
         </ul>
         <p className="mt-3">사진, 결제정보, 정밀 위치정보는 현재 Closed Alpha에서 수집하지 않습니다.</p>
       </>
@@ -20,8 +21,9 @@ const sections = [
     title: "2. 보유 기간과 삭제",
     body: (
       <ul className="list-disc space-y-2 pl-5">
-        <li>계정·프로필·답변·해제·차단·신고·지원 기록: 회원 탈퇴 시까지</li>
+        <li>계정·프로필·답변·질문 노출·일별 접속·메시지·해제·차단·신고·지원 기록: 회원 탈퇴 시까지</li>
         <li>초대 기록: 탈퇴 시 해당 이메일·사용자 연결 기록 삭제</li>
+        <li>대기 명단: 초대 안내 목적 종료 또는 삭제 요청 시까지. 등록한 브라우저에서 즉시 삭제 가능</li>
         <li>rate-limit 기록: 마지막 요청 후 최대 2일</li>
         <li>활성 데이터베이스에서는 계정 삭제 요청 완료 즉시 삭제하며, Neon 복구 이력에서는 최대 6시간 뒤 만료됩니다.</li>
       </ul>
@@ -67,7 +69,7 @@ export default function PrivacyPage() {
         <Link href="/" className="text-xl font-black tracking-[-0.04em]">unstandard</Link>
         <Link href="/app/settings" className="text-sm font-semibold text-accent">설정</Link>
       </nav>
-      <p className="text-xs font-bold uppercase tracking-[0.2em] text-accent">effective 2026-08-11</p>
+      <p className="text-xs font-bold uppercase tracking-[0.2em] text-accent">effective 2026-08-12</p>
       <h1 className="mt-3 text-4xl font-black tracking-[-0.06em]">개인정보 처리 안내</h1>
       <p className="mt-5 text-base leading-7 text-foreground/75">
         Unstandard Closed Alpha의 실제 수집·보유·삭제 범위를 설명합니다. 처리 항목이나 수탁자가 바뀌면 시행 전에 이 페이지를 갱신합니다.
