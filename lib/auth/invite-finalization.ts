@@ -5,9 +5,14 @@ import { cookies } from "next/headers";
 import { getDb } from "@/lib/db/client";
 import type { DbExecutor } from "@/lib/db/types";
 import { users } from "@/lib/db/schema/auth";
+import { legalAcceptances } from "@/lib/db/schema/legal-acceptances";
 import { consumeReservedInvite } from "@/lib/auth/invite-gate";
 import { ensureProfileForUser } from "@/lib/db/repositories/profile-bootstrap";
-import { getRegistrationTicketCookieName } from "@/lib/auth/invite-ticket";
+import {
+  getRegistrationTicketCookieName,
+  type RegistrationTicket,
+} from "@/lib/auth/invite-ticket";
+import { isRegistrationLegalAcceptance } from "@/lib/legal/acceptance";
 
 export class InviteFinalizationError extends Error {
   readonly code: string;
@@ -87,6 +92,7 @@ type FinalizeInviteInput = {
   userId: string;
   reservationCapability: string;
   email?: string | null;
+  legalAcceptance: RegistrationTicket["legalAcceptance"];
 };
 
 /**
@@ -96,6 +102,13 @@ type FinalizeInviteInput = {
 export async function finalizeInviteRegistration(input: FinalizeInviteInput): Promise<void> {
   const db = getDb();
   const injection = process.env.UNSTANDARD_TEST_INJECT_FINALIZE_FAILURE?.trim();
+
+  if (!isRegistrationLegalAcceptance(input.legalAcceptance)) {
+    throw new InviteFinalizationError(
+      "LEGAL_ACCEPTANCE_INVALID",
+      "Closed Alpha legal acceptance is required",
+    );
+  }
 
   try {
     await db.transaction(async (tx) => {
@@ -116,6 +129,14 @@ export async function finalizeInviteRegistration(input: FinalizeInviteInput): Pr
       if (injection === "finalize") {
         throw new InviteFinalizationError("INJECTED_FINALIZE_FAILURE", "Injected finalize failure");
       }
+
+      await tx.insert(legalAcceptances).values({
+        userId: input.userId,
+        adultConfirmed: input.legalAcceptance.adultConfirmed,
+        termsVersion: input.legalAcceptance.termsVersion,
+        safetyRulesVersion: input.legalAcceptance.safetyRulesVersion,
+        acceptedAt: new Date(input.legalAcceptance.acceptedAt),
+      });
 
       await markUserInviteFinalized(input.userId, tx);
 

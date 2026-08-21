@@ -192,6 +192,7 @@ export function getAuth(): ReturnType<typeof betterAuth> {
                 userId: user.id,
                 reservationCapability: ticket.capability,
                 email: user.email,
+                legalAcceptance: ticket.legalAcceptance,
               });
             } catch {
               throw new Error("Invite registration finalization failed");

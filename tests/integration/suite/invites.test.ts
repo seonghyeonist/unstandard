@@ -24,11 +24,28 @@ import {
 import { createRegistrationTicket, verifyRegistrationTicket } from "../../../lib/auth/invite-ticket";
 import { observeIntegrationCase } from "../../../lib/readiness/integration-case-log";
 import { extractPgErrorCode } from "../../../lib/db/errors";
+import {
+  CLOSED_ALPHA_SAFETY_RULES_VERSION,
+  CLOSED_ALPHA_TERMS_VERSION,
+  createRegistrationLegalAcceptance,
+} from "../../../lib/legal/acceptance";
 
 const PEPPER = "integration-test-pepper";
 const AUTH_SECRET = "integration-test-auth-secret-32chars";
 const fixtureInviteEmails = new Set<string>();
 const fixtureUserIds = new Set<string>();
+
+const TEST_LEGAL_SELECTION = {
+  adultConfirmed: true as const,
+  termsAccepted: true as const,
+  safetyRulesAccepted: true as const,
+  termsVersion: CLOSED_ALPHA_TERMS_VERSION,
+  safetyRulesVersion: CLOSED_ALPHA_SAFETY_RULES_VERSION,
+};
+
+function testLegalAcceptance() {
+  return createRegistrationLegalAcceptance(TEST_LEGAL_SELECTION);
+}
 
 function trackInviteEmail(email: string) {
   const normalized = normalizeEmail(email);
@@ -262,6 +279,7 @@ describe("integration: invite reservation lifecycle", () => {
       reserved.email,
       reserved.reservationCapability,
       AUTH_SECRET,
+      TEST_LEGAL_SELECTION,
     );
     const parsed = verifyRegistrationTicket(ticket.token, AUTH_SECRET);
     assert.ok(parsed);
@@ -359,6 +377,7 @@ describe("integration: invite finalization transaction", () => {
         userId,
         reservationCapability: reserved.reservationCapability,
         email,
+        legalAcceptance: testLegalAcceptance(),
       });
 
       assert.equal(await isUserInviteFinalized(userId, db), true);
@@ -409,6 +428,7 @@ describe("integration: invite finalization transaction", () => {
           userId,
           reservationCapability: reserved.reservationCapability,
           email,
+          legalAcceptance: testLegalAcceptance(),
         }),
       );
 
@@ -445,6 +465,7 @@ describe("integration: invite finalization transaction", () => {
         userId,
         reservationCapability: reserved.reservationCapability,
         email,
+        legalAcceptance: testLegalAcceptance(),
       }),
     );
 
@@ -487,6 +508,7 @@ describe("integration: invite finalization transaction", () => {
         userId,
         reservationCapability: reserved.reservationCapability,
         email,
+        legalAcceptance: testLegalAcceptance(),
       }),
     );
 
