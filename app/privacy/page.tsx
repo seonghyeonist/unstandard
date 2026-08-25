@@ -48,6 +48,12 @@ const sections = [
           <li>
             <strong>Neon cloud database service</strong>: 계정과 서비스 데이터베이스. 미국 AWS us-east-2(Ohio)로 서비스 이용 시 네트워크 이전. 계정 삭제 및 최대 6시간 복구 이력 만료까지. 문의는 <a className="underline underline-offset-4" href="https://neon.tech/privacy-policy" rel="noreferrer" target="_blank">Neon Privacy Policy의 Contact Us</a>.
           </li>
+          <li>
+            <strong>ImprovMX Incorporation</strong>: <a className="underline underline-offset-4" href="mailto:privacy@unstandard.app">privacy@unstandard.app</a> 수신 메일 전달. 미국·유럽의 인프라로 메일 수신 시 네트워크 이전. 메일 본문은 전달 또는 영구 반송 뒤 삭제하고, 최소 상세 전달 로그는 최대 7일, 전달 설정 변경 로그는 최대 365일 보관. 문의는 <a className="underline underline-offset-4" href="https://improvmx.com/transparency/privacy-policy/" rel="noreferrer" target="_blank">ImprovMX Privacy Policy</a>.
+          </li>
+          <li>
+            <strong>Google LLC (Gmail)</strong>: 전달된 개인정보 문의의 수신·보관·응대. 미국 등 전 세계 인프라로 메일 전달 시 네트워크 이전. 문의 처리 완료 후 90일 이내 삭제하며, 분쟁 대응이나 법정 의무가 있으면 해당 기간까지 보관. 문의는 <a className="underline underline-offset-4" href="https://policies.google.com/privacy" rel="noreferrer" target="_blank">Google Privacy Policy</a>.
+          </li>
         </ul>
         <p className="mt-3">수탁자, 국가·시기·방법, 이용 목적·보유기간이 바뀌면 시행 전에 이 페이지를 갱신합니다.</p>
       </>
@@ -93,7 +99,7 @@ export default function PrivacyPage() {
         <Link href="/" className="text-xl font-black tracking-[-0.04em]">unstandard</Link>
         <Link href="/app/settings" className="text-sm font-semibold text-accent">설정</Link>
       </nav>
-      <p className="text-xs font-bold uppercase tracking-[0.2em] text-accent">effective 2026-08-21</p>
+      <p className="text-xs font-bold uppercase tracking-[0.2em] text-accent">effective 2026-08-25</p>
       <h1 className="mt-3 text-4xl font-black tracking-[-0.06em]">개인정보 처리방침</h1>
       <p className="mt-5 text-base leading-7 text-foreground/75">
         Unstandard Closed Alpha의 실제 수집·보유·삭제·국외 이전 범위를 설명합니다. 처리 항목이나 수탁자가 바뀌면 시행 전에 이 페이지를 갱신합니다.
