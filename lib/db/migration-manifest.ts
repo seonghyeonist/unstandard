@@ -38,6 +38,10 @@ export const EXPECTED_MIGRATION_LEDGER = [
     file: "0007_alpha_balance_consent.sql",
     hash: "9a636c8b474ce6aeb81b20bc53a529d9cccc46df3b0d02db4e095abbdad8380b",
   },
+  {
+    file: "0008_strange_joshua_kane.sql",
+    hash: "18edb235efccd44fdfaed909ada1e759d45dd39c5d4a580986e24498c2c4b5b3",
+  },
 ] as const;
 
 export const EXPECTED_MIGRATION_HASHES = EXPECTED_MIGRATION_LEDGER.map(

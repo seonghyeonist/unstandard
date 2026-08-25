@@ -6,6 +6,7 @@ import {
   createRegistrationTicket,
   getRegistrationTicketCookieName,
 } from "@/lib/auth/invite-ticket";
+import { parseRegistrationLegalSelection } from "@/lib/legal/acceptance";
 import { privateJson } from "@/lib/http/private-json";
 import {
   consumeRateLimit,
@@ -32,8 +33,9 @@ export async function POST(request: Request) {
   const input = body as Record<string, unknown>;
   const email = normalizeEmail(String(input.email ?? ""));
   const code = String(input.code ?? "").trim();
+  const legalSelection = parseRegistrationLegalSelection(input);
 
-  if (!email.includes("@") || code.length < 8) {
+  if (!email.includes("@") || code.length < 8 || !legalSelection) {
     return privateJson({ error: "Invalid invite claim" }, { status: 422 });
   }
 
@@ -70,6 +72,7 @@ export async function POST(request: Request) {
     claim.email,
     claim.reservationCapability,
     secret,
+    legalSelection,
   );
   const cookieStore = await cookies();
   cookieStore.set(getRegistrationTicketCookieName(), ticket.token, {

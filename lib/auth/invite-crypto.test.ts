@@ -9,6 +9,10 @@ import {
   createRegistrationTicket,
   verifyRegistrationTicket,
 } from "./invite-ticket.ts";
+import {
+  CLOSED_ALPHA_SAFETY_RULES_VERSION,
+  CLOSED_ALPHA_TERMS_VERSION,
+} from "@/lib/legal/acceptance";
 
 describe("invite-crypto", () => {
   it("normalizes email", () => {
@@ -32,7 +36,19 @@ describe("invite-ticket", () => {
   it("signs and verifies registration tickets", () => {
     const secret = "x".repeat(32);
     const capability = "reservation-capability-token";
-    const { token } = createRegistrationTicket("invite-id", "user@example.com", capability, secret);
+    const { token } = createRegistrationTicket(
+      "invite-id",
+      "user@example.com",
+      capability,
+      secret,
+      {
+        adultConfirmed: true,
+        termsAccepted: true,
+        safetyRulesAccepted: true,
+        termsVersion: CLOSED_ALPHA_TERMS_VERSION,
+        safetyRulesVersion: CLOSED_ALPHA_SAFETY_RULES_VERSION,
+      },
+    );
     const verified = verifyRegistrationTicket(token, secret);
     assert.equal(verified?.inviteId, "invite-id");
     assert.equal(verified?.email, "user@example.com");
