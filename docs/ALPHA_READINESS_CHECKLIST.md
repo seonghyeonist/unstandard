@@ -1,6 +1,21 @@
 # Alpha Readiness Checklist
 
-## Verdict: STAGE1_NOT_READY (historical Production technical PASS; new contract unproved)
+## Verdict: CONDITIONAL / REATTESTATION_REQUIRED
+
+### Current override — 2026-08-26
+
+The 2026-08-12 checklist below is retained as execution provenance. Its open
+domain, migration, Production, mailbox, and drill boxes are no longer current.
+Production SHA `0c02fc3224eeec2fcc1cd9f622a44911e51282a5` is READY; migration
+`0008`, public notices, `privacy@unstandard.app`, Production readiness 10/10,
+and isolated support/report/delete/restore drills were verified on 2026-08-25.
+
+The founder fixed the Korean spelling as `언스탠다드` and accepted the scoped
+domain disposition in `BRAND_DECISION_UNSTANDARD_20260826.md`. The remaining
+release gate is a fresh token-bound Production artifact and same-SHA v4
+attestation rerun. Because technical evidence expires after six hours, the
+2026-08-25 artifact cannot authorize invitations today even though the deployed
+SHA has not changed.
 
 Alpha Stage 1 is **not** ready. Static quality gates alone never equal Alpha readiness.
 A proof-harness combined readiness PASS is **not** the same as

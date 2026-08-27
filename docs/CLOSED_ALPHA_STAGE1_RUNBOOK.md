@@ -2,7 +2,7 @@
 
 **Version:** founder-resolution-v0.1 / operations-v4
 **Effective:** 2026-08-12
-**Current verdict:** `STAGE1_NOT_READY`
+**Current verdict:** `CONDITIONAL / REATTESTATION_REQUIRED`
 
 ## 1. Decision contract
 
@@ -35,7 +35,35 @@ an unchanged experiment through obvious failure.
 
 Older 30-seat/v3 instructions are historical and cannot authorize this release.
 
-## 3. Current external baseline (read-only, 2026-08-12)
+### 2.1 Latest checkpoint override (2026-08-26)
+
+This checkpoint supersedes the historical baseline and blocker lists below
+where they describe a condition as current:
+
+- Production source: `0c02fc3224eeec2fcc1cd9f622a44911e51282a5`.
+- Vercel Production: `dpl_BQxZvNgk2kVZUD4rgp1dLgcQvj8V`, `READY`, exact SHA;
+  no grouped runtime errors observed over the preceding seven days.
+- Neon Production: project `raspy-fog-00907976`, branch
+  `br-bitter-wave-ajs8dy0u`; migrations `0000`–`0008` are applied and
+  `legal_acceptances` exists.
+- Canonical domain: `unstandard.app`, acquired and bound. The verified privacy
+  route is `https://unstandard.app/privacy`; `privacy@unstandard.app` has a
+  delivered external receipt test through ImprovMX.
+- Korean brand spelling: `언스탠다드`, intentionally selected by the founder.
+  It is not represented as identical to the National Institute of Korean
+  Language's general rendering `스탠더드`.
+- Domain disposition: `NO_BLOCKING_CONFLICT_FOUND` is limited to the Korea-only
+  small Closed Alpha and Nice 9/38/41/42/45 screening recorded in
+  `BRAND_DECISION_UNSTANDARD_20260826.md`. UK marketing, class-41 content/events,
+  merchandise, or paid international expansion requires a new counsel review.
+- Remaining release action: create fresh, operator-local Production evidence
+  (maximum age six hours), bind a completed v4 attestation to the same deployed
+  SHA, and rerun `operations:closed-alpha:gate`. A historical 9/10 preflight is
+  not launch authority.
+
+## 3. Historical external baseline (read-only, 2026-08-12)
+
+This section is retained as provenance only. Section 2.1 is the current state.
 
 | Surface | Observed state | Meaning |
 |---|---|---|
@@ -316,15 +344,16 @@ Build and Vercel deploy must never run migrations automatically.
 
 ## 15. Launch blockers at this checkpoint
 
-- implementation branch not yet independently reviewed or merged;
-- migrations `0005`/`0006` passed diagnostic disposable-Neon verification,
-  but a fresh exact-SHA machine artifact is still required;
-- no exact-head Vercel Preview/Production evidence;
-- canonical domain not selected/acquired/audited;
-- role-based A/B market and separate consent are founder-approved and enforced;
-- v4 Free exception/upgrade-trigger observation not signed;
-- Production migration not authorized or applied;
-- new support, deletion, restore, and runtime evidence not captured.
+All implementation, legal-notice, mailbox, migration, exact-SHA deployment,
+runtime, database-drill, domain-acquisition, trademark-screening and founder
+brand-decision inputs have been captured. The remaining blocker is deliberately
+narrow:
 
-Until these close, the correct state is `STAGE1_NOT_READY`; do not reuse the
-historical 30-seat launch artifact.
+1. regenerate the token-bound Production evidence within its six-hour window;
+2. refresh the v4 operational attestation on that same SHA, including the
+   founder domain disposition and a current Neon trigger observation; and
+3. obtain 10/10 from `operations:closed-alpha:gate` before the first invite.
+
+Until that exact-SHA rerun passes, the state is
+`CONDITIONAL / REATTESTATION_REQUIRED`. Do not reuse the historical 30-seat
+artifact or the 2026-08-25 9/10 preflight as launch authority.

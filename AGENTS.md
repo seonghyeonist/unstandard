@@ -23,10 +23,13 @@
 
 ## 알파 상태
 
-**STAGE1_NOT_READY** — 과거 Production SHA `da90853d…`의 기술 readiness는
-PASS였지만, 50석 Stage 1 변경은 아직 미배포다. 새 migration의 disposable
-Neon 검증, exact-head Preview/Production 증거, domain 확보, v4 운영 attestation이
-모두 PASS하기 전 초대를 확대하지 않는다. 현재 절차는
+**CONDITIONAL / REATTESTATION_REQUIRED** — Production은 SHA
+`0c02fc3224eeec2fcc1cd9f622a44911e51282a5`에서 READY이고 migration
+`0000`–`0008`, 공개 법적 고지, support/report/delete/restore drill, canonical
+domain 및 메일함 검증까지 완료됐다. 한국어 브랜드 표기는 창업자 결정으로
+`언스탠다드`다. 2026-08-25의 마지막 v4 gate는 domain disposition 전 9/10이었고,
+2026-08-26 founder disposition 이후에는 **새로운 6시간 이내 Production evidence와
+동일 SHA attestation으로 gate를 다시 실행하기 전** 초대를 발행하지 않는다. 현재 절차는
 [`docs/CLOSED_ALPHA_STAGE1_RUNBOOK.md`](./docs/CLOSED_ALPHA_STAGE1_RUNBOOK.md)를 따른다.
 
 ## do-not-build-yet
