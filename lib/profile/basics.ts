@@ -29,6 +29,7 @@ export type ProfileSetupView = {
   eligible: boolean;
   verification: "not_started" | "pending" | "verified" | "expired";
   verificationAvailable: boolean;
+  pendingIdentityRequestId?: string;
 };
 
 // Shared, pure policy used by service tests. SQL enforces the same conditions at read/write boundaries.

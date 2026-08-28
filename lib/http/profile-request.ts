@@ -3,7 +3,7 @@ export function isSameOriginMutation(request: Request): boolean {
   const origin = request.headers.get("origin");
   return origin === new URL(request.url).origin && request.headers.get("sec-fetch-site") !== "cross-site";
 }
-export async function readSmallJson(request: Request, maxBytes = 2048): Promise<unknown> {
+export async function readSmallJson(request: Pick<Request, "headers" | "body">, maxBytes = 2048): Promise<unknown> {
   if (!request.headers.get("content-type")?.toLowerCase().startsWith("application/json")) throw new Error("Invalid body");
   if (!request.body) throw new Error("Invalid body");
   const reader = request.body.getReader();

@@ -6,20 +6,20 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { TextInput } from "@/components/ui/form-field";
 import { ACTIVITY_REGIONS, PROFILE_CONSENT_VERSION, INTRODUCTION_SCOPE_VERSION, type ProfileSetupView } from "@/lib/profile/basics";
-import { IDENTITY_NOTICE_VERSION } from "@/lib/identity/contracts";
+import { completeBrowserIdentity, startBrowserIdentity } from "@/lib/identity/browser-flow";
 
 async function readSetup(): Promise<ProfileSetupView> {
   const response = await fetch("/api/profile/basics", { cache: "no-store" });
   if (!response.ok) throw new Error("프로필을 불러오지 못했어요. 잠시 뒤 다시 시도해 주세요.");
   return response.json();
 }
-export function ProfileSetup({ identityRequest }: { identityRequest?: string }) {
+export function ProfileSetup() {
   const query = useQuery({ queryKey: ["profile-setup"], queryFn: readSetup });
   if (query.isLoading) return <p role="status">프로필을 불러오는 중이에요.</p>;
   if (!query.data || query.isError) return <Card><p role="alert">프로필을 불러오지 못했어요.</p><Button onClick={() => query.refetch()}>다시 시도</Button></Card>;
-  return <ProfileBasicsForm key={query.data.basics?.updatedAt ?? "new"} setup={query.data} identityRequest={identityRequest} />;
+  return <ProfileBasicsForm key={query.data.basics?.updatedAt ?? "new"} setup={query.data} />;
 }
-export function ProfileBasicsForm({ setup, identityRequest }: { setup: ProfileSetupView; identityRequest?: string }) {
+export function ProfileBasicsForm({ setup }: { setup: ProfileSetupView }) {
   const client = useQueryClient();
   const [nickname, setNickname] = useState(setup.basics?.nickname ?? "");
   const [gender, setGender] = useState(setup.basics?.gender ?? "");
@@ -28,6 +28,8 @@ export function ProfileBasicsForm({ setup, identityRequest }: { setup: ProfileSe
   const [scope, setScope] = useState(setup.basics?.introductionScopeAccepted ?? false);
   const [consent, setConsent] = useState(false);
   const [identityConsent, setIdentityConsent] = useState(false);
+  const [startedRequestId, setStartedRequestId] = useState<string>();
+  const identityRequest = startedRequestId ?? setup.pendingIdentityRequestId;
   async function refresh() {
     await client.invalidateQueries({ queryKey: ["profile-setup"] });
     await client.invalidateQueries({ queryKey: ["current-user"] });
@@ -46,12 +48,19 @@ export function ProfileBasicsForm({ setup, identityRequest }: { setup: ProfileSe
     if (!response.ok) throw new Error("철회를 완료하지 못했어요. 다시 시도해 주세요.");
   }, onSuccess: refresh });
   const verify = useMutation({ mutationFn: async (action: "start" | "complete") => {
-    const response = await fetch(`/api/identity/${action}`, { method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(action === "start" ? { consentAccepted: identityConsent, noticeVersion: IDENTITY_NOTICE_VERSION } : { requestId: identityRequest }) });
-    const result = await response.json();
-    if (!response.ok) throw new Error("인증을 완료하지 못했어요. 현재 인증 연결 상태를 확인해 주세요.");
-    if (result.url) window.location.assign(result.url);
-  }, onSuccess: refresh });
+    if (action === "complete") {
+      await completeBrowserIdentity(identityRequest ?? "");
+    } else {
+      // SDK loader is not imported until the configured service is available and the user consents.
+      if (!setup.verificationAvailable || !identityConsent) throw new Error("인증 안내를 확인해 주세요.");
+      let sdk;
+      try { sdk = await import("@portone/browser-sdk/v2"); }
+      catch { throw new Error("인증 화면을 불러오지 못했어요. 잠시 뒤 다시 시도해 주세요."); }
+      await startBrowserIdentity({ consentAccepted: identityConsent, origin: window.location.origin,
+        sdk: sdk.requestIdentityVerification, onStarted: setStartedRequestId });
+    }
+    setStartedRequestId(undefined);
+  }, onSettled: refresh });
   const busy = save.isPending || withdraw.isPending || verify.isPending;
   return <div className="space-y-5">
     <Card>
@@ -71,10 +80,10 @@ export function ProfileBasicsForm({ setup, identityRequest }: { setup: ProfileSe
     </Card>
     <Card>
       <h2 className="text-xl font-black">실명·휴대전화 확인</h2>
-      <p className="mt-3 text-sm leading-6">{setup.verificationAvailable ? "연결된 인증 화면에서 실명·휴대전화 확인을 진행해요." : "인증 서비스 준비 중이에요. 지금은 실명·전화번호를 입력하거나 제출할 수 없어요."}</p>
-      <p className="mt-3 text-sm leading-6 text-foreground/70">실명·전화번호는 일반 프로필과 분리하며, 언스탠다드 회원 DB·애플리케이션 로그에는 원문을 저장하지 않는 구조예요. 인증사 연결 전에는 수집하지 않아요. 인증사의 보관·파기 조건은 실제 연결 전에 별도로 안내해요. 외부 보관분까지 ‘확인 즉시 폐기’한다고 약속하지 않아요.</p>
+      <p className="mt-3 text-sm leading-6">{setup.verificationAvailable ? "PortOne을 통한 다날 휴대폰 본인인증 화면에서 실명과 본인 명의 휴대전화 소유를 함께 확인해요. 팝업을 허용해 주세요." : "인증 서비스 준비 중이에요. 지금은 실명·전화번호를 입력하거나 제출할 수 없어요."}</p>
+      <p className="mt-3 text-sm leading-6 text-foreground/70">실명·휴대전화 정보는 인증사 화면에서 입력해요. 서버가 결과를 확인할 때 원문을 일시 처리할 수 있지만, 확인 후 별도로 보관하지 않으며 회원 DB·애플리케이션 로그에도 저장하지 않아요. 인증 상태와 요청·동의 기록만 남겨요. 인증사 자신의 보유·파기 조건은 별도이며, 확정된 안내를 게시하기 전에는 연결하지 않아요. <Link className="underline" href="/privacy">개인정보 안내</Link></p>
       <p className="mt-3 text-sm">인증 상태: {({ not_started: "미인증", pending: "확인 대기", verified: "확인 완료", expired: "요청 만료" })[setup.verification]}</p>
-      <label className="mt-4 flex gap-3 text-sm"><input type="checkbox" disabled={!setup.verificationAvailable} checked={identityConsent} onChange={(e) => setIdentityConsent(e.target.checked)} /><span>인증 목적·항목·보유 및 파기 안내를 확인했어요.</span></label>
+      <label className="mt-4 flex gap-3 text-sm"><input type="checkbox" disabled={!setup.verificationAvailable} checked={identityConsent} onChange={(e) => setIdentityConsent(e.target.checked)} /><span>실명·본인 명의 휴대전화 확인을 위한 처리와 인증 결과 기록에 동의해요. 목적·항목·보유 및 파기 안내를 확인했으며, 거부하면 소개 기능을 이용할 수 없어요.</span></label>
       <Button className="mt-4 w-full" disabled={busy || !setup.verificationAvailable || !setup.basics?.introductionScopeAccepted || !identityConsent} onClick={() => verify.mutate("start")}>실명·휴대전화 인증 시작</Button>
       {identityRequest ? <Button className="mt-3 w-full" disabled={busy || !setup.verificationAvailable} onClick={() => verify.mutate("complete")}>인증 결과 확인</Button> : null}
       {verify.isError ? <p role="alert" className="mt-3 text-sm text-danger">{verify.error.message}</p> : null}

@@ -23,7 +23,8 @@ export const profileBasicsRepository: ProfileBasicsRepository = {
       v.status === "verified" ? "verified" : v.expiresAt <= new Date() ? "expired" : "pending";
     return { basics: { nickname: row.nickname, gender: row.basics.gender as Gender, age: row.basics.age,
       region: row.basics.region, introductionScopeAccepted: row.basics.introductionScopeAccepted,
-      updatedAt: row.basics.updatedAt.toISOString() }, verification: status, eligible: row.eligible };
+      updatedAt: row.basics.updatedAt.toISOString() }, verification: status, eligible: row.eligible,
+      pendingIdentityRequestId: status === "pending" ? v!.requestId : undefined };
   },
   async save(userId, input) {
     await getDb().transaction(async (tx) => {

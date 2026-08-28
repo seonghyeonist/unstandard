@@ -61,4 +61,13 @@ describe("basic profile server-rendered form", () => {
     assert.doesNotMatch(html, /type="tel"|name="realName"|name="phone"/);
     assert.match(html, /지원·계정 삭제/);
   });
+  it("offers result recovery from the authenticated pending request without rendering its ID or personal input fields", () => {
+    const pendingIdentityRequestId = "11111111-1111-4111-8111-111111111111";
+    const html = renderToStaticMarkup(createElement(QueryClientProvider, { client: new QueryClient() },
+      createElement(ProfileBasicsForm, { setup: { basics: null, eligible: false, verification: "pending",
+        verificationAvailable: true, pendingIdentityRequestId } })));
+    assert.match(html, /인증 결과 확인/); assert.match(html, /확인 대기/);
+    assert.doesNotMatch(html, new RegExp(pendingIdentityRequestId));
+    assert.doesNotMatch(html, /type="tel"|name="realName"|name="phone"/);
+  });
 });
