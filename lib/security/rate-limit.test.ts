@@ -12,7 +12,7 @@ describe("closed-alpha rate-limit policy", () => {
     const again = hashRateLimitSubject("inviteClaim", "203.0.113.4", "secret");
     const otherScope = hashRateLimitSubject("reportCreate", "203.0.113.4", "secret");
 
-    assert.equal(RATE_LIMIT_POLICY_VERSION, "closed-alpha-v2");
+    assert.equal(RATE_LIMIT_POLICY_VERSION, "closed-alpha-v3");
     assert.equal(first, again);
     assert.notEqual(first, otherScope);
     assert.equal(first.includes("203.0.113.4"), false);

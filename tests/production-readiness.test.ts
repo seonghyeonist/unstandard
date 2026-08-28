@@ -116,7 +116,7 @@ function attestation(
       },
       privacyNoticeUrl: "https://alpha.example.com/privacy",
       accountDeletionTestReference: "delete-integration-123",
-      rateLimitPolicyVersion: "closed-alpha-v2",
+      rateLimitPolicyVersion: "closed-alpha-v3",
       measurementContractVersion: "alpha-stage1-kpi-v1",
       metricsCommand: "npm run alpha:metrics",
       supplyBalanceProcedureReference: "docs/CLOSED_ALPHA_OPERATIONS_RUNBOOK.md#supply",

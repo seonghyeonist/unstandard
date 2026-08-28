@@ -1,3 +1,11 @@
+import { profileBasicsRepository } from "../../../lib/db/repositories/profile-basics.repository";
+import { identityRepository } from "../../../lib/db/repositories/identity.repository";
+import { canAccessIntroduction } from "../../../lib/db/repositories/introduction-policy";
+import { getPublicProfileById, listPublicCandidatesForViewer } from "../../../lib/db/repositories/candidates.repository";
+import { createMessage, listConversation } from "../../../lib/db/repositories/messages.repository";
+import { identityVerifications, profileBasics } from "../../../lib/db/schema/profile-basics";
+import { INTRODUCTION_SCOPE_VERSION, PROFILE_CONSENT_VERSION } from "../../../lib/profile/basics";
+import { addSyntheticVerifiedBasics } from "../profile-fixture";
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import { describe, it } from "node:test";
@@ -17,6 +25,7 @@ import { createUnlock } from "../../../lib/db/repositories/unlocks.repository";
 async function insertOnboardedUser(
   db: ReturnType<typeof createIntegrationDb>,
   suffix: string,
+  gender: "male" | "female" = "male",
 ) {
   const userId = `unlock-user-${suffix}`;
   await db.insert(users).values({
@@ -43,10 +52,58 @@ async function insertOnboardedUser(
     smallJoys: ["tea"],
   });
 
+  await addSyntheticVerifiedBasics(db, userId, gender);
   return { userId, profileId: profile.id };
 }
 
 describe("integration: db-backed unlock vertical slice", () => {
+  it("profile eligibility, direct access, revision binding and deletion fail closed", async () => {
+    const url = getIntegrationDatabaseUrl();
+    await runDrizzleMigrations(url);
+    await seedClosedAlphaData(url);
+    const db = createIntegrationDb(url);
+    const a = await insertOnboardedUser(db, `basics-a-${Date.now()}`, "male");
+    const b = await insertOnboardedUser(db, `basics-b-${Date.now()}`, "female");
+    const same = await insertOnboardedUser(db, `basics-same-${Date.now()}`, "male");
+    const passAnswer = "어제 비 오는 골목에서 따뜻한 국물을 마시며 마음이 조금 풀렸어요. 창밖 소리가 선명했어요.";
+    try {
+      assert.equal(await canAccessIntroduction(a.userId, b.profileId), true);
+      assert.equal(await canAccessIntroduction(a.userId, same.profileId), false);
+      assert.equal(await getPublicProfileById(same.profileId, a.userId), "not_found");
+      assert.equal((await submitDbUnlockAnswer({ viewerUserId: a.userId, profileId: b.profileId, answer: passAnswer })).ok, true);
+      assert.equal((await createMessage({ viewerUserId: a.userId, targetProfileId: b.profileId, body: "synthetic message" })).ok, true);
+      const input = { nickname: "new-nick", gender: "female" as const, age: 23, region: "서울" as const,
+        introductionScopeAccepted: true, profileConsentAccepted: true as const,
+        profileConsentVersion: PROFILE_CONSENT_VERSION, introductionScopeVersion: INTRODUCTION_SCOPE_VERSION };
+      await profileBasicsRepository.save(b.userId, input);
+      assert.equal(await canAccessIntroduction(a.userId, b.profileId), false);
+      assert.equal(await getPublicProfileById(b.profileId, a.userId), "not_found");
+      assert.equal((await getDbPrivateProfile({ viewerUserId: a.userId, profileId: b.profileId })).ok, false);
+      assert.equal((await listConversation({ viewerUserId: a.userId, targetProfileId: b.profileId })).ok, false);
+      assert.equal((await createMessage({ viewerUserId: a.userId, targetProfileId: b.profileId, body: "blocked message" })).ok, false);
+      assert.equal((await getDbUnlockStatus({ viewerUserId: a.userId, profileId: b.profileId })).ok, false);
+      assert.equal(await listPublicCandidatesForViewer(b.userId), "setup_required");
+      const pending = await identityRepository.begin(b.userId, "test-only", new Date());
+      assert.ok(pending);
+      await profileBasicsRepository.save(b.userId, { ...input, age: 24 });
+      assert.equal(await identityRepository.complete(pending, new Date()), false);
+      const fresh = await identityRepository.begin(b.userId, "test-only", new Date());
+      assert.ok(fresh);
+      assert.equal(await identityRepository.find(a.userId, fresh.requestId), null);
+      assert.equal(await identityRepository.complete(fresh, new Date()), true);
+      assert.equal(await canAccessIntroduction(a.userId, b.profileId), true);
+      await profileBasicsRepository.withdraw(b.userId);
+      assert.equal((await profileBasicsRepository.read(b.userId)).basics, null);
+      assert.equal((await db.select().from(identityVerifications).where(eq(identityVerifications.userId, b.userId))).length, 0);
+      assert.equal(await canAccessIntroduction(a.userId, b.profileId), false);
+      await db.delete(users).where(eq(users.id, a.userId));
+      assert.equal((await db.select().from(profileBasics).where(eq(profileBasics.userId, a.userId))).length, 0);
+      assert.equal((await db.select().from(identityVerifications).where(eq(identityVerifications.userId, a.userId))).length, 0);
+    } finally {
+      for (const f of [a, b, same]) await db.delete(users).where(eq(users.id, f.userId));
+    }
+  });
+
   it("pass creates unlock; non-pass does not; isolation + private gate", async () => {
     const url = getIntegrationDatabaseUrl();
     await runDrizzleMigrations(url);
@@ -54,7 +111,7 @@ describe("integration: db-backed unlock vertical slice", () => {
     const db = createIntegrationDb(url);
 
     const viewerA = await insertOnboardedUser(db, `a-${Date.now()}`);
-    const targetB = await insertOnboardedUser(db, `b-${Date.now()}`);
+    const targetB = await insertOnboardedUser(db, `b-${Date.now()}`, "female");
     const stranger = await insertOnboardedUser(db, `c-${Date.now()}`);
 
     await observeIntegrationCase("db_unlock_reject_no_row", async () => {

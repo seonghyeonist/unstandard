@@ -1,3 +1,5 @@
+export * from "@/lib/db/schema/profile-basics";
+import * as profileBasicsSchema from "@/lib/db/schema/profile-basics";
 export * from "@/lib/db/schema/auth";
 export * from "@/lib/db/schema/profiles";
 export * from "@/lib/db/schema/questions";
@@ -33,6 +35,7 @@ import * as waitlistSchema from "@/lib/db/schema/waitlist";
 import * as legalAcceptancesSchema from "@/lib/db/schema/legal-acceptances";
 
 export const schema = {
+  ...profileBasicsSchema,
   ...authSchema,
   ...profilesSchema,
   ...questionsSchema,

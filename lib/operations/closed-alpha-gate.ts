@@ -1,3 +1,4 @@
+import { RATE_LIMIT_POLICY_VERSION } from "@/lib/security/rate-limit-policy";
 import { createHash } from "node:crypto";
 import { ALPHA_STAGE_1_CAP } from "@/lib/alpha/stage1-policy";
 import { ALPHA_METRICS_CONTRACT_VERSION } from "@/lib/alpha/metrics";
@@ -77,7 +78,7 @@ export type ClosedAlphaOperationalAttestation = {
     };
     privacyNoticeUrl: string;
     accountDeletionTestReference: string;
-    rateLimitPolicyVersion: "closed-alpha-v2";
+    rateLimitPolicyVersion: typeof RATE_LIMIT_POLICY_VERSION;
     measurementContractVersion: typeof ALPHA_METRICS_CONTRACT_VERSION;
     metricsCommand: "npm run alpha:metrics";
     supplyBalanceProcedureReference: string;
@@ -263,7 +264,7 @@ function operationalEvidenceIsComplete(
     timestampIsFresh(evidence.restoreDrill.completedAt, CLOSED_ALPHA_ATTESTATION_MAX_AGE_MS, nowMs) &&
     evidence.domain.canonicalDomain.trim().toLowerCase() === productionHostname.toLowerCase() &&
     isHttpsPrivacyUrl(evidence.privacyNoticeUrl, evidence.domain.canonicalDomain) &&
-    evidence.rateLimitPolicyVersion === "closed-alpha-v2" &&
+    evidence.rateLimitPolicyVersion === RATE_LIMIT_POLICY_VERSION &&
     evidence.measurementContractVersion === ALPHA_METRICS_CONTRACT_VERSION &&
     evidence.metricsCommand === "npm run alpha:metrics" &&
     evidence.monetizationMode === "disabled" &&

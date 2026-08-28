@@ -50,7 +50,7 @@ export default function RegisterPage() {
       await signUpWithEmailPassword(name, email, password);
     },
     onSuccess: () => {
-      router.push("/onboarding");
+      router.push("/profile-setup");
     },
   });
 
@@ -58,7 +58,7 @@ export default function RegisterPage() {
     <AppShell title="초대 확인" eyebrow="register">
       <Card>
         <p className="text-sm text-foreground/60">
-          Closed alpha registration requires a founder-issued invite code.
+          창업자가 발급한 초대코드로 가입해요. 가입 후 성별·만 나이·활동 지역과 소개 범위를 확인하며, 실명·전화번호는 별도 인증 절차로 분리돼요.
         </p>
         <form
           className="mt-6 space-y-3"
@@ -84,7 +84,10 @@ export default function RegisterPage() {
           />
           <input
             type="text"
-            placeholder="Display name"
+            placeholder="닉네임 (실명 입력 금지)"
+            aria-label="닉네임"
+            autoComplete="nickname"
+            maxLength={16}
             className="w-full rounded-xl border border-foreground/15 bg-background px-4 py-3 text-sm"
             value={name}
             onChange={(event) => setName(event.target.value)}
