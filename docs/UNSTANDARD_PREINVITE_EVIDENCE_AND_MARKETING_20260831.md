@@ -100,6 +100,14 @@ npm run operations:production:verify
 
 `UNSTANDARD_DEBUG_CHECK_TOKEN`의 값은 이 문서에 기록하지 않는다. Vercel 환경변수 페이지에서 Production 항목의 존재만 확인하고, secret manager 또는 로컬 환경에 직접 주입한다. 값이 없거나 접근할 수 없으면 결과는 `BLOCKED_EXTERNAL`이며 추정 PASS를 만들지 않는다.
 
+Vercel CLI를 사용할 경우 공식 명령은 다음과 같다. 이 명령은 Production 변수를 로컬 파일로 내려받으므로, 파일 권한·보관·삭제를 형의 로컬 secret 관리 규칙으로 처리한다. 파일 내용을 채팅/GitHub에 올리지 않는다.
+
+```bash
+vercel env pull .env.production.local --environment=production
+```
+
+공식 참고: https://vercel.com/docs/cli/env
+
 ### 4.2 PR #80이 최종 승인된 뒤
 
 PR #80의 최종 merge/promote SHA가 `c385717f…`와 달라질 수 있으므로, merge 이후 실제 GitHub commit SHA와 실제 Vercel `READY` deployment metadata를 다시 읽는다. 그 **최종 SHA**를 `UNSTANDARD_EXPECTED_PRODUCTION_GIT_SHA`에 넣어 위 명령을 다시 실행한다.
