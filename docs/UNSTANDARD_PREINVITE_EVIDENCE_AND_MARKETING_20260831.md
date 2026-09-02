@@ -1,6 +1,6 @@
 # Unstandard 초대 전 Production 증거·운영 게이트·마케팅 실행안
 
-작성일: 2026-08-31  
+작성일: 2026-09-02  
 상태: **초대 보류 (`STAGE1_NOT_READY`)**  
 대상: Closed Alpha Stage 1 / 최대 50명 / 한국 성인 / 웹앱
 
@@ -11,10 +11,10 @@
 현재 초대를 발송하지 않는다.
 
 - 현재 `main` SHA는 `0c02fc3224eeec2fcc1cd9f622a44911e51282a5`다.
-- 현재 Vercel Production 배포도 이 SHA의 `READY` 배포다: `dpl_qYabi7oGpqMDDg9ayVAyBgiasgZY`.
-- 프로필·실명/휴대전화 인증 변경 PR #80의 현재 HEAD는 `c385717f2c4a8b63a1602c3ff5c0d83d999dc11c`이며 아직 draft/open/unmerged다.
+- 현재 Vercel Production 배포도 이 SHA의 `READY` 배포다: `dpl_CMHQAwDQx1qdHCv8zHAiLwfai5NF`.
+- 프로필·실명/휴대전화 인증 변경 PR #80의 현재 HEAD는 `f6776ffe56496ec465187e36b01112c15f01fb3d`이며 아직 draft/open/unmerged다.
 - 따라서 현재 Production은 PR #80과 **동일 SHA가 아니다**. PR #80의 새 기능을 기준으로 초대 게이트를 닫을 수 없다.
-- Vercel Production에 `UNSTANDARD_DEBUG_CHECK_TOKEN`은 존재하는 것으로 확인했지만, 토큰을 채팅이나 문서에 노출하지 않고 operator-local 명령으로 endpoint를 호출하는 단계가 아직 남아 있다.
+- 이전 readiness 확인에 사용된 operator token plaintext는 로컬에서 폐기되어 현재 재사용할 수 없다. 이번 실행에서는 새 Production secret을 발급·교체하지 않았으므로 fresh operator-authenticated evidence를 만들지 않았다.
 - PR #80의 두 migration은 격리 Neon branch에서 스키마 rehearsal을 통과했지만, 이것은 표준 Node→Neon migrator 재실행/no-op와 Production 증거를 대체하지 않는다.
 
 ## 2. 2026-08-31 신선한 현재 상태
@@ -26,7 +26,7 @@
 | GitHub `main` | `0c02fc32…` | 현재 Production이 기준으로 삼는 코드 |
 | PR #80 HEAD | `c385717f…`, draft/open | 프로필·identity 변경은 아직 Production 대상이 아님 |
 | PR #80 CI | `static-gates` 성공, `build (24.x)` 성공 | 정적/빌드 증거는 있음. Production 증거는 아님 |
-| Production deployment | `dpl_qYabi7oGpqMDDg9ayVAyBgiasgZY`, `READY` | 현재 main SHA 배포가 살아 있음 |
+| Production deployment | `dpl_CMHQAwDQx1qdHCv8zHAiLwfai5NF`, `READY` | 현재 main SHA 배포가 살아 있음 |
 | Production domain | `https://unstandard.app` 및 `www` alias 관찰 | canonical domain 운영 증거는 별도 attestation 필요 |
 | Production runtime errors | 최근 7일 관찰상 없음 | 짧은 runtime 관찰. launch 승인 아님 |
 | anonymous readiness request | `/api/operations/readiness`가 `404` | operator token 없는 요청을 숨기는 의도된 동작 |
@@ -52,7 +52,7 @@ Root에 migration/seed/write를 하지 않았다. Free + unprotected branch는 v
 
 Production root의 자식으로 새 격리 branch를 만들고, branch ID를 고정하여 사용했다.
 
-- Temporary branch: `br-autumn-frog-ajmmdyqb`
+- Temporary branch: `br-proud-tooth-aj4k1eed`
 - Parent: `br-bitter-wave-ajs8dy0u`
 - 목적: PR #80의 `0009_alpha_profile_identity.sql` 및 `0010_identity_notice_version.sql` 스키마 rehearsal
 - 결과: ledger 11개, 서로 다른 hash 11개, latest id `11`
@@ -65,9 +65,9 @@ Production root의 자식으로 새 격리 branch를 만들고, branch ID를 고
 
 제한 사항:
 
-1. 이 rehearsal은 직접 단일 SQL transaction으로 실행한 스키마 확인이다.
-2. 표준 `scripts/db/migrate.ts`를 실제 Node runtime으로 실행한 증거가 아니다.
-3. 두 번째 표준 migrator 실행의 machine-generated no-op artifact가 아니다.
+1. disposable branch에서 표준 `npm run db:migrate` Node runtime을 실행해 ledger 11개와 신규 schema를 확인했다.
+2. `migration_second_run_noop` 단일 케이스는 실제 Neon PostgreSQL에서 PASS했지만, 이후 transport helper 수정으로 PR HEAD가 바뀌었으므로 최종 증거로 재사용하지 않는다.
+3. 현재 HEAD `f6776ffe…` 기준 4개 suite의 machine-generated integration PASS artifact는 아직 생성되지 않았다. 실행은 시간 제한으로 중단됐고 fixture baseline은 복구했다.
 4. PR #80의 exact Preview HTTP/browser smoke가 아니다.
 5. Production migration approval이나 live PortOne/Danal 인증 증거가 아니다.
 
@@ -100,11 +100,7 @@ npm run operations:production:verify
 
 `UNSTANDARD_DEBUG_CHECK_TOKEN`의 값은 이 문서에 기록하지 않는다. Vercel 환경변수 페이지에서 Production 항목의 존재만 확인하고, secret manager 또는 로컬 환경에 직접 주입한다. 값이 없거나 접근할 수 없으면 결과는 `BLOCKED_EXTERNAL`이며 추정 PASS를 만들지 않는다.
 
-Vercel CLI를 사용할 경우 공식 명령은 다음과 같다. 이 명령은 Production 변수를 로컬 파일로 내려받으므로, 파일 권한·보관·삭제를 형의 로컬 secret 관리 규칙으로 처리한다. 파일 내용을 채팅/GitHub에 올리지 않는다.
-
-```bash
-vercel env pull .env.production.local --environment=production
-```
+이번 실행에서는 `vercel env pull`로 Production secret을 회수하지 않는다. 기존 operator token plaintext는 폐기됐고, 새 token은 founder/operator가 승인된 secret manager에서 일회성 로컬 프로세스에만 주입해야 한다. secret이 없으면 결과는 `BLOCKED_EXTERNAL`이며 추정 PASS를 만들지 않는다. 파일 내용을 채팅/GitHub에 올리지 않는다.
 
 공식 참고: https://vercel.com/docs/cli/env
 
@@ -176,10 +172,10 @@ Free root branch를 계속 사용하려면 attestation에 다음이 필요하다
 | PR #80 | https://github.com/seonghyeonist/unstandard/pull/80 |
 | main ruleset | https://github.com/seonghyeonist/unstandard/rules/21377107 |
 | Vercel project | https://vercel.com/unstandard/unstandard-m9qj |
-| 현재 Production deployment inspector | https://vercel.com/unstandard/unstandard-m9qj/qYabi7oGpqMDDg9ayVAyBgiasgZY |
+| 현재 Production deployment inspector | https://vercel.com/unstandard/unstandard-m9qj/CMHQAwDQx1qdHCv8zHAiLwfai5NF |
 | Vercel Environment Variables | https://vercel.com/unstandard/unstandard-m9qj/settings/environment-variables |
 | Neon project | https://console.neon.tech/app/projects/raspy-fog-00907976 |
-| Neon rehearsal branch | https://console.neon.tech/app/projects/raspy-fog-00907976/branches/br-autumn-frog-ajmmdyqb |
+| Neon rehearsal branch | https://console.neon.tech/app/projects/raspy-fog-00907976/branches/br-proud-tooth-aj4k1eed |
 | Production site | https://unstandard.app/ |
 | Privacy page | https://unstandard.app/privacy |
 | Operator readiness endpoint | https://unstandard.app/api/operations/readiness |
@@ -327,16 +323,16 @@ Adobe Express에서는 위 색·폰트·로고·CTA를 Brand Kit으로 저장하
 
 ### 7.7 KPI와 중단 규칙
 
-기존 Stage 1 계약의 초기 기준을 사용하되, 숫자가 곧 launch 승인은 아니다.
+아래 수치는 마케팅·관찰용 KPI이며 launch 승인이 아니다. 정확한 성숙도, 표본 수, GO/CONDITIONAL/NO-GO 판정은 `CLOSED_ALPHA_STAGE1_RUNBOOK.md`를 기준으로 한다.
 
 | 지표 | 목표/관찰 기준 | 미달 시 |
 |---|---|---|
 | 후보 신청자 | 70–100명 | 카피·채널 수정 |
 | 실제 초대 계정 | 최대 50명 | 운영 gate와 supply를 확인하며 batch 조절 |
-| 온보딩 완료율 | `>=70%` | 질문 수·첫 화면 마찰 축소 |
+| 온보딩 완료율 | `>=75%`, 최소 10명 | 질문 수·첫 화면 마찰 축소 |
 | 첫 질문 답변율 | `>=55%` | 질문 난이도와 helper 문구 수정 |
-| 첫 blur 해제 | 중간값 `<=3분` | 단계·카피·empty state 점검 |
-| D7 retention | `>=25%`, 이상적으로 40% 근접 | 질문 재방문 이유와 알림 설계 재검토 |
+| 첫 blur 해제 | 중간값 `<=180초`, 최소 10명 | 단계·카피·empty state 점검 |
+| D7 retention | `>=40%`, 성숙 참가자 최소 10명 | 질문 재방문 이유와 알림 설계 재검토 |
 | 피드백 제출 | `>=30%` | 폼 간소화 |
 | 신고/차단 | 급증 없음 | 즉시 초대 중단, moderation review |
 | supply balance | founder-defined bucket 기준 안정 | minority boost/soft waitlist/hard gate |
@@ -376,10 +372,10 @@ Adobe Express에서는 위 색·폰트·로고·CTA를 Brand Kit으로 저장하
 
 ## 10. 현재 남은 blocker
 
-1. PR #80이 아직 Production과 동일 SHA가 아니다.
-2. operator token을 사용한 새 `operations:production:verify` artifact가 없다.
-3. PR #80 기준 exact Preview deployment와 HTTP/browser smoke가 없다.
-4. 표준 Node→Neon integration, migrator second-run no-op, concurrency drill이 새 HEAD에서 없다.
+1. PR #80 최신 HEAD `f6776ffe…`가 아직 Production과 동일 SHA가 아니다.
+2. 폐기된 operator token을 재사용하지 않았고, 새 `operations:production:verify` artifact가 없다.
+3. PR #80 최신 HEAD 기준 exact Preview deployment와 HTTP/browser smoke가 없다.
+4. 최신 HEAD 기준 4-suite Node→Neon integration PASS artifact와 concurrency drill이 없다.
 5. PortOne/Danal 계약·비용·live channel·개인정보/로그 scrub 검토가 끝나지 않았다.
 6. 현재 Neon root는 Free + unprotected라 fresh Free-plan exception 또는 protected paid branch evidence가 필요하다.
 7. v4 attestation의 support, deletion, restore, moderation, supply, domain 네 부분 audit, monetization disabled evidence가 비어 있다.
