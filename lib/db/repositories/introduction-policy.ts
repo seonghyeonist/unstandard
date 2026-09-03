@@ -2,7 +2,7 @@ import "server-only";
 import { sql, type SQL } from "drizzle-orm";
 import { getDb } from "@/lib/db/client";
 import type { DbExecutor } from "@/lib/db/types";
-import { IDENTITY_NOTICE_VERSION } from "@/lib/identity/contracts";
+import { IDENTITY_BIOMETRIC_CONSENT_VERSION, IDENTITY_NOTICE_VERSION } from "@/lib/identity/contracts";
 import { PROFILE_CONSENT_VERSION, INTRODUCTION_SCOPE_VERSION } from "@/lib/profile/basics";
 
 /** Aliases are static identifiers only. One SQL snapshot covers both profiles and attestations. */
@@ -17,7 +17,11 @@ export function eligibleProfileSql(userId: SQL): SQL {
       AND pb.profile_consent_version = ${PROFILE_CONSENT_VERSION}
       AND pb.introduction_scope_version = ${INTRODUCTION_SCOPE_VERSION}
       AND pb.updated_at <= now() AND pb.updated_at > now() - interval '365 days'
-      AND iv.notice_version = ${IDENTITY_NOTICE_VERSION} AND iv.status = 'verified' AND iv.verified_at IS NOT NULL AND iv.verified_at <= now()
+      AND iv.notice_version = ${IDENTITY_NOTICE_VERSION}
+      AND iv.biometric_consent_version = ${IDENTITY_BIOMETRIC_CONSENT_VERSION}
+      AND iv.status = 'verified'
+      AND iv.provider_reference IS NOT NULL AND iv.verified_at IS NOT NULL AND iv.verified_at <= now()
+      AND iv.provider_purged_at IS NOT NULL AND iv.provider_purged_at >= iv.verified_at
       AND iv.profile_revision = pb.revision
   )`;
 }

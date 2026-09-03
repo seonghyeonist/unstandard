@@ -5,12 +5,15 @@ import { ProfileBasicsForm } from "../components/profile/profile-basics-form";
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { canIntroduce, isIntroductionEligible, profileBasicsSchema, PROFILE_CONSENT_VERSION, INTRODUCTION_SCOPE_VERSION, type EligibilityFacts } from "../lib/profile/basics";
+import { IDENTITY_BIOMETRIC_CONSENT_VERSION } from "../lib/identity/contracts";
 import { isSameOriginMutation, readSmallJson } from "../lib/http/profile-request";
 
 const now = new Date("2026-08-28T00:00:00Z");
 const facts: EligibilityFacts = { gender: "male", age: 22, region: "서울", profileConsentVersion: PROFILE_CONSENT_VERSION,
   introductionScopeVersion: INTRODUCTION_SCOPE_VERSION, introductionScopeAccepted: true, updatedAt: now,
-  identityNoticeVersion: "alpha-identity-v1", onboarded: true, revision: "revision-1", verifiedRevision: "revision-1", verifiedAt: now };
+  identityNoticeVersion: "alpha-identity-v1", identityBiometricConsentVersion: IDENTITY_BIOMETRIC_CONSENT_VERSION,
+  identityStatus: "verified", providerReference: "provider-reference-1",
+  onboarded: true, revision: "revision-1", verifiedRevision: "revision-1", verifiedAt: now, providerPurgedAt: now };
 const input = { nickname: "여름", gender: "male", age: 22, region: "서울", introductionScopeAccepted: true,
   profileConsentAccepted: true, profileConsentVersion: PROFILE_CONSENT_VERSION, introductionScopeVersion: INTRODUCTION_SCOPE_VERSION };
 
@@ -28,8 +31,9 @@ describe("basic profile consent and eligibility", () => {
     assert.equal(canIntroduce(facts, { ...facts, gender: "female" }, now), true);
     assert.equal(canIntroduce(facts, facts, now), false);
   });
-  for (const patch of [{ identityNoticeVersion: "old" }, { gender: null }, { age: null }, { region: null }, { introductionScopeAccepted: false },
-    { verifiedAt: null }, { verifiedRevision: "old" }, { onboarded: false }, { updatedAt: new Date("2025-08-28T00:00:00Z") },
+  for (const patch of [{ identityNoticeVersion: "old" }, { identityBiometricConsentVersion: "old" }, { identityStatus: "verified_unpurged" }, { providerReference: null },
+    { gender: null }, { age: null }, { region: null }, { introductionScopeAccepted: false },
+    { verifiedAt: null }, { providerPurgedAt: null }, { verifiedRevision: "old" }, { onboarded: false }, { updatedAt: new Date("2025-08-28T00:00:00Z") },
     { verifiedAt: new Date("2030-01-01") }, { profileConsentVersion: "old" }, { introductionScopeVersion: "old" }]) {
     it(`fails closed for incomplete/stale facts ${JSON.stringify(patch)}`, () => {
       assert.equal(isIntroductionEligible({ ...facts, ...patch }, now), false);
@@ -57,8 +61,8 @@ describe("basic profile server-rendered form", () => {
       createElement(ProfileBasicsForm, { setup: { basics: null, eligible: false, verification: "not_started", verificationAvailable: false } })));
     assert.match(html, /성별/); assert.match(html, /만 나이/); assert.match(html, /시도 선택/);
     assert.match(html, /인증 서비스 준비 중/);
-    assert.match(html, /disabled=""[^>]*>실명·휴대전화 인증 시작/);
-    assert.doesNotMatch(html, /type="tel"|name="realName"|name="phone"/);
+    assert.match(html, /disabled=""[^>]*>신원·성인 인증 시작/);
+    assert.doesNotMatch(html, /type="tel"|name="realName"|name="phone"|name="birth/);
     assert.match(html, /지원·계정 삭제/);
   });
   it("offers result recovery from the authenticated pending request without rendering its ID or personal input fields", () => {
@@ -68,6 +72,6 @@ describe("basic profile server-rendered form", () => {
         verificationAvailable: true, pendingIdentityRequestId } })));
     assert.match(html, /인증 결과 확인/); assert.match(html, /확인 대기/);
     assert.doesNotMatch(html, new RegExp(pendingIdentityRequestId));
-    assert.doesNotMatch(html, /type="tel"|name="realName"|name="phone"/);
+    assert.doesNotMatch(html, /type="tel"|name="realName"|name="phone"|name="birth/);
   });
 });

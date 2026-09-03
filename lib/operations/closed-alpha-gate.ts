@@ -3,6 +3,7 @@ import { createHash } from "node:crypto";
 import { ALPHA_STAGE_1_CAP } from "@/lib/alpha/stage1-policy";
 import { ALPHA_METRICS_CONTRACT_VERSION } from "@/lib/alpha/metrics";
 import type { VerifiedProductionReadinessEvidence } from "@/lib/operations/production-evidence";
+import { IDENTITY_PROVIDER_NOTICE_READY } from "@/lib/identity/notice";
 
 export const CLOSED_ALPHA_TECHNICAL_MAX_AGE_MS = 6 * 60 * 60 * 1000;
 export const CLOSED_ALPHA_ATTESTATION_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000;
@@ -378,6 +379,12 @@ export function evaluateClosedAlphaLaunch(input: {
         input.attestation.incidentResponseMinutes <= 1_440,
       "INCIDENT_RESPONSE_TARGET_APPROVED",
       "INCIDENT_RESPONSE_TARGET_INVALID",
+    ),
+    gate(
+      "identity_provider_notice",
+      IDENTITY_PROVIDER_NOTICE_READY,
+      "IDENTITY_PROVIDER_NOTICE_READY",
+      "IDENTITY_PROVIDER_NOTICE_NOT_READY",
     ),
   ];
 

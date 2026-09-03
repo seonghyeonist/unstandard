@@ -1,4 +1,4 @@
-import { IDENTITY_NOTICE_VERSION } from "@/lib/identity/contracts";
+import { IDENTITY_BIOMETRIC_CONSENT_VERSION, IDENTITY_NOTICE_VERSION } from "@/lib/identity/contracts";
 import { z } from "zod";
 
 export const PROFILE_CONSENT_VERSION = "alpha-basic-profile-v1";
@@ -27,7 +27,7 @@ export type BasicProfile = {
 export type ProfileSetupView = {
   basics: BasicProfile | null;
   eligible: boolean;
-  verification: "not_started" | "pending" | "verified" | "expired";
+  verification: "not_started" | "pending" | "purge_pending" | "verified" | "expired";
   verificationAvailable: boolean;
   pendingIdentityRequestId?: string;
 };
@@ -38,6 +38,9 @@ export type EligibilityFacts = {
   profileConsentVersion: string | null; introductionScopeVersion: string | null;
   introductionScopeAccepted: boolean; updatedAt: Date | null; onboarded: boolean;
   identityNoticeVersion: string | null;
+  identityBiometricConsentVersion: string | null;
+  identityStatus: "pending" | "verified_unpurged" | "verified" | null;
+  providerReference: string | null; providerPurgedAt: Date | null;
   revision: string | null; verifiedRevision: string | null; verifiedAt: Date | null;
 };
 export function isIntroductionEligible(f: EligibilityFacts, now = new Date()): boolean {
@@ -45,7 +48,10 @@ export function isIntroductionEligible(f: EligibilityFacts, now = new Date()): b
     f.age! >= 19 && f.age! <= 120 && ACTIVITY_REGIONS.includes(f.region as typeof ACTIVITY_REGIONS[number]) &&
     f.profileConsentVersion === PROFILE_CONSENT_VERSION &&
     f.introductionScopeVersion === INTRODUCTION_SCOPE_VERSION && f.introductionScopeAccepted &&
-    f.identityNoticeVersion === IDENTITY_NOTICE_VERSION && f.onboarded && !!f.revision && f.revision === f.verifiedRevision && !!f.verifiedAt &&
+    f.identityNoticeVersion === IDENTITY_NOTICE_VERSION && f.identityBiometricConsentVersion === IDENTITY_BIOMETRIC_CONSENT_VERSION &&
+    f.identityStatus === "verified" && !!f.providerReference &&
+    f.onboarded && !!f.revision && f.revision === f.verifiedRevision && !!f.verifiedAt &&
+    !!f.providerPurgedAt && f.providerPurgedAt >= f.verifiedAt && f.providerPurgedAt <= now &&
     !!f.updatedAt && f.updatedAt <= now && now.getTime() - f.updatedAt.getTime() < PROFILE_FRESHNESS_MS &&
     f.verifiedAt <= now;
 }

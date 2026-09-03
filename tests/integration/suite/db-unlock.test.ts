@@ -5,6 +5,7 @@ import { getPublicProfileById, listPublicCandidatesForViewer } from "../../../li
 import { createMessage, listConversation } from "../../../lib/db/repositories/messages.repository";
 import { identityVerifications, profileBasics } from "../../../lib/db/schema/profile-basics";
 import { INTRODUCTION_SCOPE_VERSION, PROFILE_CONSENT_VERSION } from "../../../lib/profile/basics";
+import { IDENTITY_BIOMETRIC_CONSENT_VERSION } from "../../../lib/identity/contracts";
 import { addSyntheticVerifiedBasics } from "../profile-fixture";
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
@@ -83,14 +84,35 @@ describe("integration: db-backed unlock vertical slice", () => {
       assert.equal((await createMessage({ viewerUserId: a.userId, targetProfileId: b.profileId, body: "blocked message" })).ok, false);
       assert.equal((await getDbUnlockStatus({ viewerUserId: a.userId, profileId: b.profileId })).ok, false);
       assert.equal(await listPublicCandidatesForViewer(b.userId), "setup_required");
-      const pending = await identityRepository.begin(b.userId, "test-only", new Date());
+      const pending = await identityRepository.begin(b.userId, "test-only", IDENTITY_BIOMETRIC_CONSENT_VERSION, new Date());
       assert.ok(pending);
       await profileBasicsRepository.save(b.userId, { ...input, age: 24 });
-      assert.equal(await identityRepository.complete(pending, new Date()), false);
-      const fresh = await identityRepository.begin(b.userId, "test-only", new Date());
+      assert.equal(await identityRepository.markVerifiedUnpurged(pending!, {
+        requestId: pending!.requestId,
+        providerReference: "33333333-3333-4333-8333-333333333333",
+        verifiedAt: new Date(),
+        documentVerified: true,
+        livenessVerified: true,
+        faceMatchVerified: true,
+        deviceIpVerified: true,
+        adultVerified: true,
+      }, new Date()), false);
+      const fresh = await identityRepository.begin(b.userId, "test-only", IDENTITY_BIOMETRIC_CONSENT_VERSION, new Date());
       assert.ok(fresh);
       assert.equal(await identityRepository.find(a.userId, fresh.requestId), null);
-      assert.equal(await identityRepository.complete(fresh, new Date()), true);
+      const freshProviderReference = randomUUID();
+      assert.equal(await identityRepository.bindProviderReference(fresh!, freshProviderReference), true);
+      assert.equal(await identityRepository.markVerifiedUnpurged(fresh!, {
+        requestId: fresh!.requestId,
+        providerReference: freshProviderReference,
+        verifiedAt: new Date(),
+        documentVerified: true,
+        livenessVerified: true,
+        faceMatchVerified: true,
+        deviceIpVerified: true,
+        adultVerified: true,
+      }, new Date()), true);
+      assert.equal(await identityRepository.markVerified(fresh!, new Date()), true);
       assert.equal(await canAccessIntroduction(a.userId, b.profileId), true);
       await profileBasicsRepository.withdraw(b.userId);
       assert.equal((await profileBasicsRepository.read(b.userId)).basics, null);

@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { boolean, check, integer, pgTable, text, timestamp, uuid } from "drizzle-orm/pg-core";
+import { boolean, check, integer, pgTable, text, timestamp, uniqueIndex, uuid } from "drizzle-orm/pg-core";
 import { users } from "@/lib/db/schema/auth";
 
 // No backfill: an absent row means the user has not supplied these fields.
@@ -27,12 +27,21 @@ export const identityVerifications = pgTable("identity_verifications", {
   profileRevision: uuid("profile_revision").notNull(),
   status: text("status").notNull(),
   provider: text("provider").notNull(),
+  providerReference: text("provider_reference"),
+  biometricConsentVersion: text("biometric_consent_version").notNull(),
   noticeVersion: text("notice_version").notNull(),
   requestedAt: timestamp("requested_at", { withTimezone: true }).notNull(),
   expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
   verifiedAt: timestamp("verified_at", { withTimezone: true }),
+  providerPurgedAt: timestamp("provider_purged_at", { withTimezone: true }),
 }, (t) => [
-  check("identity_status_check", sql`${t.status} IN ('pending', 'verified')`),
-  check("identity_result_check", sql`(${t.status} = 'pending' AND ${t.verifiedAt} IS NULL) OR (${t.status} = 'verified' AND ${t.verifiedAt} IS NOT NULL)`),
+  uniqueIndex("identity_verifications_provider_reference_unique").on(t.providerReference),
+  check("identity_status_check", sql`${t.status} IN ('pending', 'verified_unpurged', 'verified')`),
+  check("identity_result_check", sql`(
+    (${t.status} = 'pending' AND ${t.verifiedAt} IS NULL AND ${t.providerPurgedAt} IS NULL)
+    OR (${t.status} = 'verified_unpurged' AND ${t.verifiedAt} IS NOT NULL AND ${t.providerPurgedAt} IS NULL)
+    OR (${t.status} = 'verified' AND ${t.verifiedAt} IS NOT NULL AND ${t.providerPurgedAt} IS NOT NULL)
+  )`),
+  check("identity_provider_reference_check", sql`${t.status} = 'pending' OR ${t.providerReference} IS NOT NULL`),
   check("identity_expiry_check", sql`${t.expiresAt} > ${t.requestedAt}`),
 ]);

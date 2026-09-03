@@ -1,6 +1,6 @@
 import "server-only";
 import type { IdentityProvider } from "@/lib/identity/contracts";
-import { createPortOneIdentityProvider, parsePortOneIdentityConfig } from "@/lib/identity/portone";
+import { createDiditIdentityProvider, parseDiditIdentityConfig } from "@/lib/identity/didit";
 import { IDENTITY_PROVIDER_NOTICE_READY } from "@/lib/identity/notice";
 
 /** Deliberately closed until a provider, contract, retention notice and live flow are approved.
@@ -8,6 +8,6 @@ import { IDENTITY_PROVIDER_NOTICE_READY } from "@/lib/identity/notice";
  */
 export function getIdentityProvider(): IdentityProvider | null {
   if (!IDENTITY_PROVIDER_NOTICE_READY) return null;
-  const config = parsePortOneIdentityConfig(process.env);
-  return config ? createPortOneIdentityProvider(config) : null;
+  const config = parseDiditIdentityConfig(process.env);
+  return config ? createDiditIdentityProvider(config) : null;
 }

@@ -12,7 +12,7 @@ export async function getProfileRecruitmentCounts() {
       WHERE i.target_phase = ${ALPHA_STAGE_1_PHASE} AND i.status = 'consumed' AND u.invite_finalized_at IS NOT NULL
     ) SELECT coalesce(b.gender, 'not_provided') AS gender,
       count(*)::int AS registered,
-      count(*) FILTER (WHERE v.status = 'verified' AND v.profile_revision = b.revision)::int AS verified,
+      count(*) FILTER (WHERE v.status = 'verified' AND v.profile_revision = b.revision AND v.provider_purged_at IS NOT NULL)::int AS verified,
       count(*) FILTER (WHERE ${eligibleProfileSql(sql`population.id`)})::int AS eligible
     FROM population LEFT JOIN profile_basics b ON b.user_id = population.id
     LEFT JOIN identity_verifications v ON v.user_id = population.id

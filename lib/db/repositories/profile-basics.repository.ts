@@ -1,4 +1,4 @@
-import { IDENTITY_NOTICE_VERSION } from "@/lib/identity/contracts";
+import { IDENTITY_BIOMETRIC_CONSENT_VERSION, IDENTITY_NOTICE_VERSION } from "@/lib/identity/contracts";
 import "server-only";
 import { randomUUID } from "node:crypto";
 import { eq, sql } from "drizzle-orm";
@@ -19,12 +19,12 @@ export const profileBasicsRepository: ProfileBasicsRepository = {
       .where(eq(profileBasics.userId, userId)).limit(1);
     if (!row) return { basics: null, verification: "not_started", eligible: false };
     const v = row.verification;
-    const status = !v || v.noticeVersion !== IDENTITY_NOTICE_VERSION || v.profileRevision !== row.basics.revision ? "not_started" :
-      v.status === "verified" ? "verified" : v.expiresAt <= new Date() ? "expired" : "pending";
+    const status = !v || v.noticeVersion !== IDENTITY_NOTICE_VERSION || v.biometricConsentVersion !== IDENTITY_BIOMETRIC_CONSENT_VERSION || v.profileRevision !== row.basics.revision ? "not_started" :
+      v.status === "verified" ? "verified" : v.status === "verified_unpurged" ? "purge_pending" : v.expiresAt <= new Date() ? "expired" : "pending";
     return { basics: { nickname: row.nickname, gender: row.basics.gender as Gender, age: row.basics.age,
       region: row.basics.region, introductionScopeAccepted: row.basics.introductionScopeAccepted,
       updatedAt: row.basics.updatedAt.toISOString() }, verification: status, eligible: row.eligible,
-      pendingIdentityRequestId: status === "pending" ? v!.requestId : undefined };
+      pendingIdentityRequestId: status === "pending" || status === "purge_pending" ? v!.requestId : undefined };
   },
   async save(userId, input) {
     await getDb().transaction(async (tx) => {

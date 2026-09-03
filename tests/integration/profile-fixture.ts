@@ -10,5 +10,7 @@ export async function addSyntheticVerifiedBasics(db: IntegrationDb, userId: stri
     introductionScopeVersion: INTRODUCTION_SCOPE_VERSION, profileConsentVersion: PROFILE_CONSENT_VERSION,
     consentedAt: now, updatedAt: now, revision });
   await db.insert(identityVerifications).values({ userId, requestId: randomUUID(), profileRevision: revision,
-    provider: "integration-fixture-only", noticeVersion: "alpha-identity-v1", status: "verified", requestedAt: now, verifiedAt: now, expiresAt: new Date(now.getTime() + 600000) });
+    provider: "integration-fixture-only", providerReference: randomUUID(), biometricConsentVersion: "alpha-biometric-identity-v1",
+    noticeVersion: "alpha-identity-v1", status: "verified", requestedAt: now, verifiedAt: now,
+    providerPurgedAt: now, expiresAt: new Date(now.getTime() + 600000) });
 }

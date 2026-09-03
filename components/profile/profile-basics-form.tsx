@@ -51,13 +51,9 @@ export function ProfileBasicsForm({ setup }: { setup: ProfileSetupView }) {
     if (action === "complete") {
       await completeBrowserIdentity(identityRequest ?? "");
     } else {
-      // SDK loader is not imported until the configured service is available and the user consents.
       if (!setup.verificationAvailable || !identityConsent) throw new Error("인증 안내를 확인해 주세요.");
-      let sdk;
-      try { sdk = await import("@portone/browser-sdk/v2"); }
-      catch { throw new Error("인증 화면을 불러오지 못했어요. 잠시 뒤 다시 시도해 주세요."); }
       await startBrowserIdentity({ consentAccepted: identityConsent, origin: window.location.origin,
-        sdk: sdk.requestIdentityVerification, onStarted: setStartedRequestId });
+        onStarted: setStartedRequestId });
     }
     setStartedRequestId(undefined);
   }, onSettled: refresh });
@@ -79,12 +75,12 @@ export function ProfileBasicsForm({ setup }: { setup: ProfileSetupView }) {
       </form>
     </Card>
     <Card>
-      <h2 className="text-xl font-black">실명·휴대전화 확인</h2>
-      <p className="mt-3 text-sm leading-6">{setup.verificationAvailable ? "PortOne을 통한 다날 휴대폰 본인인증 화면에서 실명과 본인 명의 휴대전화 소유를 함께 확인해요. 팝업을 허용해 주세요." : "인증 서비스 준비 중이에요. 지금은 실명·전화번호를 입력하거나 제출할 수 없어요."}</p>
-      <p className="mt-3 text-sm leading-6 text-foreground/70">실명·휴대전화 정보는 인증사 화면에서 입력해요. 서버가 결과를 확인할 때 원문을 일시 처리할 수 있지만, 확인 후 별도로 보관하지 않으며 회원 DB·애플리케이션 로그에도 저장하지 않아요. 인증 상태와 요청·동의 기록만 남겨요. 인증사 자신의 보유·파기 조건은 별도이며, 확정된 안내를 게시하기 전에는 연결하지 않아요. <Link className="underline" href="/privacy">개인정보 안내</Link></p>
-      <p className="mt-3 text-sm">인증 상태: {({ not_started: "미인증", pending: "확인 대기", verified: "확인 완료", expired: "요청 만료" })[setup.verification]}</p>
-      <label className="mt-4 flex gap-3 text-sm"><input type="checkbox" disabled={!setup.verificationAvailable} checked={identityConsent} onChange={(e) => setIdentityConsent(e.target.checked)} /><span>실명·본인 명의 휴대전화 확인을 위한 처리와 인증 결과 기록에 동의해요. 목적·항목·보유 및 파기 안내를 확인했으며, 거부하면 소개 기능을 이용할 수 없어요.</span></label>
-      <Button className="mt-4 w-full" disabled={busy || !setup.verificationAvailable || !setup.basics?.introductionScopeAccepted || !identityConsent} onClick={() => verify.mutate("start")}>실명·휴대전화 인증 시작</Button>
+      <h2 className="text-xl font-black">신원·성인 확인</h2>
+      <p className="mt-3 text-sm leading-6">{setup.verificationAvailable ? "Didit의 보안 인증 화면에서 신분증·수동적 생체활성·얼굴 일치·기기/IP 위험 신호를 확인해요. 완료 후 인증사 세션 삭제 확인까지 진행해요." : "인증 서비스 준비 중이에요. 지금은 신분증·생체정보를 입력하거나 제출할 수 없어요."}</p>
+      <p className="mt-3 text-sm leading-6 text-foreground/70">인증 정보는 Didit 화면에서 입력해요. 앱은 인증 결과에 필요한 최소 상태만 확인하고 신분증 원문·이름·생년월일·영상·얼굴 템플릿을 저장하지 않아요. Didit의 실제 처리자·보유기간·국외이전 조건은 계약과 확정 고지 후에만 연결해요. <Link className="underline" href="/privacy">개인정보 안내</Link></p>
+      <p className="mt-3 text-sm">인증 상태: {({ not_started: "미인증", pending: "확인 대기", purge_pending: "삭제 확인 대기", verified: "확인 완료", expired: "요청 만료" })[setup.verification]}</p>
+      <label className="mt-4 flex gap-3 text-sm"><input type="checkbox" disabled={!setup.verificationAvailable} checked={identityConsent} onChange={(e) => setIdentityConsent(e.target.checked)} /><span>신분증·수동적 생체활성·얼굴 일치·성인 여부와 필요한 기기/IP 분석 처리, 인증 결과 기록 및 인증 세션 삭제 확인에 동의해요. 거부하면 소개 기능을 이용할 수 없어요.</span></label>
+      <Button className="mt-4 w-full" disabled={busy || !setup.verificationAvailable || !setup.basics?.introductionScopeAccepted || !identityConsent} onClick={() => verify.mutate("start")}>신원·성인 인증 시작</Button>
       {identityRequest ? <Button className="mt-3 w-full" disabled={busy || !setup.verificationAvailable} onClick={() => verify.mutate("complete")}>인증 결과 확인</Button> : null}
       {verify.isError ? <p role="alert" className="mt-3 text-sm text-danger">{verify.error.message}</p> : null}
     </Card>
