@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { readFileSync } from "node:fs";
 import { getSocialProviderAvailabilityFromEnv } from "../lib/auth/social-config-policy";
+import { parseNaverProfile } from "../lib/auth/naver-profile";
 import { oauthInviteEmailMatches, oauthInviteRegistrationAllowed } from "../lib/auth/oauth-invite";
 
 describe("closed-alpha OAuth invite gate", () => {
@@ -37,6 +38,33 @@ describe("closed-alpha OAuth invite gate", () => {
     }), { google: false, naver: false });
   });
 
+  it("accepts only a successful Naver profile and reduces it to the auth minimum", () => {
+    assert.deepEqual(parseNaverProfile({
+      resultcode: "00",
+      message: "success",
+      response: {
+        id: "naver-synthetic-id",
+        email: " member@example.com ",
+        name: "Should Not Persist",
+        mobile: "+1-202-555-0100",
+        birthyear: "1990",
+      },
+    }), {
+      id: "naver-synthetic-id",
+      name: "Member",
+      email: "member@example.com",
+      emailVerified: false,
+    });
+    assert.equal(parseNaverProfile({
+      resultcode: "04",
+      response: { id: "naver-synthetic-id", email: "member@example.com" },
+    }), null);
+    assert.equal(parseNaverProfile({
+      resultcode: "00",
+      response: { id: "naver-synthetic-id" },
+    }), null);
+  });
+
   it("keeps implicit signup and account linking disabled in the server contract", () => {
     const source = readFileSync("lib/auth/auth.ts", "utf8");
     assert.match(source, /disableImplicitSignUp:\s*true/);
@@ -47,6 +75,9 @@ describe("closed-alpha OAuth invite gate", () => {
     assert.match(source, /finalizeInviteRegistration/);
     assert.match(source, /clearRegistrationTicketCookie/);
     assert.match(source, /genericOAuth\(\{ config: naverOAuthConfig\(\) \}\)/);
+    assert.match(source, /tokenUrlParams:/);
+    assert.match(source, /context\.query\?\.state/);
+    assert.match(source, /parseNaverProfile/);
   });
 
   it("does not place OAuth or Didit secrets in client entrypoints", () => {

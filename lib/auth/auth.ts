@@ -1,13 +1,12 @@
 import "server-only";
 
-import { betterAuth, type BetterAuthOptions } from "better-auth";
+import { betterAuth, type BetterAuthOptions, type GenericEndpointContext } from "better-auth";
 import { nextCookies } from "better-auth/next-js";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { APIError, createAuthMiddleware } from "better-auth/api";
 import { genericOAuth } from "better-auth/plugins/generic-oauth";
 import { cookies } from "next/headers";
 import { eq } from "drizzle-orm";
-import { z } from "zod";
 import { getDb } from "@/lib/db/client";
 import { users } from "@/lib/db/schema/auth";
 import { schema } from "@/lib/db/schema";
@@ -23,6 +22,7 @@ import {
   getRegistrationTicketCookieName,
   verifyRegistrationTicket,
 } from "@/lib/auth/invite-ticket";
+import { parseNaverProfile } from "@/lib/auth/naver-profile";
 import { oauthInviteRegistrationAllowed } from "@/lib/auth/oauth-invite";
 import { getSocialProviderAvailability } from "@/lib/auth/social-config";
 import { readSmallJson } from "@/lib/http/profile-request";
@@ -82,13 +82,6 @@ function socialProviders(): NonNullable<BetterAuthOptions["socialProviders"]> {
   };
 }
 
-const naverProfileSchema = z.object({
-  response: z.object({
-    id: z.string().trim().min(1).max(256),
-    email: z.string().trim().email().max(320),
-  }).passthrough(),
-}).passthrough();
-
 function naverOAuthConfig() {
   const clientId = process.env.NAVER_CLIENT_ID?.trim();
   const clientSecret = process.env.NAVER_CLIENT_SECRET?.trim();
@@ -104,6 +97,13 @@ function naverOAuthConfig() {
     // Naver's login API treats profile permissions as an app-console setting;
     // do not request unrelated profile fields from the authorization screen.
     scopes: [],
+    // Naver requires the CSRF state returned to the callback to be sent again
+    // during authorization-code exchange. Better Auth's generic adapter keeps
+    // the state in the callback query, so pass only that opaque value through.
+    tokenUrlParams: (context: GenericEndpointContext): Record<string, string> => {
+      const state = typeof context.query?.state === "string" ? context.query.state : "";
+      return state ? { state } : {};
+    },
     disableImplicitSignUp: true,
     getUserInfo: async (tokens: { accessToken?: string }) => {
       if (!tokens.accessToken) return null;
@@ -118,14 +118,7 @@ function naverOAuthConfig() {
           await response.body?.cancel();
           return null;
         }
-        const parsed = naverProfileSchema.safeParse(await readSmallJson(response, 32 * 1024));
-        if (!parsed.success) return null;
-        return {
-          id: parsed.data.response.id,
-          name: "Member",
-          email: parsed.data.response.email,
-          emailVerified: false,
-        };
+        return parseNaverProfile(await readSmallJson(response, 32 * 1024));
       } catch {
         return null;
       }
