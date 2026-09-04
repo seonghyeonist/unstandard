@@ -8,10 +8,13 @@ import { AppShell } from "@/components/layout/app-shell";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { signInWithEmailPassword, startMockSession } from "@/app/login/actions";
+import { authClient } from "@/lib/auth/client";
+import type { SocialProviderAvailability, SocialProviderId } from "@/lib/auth/social-config";
 
 type LoginClientProps = {
   mockAllowed: boolean;
   databaseAuthEnabled: boolean;
+  socialProviders: SocialProviderAvailability;
   errorCode?: string;
 };
 
@@ -31,6 +34,7 @@ function resolveLoginError(errorCode?: string): string | null {
 export default function LoginClient({
   mockAllowed,
   databaseAuthEnabled,
+  socialProviders,
   errorCode,
 }: LoginClientProps) {
   const router = useRouter();
@@ -54,6 +58,34 @@ export default function LoginClient({
       router.push("/onboarding");
     },
   });
+
+  const socialMutation = useMutation({
+    mutationFn: async (provider: SocialProviderId) => {
+      const result = provider === "naver"
+        ? await authClient.signIn.oauth2({
+          providerId: provider,
+          callbackURL: "/onboarding",
+          newUserCallbackURL: "/profile-setup",
+          errorCallbackURL: "/login",
+          requestSignUp: false,
+          disableRedirect: true,
+        })
+        : await authClient.signIn.social({
+          provider,
+          callbackURL: "/onboarding",
+          newUserCallbackURL: "/profile-setup",
+          errorCallbackURL: "/login",
+          requestSignUp: false,
+          disableRedirect: true,
+        });
+      if (result.error || !result.data?.url) {
+        throw new Error("소셜 로그인을 시작하지 못했어요. 제공자 설정과 계정 상태를 확인해 주세요.");
+      }
+      window.location.assign(result.data.url);
+    },
+  });
+
+  const socialBusy = signInMutation.isPending || socialMutation.isPending;
 
   return (
     <AppShell title="닫힌 문 앞에서" eyebrow="login">
@@ -97,11 +129,33 @@ export default function LoginClient({
               <Button
                 className="w-full"
                 type="submit"
-                disabled={signInMutation.isPending || !email.trim() || password.length < 10}
+                disabled={socialBusy || !email.trim() || password.length < 10}
               >
                 {signInMutation.isPending ? "Signing in…" : "Sign in"}
               </Button>
             </form>
+            <div className="mt-5 border-t border-line pt-5">
+              <p className="text-sm font-semibold">또는 Google/Naver로 로그인</p>
+              <p className="mt-2 text-xs leading-5 text-foreground/60">
+                기존 계정만 로그인할 수 있어요. 새 가입은 초대코드가 있는 등록 화면에서 진행합니다.
+              </p>
+              <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                {(["google", "naver"] as const).map((provider) => (
+                  <Button
+                    key={provider}
+                    type="button"
+                    className={provider === "google" ? "bg-foreground hover:bg-foreground/80" : "bg-[#03c75a] hover:bg-[#02a94d]"}
+                    disabled={socialBusy || !socialProviders[provider]}
+                    onClick={() => socialMutation.mutate(provider)}
+                  >
+                    {provider === "google" ? "Google로 로그인" : "Naver로 로그인"}
+                  </Button>
+                ))}
+              </div>
+              {!socialProviders.google && !socialProviders.naver ? (
+                <p className="mt-2 text-xs text-foreground/60">소셜 로그인은 외부 OAuth 앱 설정 후 활성화됩니다.</p>
+              ) : null}
+            </div>
             <Link className="mt-4 inline-block text-sm text-foreground/70 underline" href="/register">
               Have an invite? Create your account
             </Link>
@@ -132,6 +186,9 @@ export default function LoginClient({
         ) : null}
         {signInMutation.isError ? (
           <p className="mt-3 text-sm text-danger">{(signInMutation.error as Error).message}</p>
+        ) : null}
+        {socialMutation.isError ? (
+          <p className="mt-3 text-sm text-danger">{(socialMutation.error as Error).message}</p>
         ) : null}
 
         <Link className="mt-6 inline-block text-sm text-foreground/60 underline" href="/">

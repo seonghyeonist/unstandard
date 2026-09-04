@@ -1,9 +1,10 @@
 import "server-only";
 
-import { betterAuth } from "better-auth";
+import { betterAuth, type BetterAuthOptions, type GenericEndpointContext } from "better-auth";
 import { nextCookies } from "better-auth/next-js";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { APIError, createAuthMiddleware } from "better-auth/api";
+import { genericOAuth } from "better-auth/plugins/generic-oauth";
 import { cookies } from "next/headers";
 import { eq } from "drizzle-orm";
 import { getDb } from "@/lib/db/client";
@@ -21,6 +22,10 @@ import {
   getRegistrationTicketCookieName,
   verifyRegistrationTicket,
 } from "@/lib/auth/invite-ticket";
+import { parseNaverProfile } from "@/lib/auth/naver-profile";
+import { oauthInviteRegistrationAllowed } from "@/lib/auth/oauth-invite";
+import { getSocialProviderAvailability } from "@/lib/auth/social-config";
+import { readSmallJson } from "@/lib/http/profile-request";
 
 function getTrustedOrigins(): string[] {
   const origins = new Set<string>();
@@ -54,6 +59,79 @@ function requireAuthSecret(): string {
     throw new Error("BETTER_AUTH_SECRET is not configured");
   }
   return secret;
+}
+
+function socialProviders(): NonNullable<BetterAuthOptions["socialProviders"]> {
+  const availability = getSocialProviderAvailability();
+  const googleId = process.env.GOOGLE_CLIENT_ID?.trim();
+  const googleSecret = process.env.GOOGLE_CLIENT_SECRET?.trim();
+  return {
+    ...(availability.google && googleId && googleSecret ? {
+      google: {
+        clientId: googleId,
+        clientSecret: googleSecret,
+        disableImplicitSignUp: true,
+        mapProfileToUser: (profile) => ({
+          // OAuth display names are not application profile names.
+          name: "Member",
+          image: undefined,
+          emailVerified: profile.email_verified === true,
+        }),
+      },
+    } : {}),
+  };
+}
+
+function naverOAuthConfig() {
+  const clientId = process.env.NAVER_CLIENT_ID?.trim();
+  const clientSecret = process.env.NAVER_CLIENT_SECRET?.trim();
+  if (!clientId || !clientSecret || /[\r\n]/.test(clientId) || /[\r\n]/.test(clientSecret)) return [];
+
+  return [{
+    providerId: "naver",
+    authorizationUrl: "https://nid.naver.com/oauth2.0/authorize",
+    tokenUrl: "https://nid.naver.com/oauth2.0/token",
+    userInfoUrl: "https://openapi.naver.com/v1/nid/me",
+    clientId,
+    clientSecret,
+    // Naver's login API treats profile permissions as an app-console setting;
+    // do not request unrelated profile fields from the authorization screen.
+    scopes: [],
+    // Naver requires the CSRF state returned to the callback to be sent again
+    // during authorization-code exchange. Better Auth's generic adapter keeps
+    // the state in the callback query, so pass only that opaque value through.
+    tokenUrlParams: (context: GenericEndpointContext): Record<string, string> => {
+      const state = typeof context.query?.state === "string" ? context.query.state : "";
+      return state ? { state } : {};
+    },
+    disableImplicitSignUp: true,
+    getUserInfo: async (tokens: { accessToken?: string }) => {
+      if (!tokens.accessToken) return null;
+      try {
+        const response = await fetch("https://openapi.naver.com/v1/nid/me", {
+          method: "GET",
+          cache: "no-store",
+          redirect: "error",
+          headers: { Authorization: `Bearer ${tokens.accessToken}`, Accept: "application/json" },
+        });
+        if (!response.ok) {
+          await response.body?.cancel();
+          return null;
+        }
+        return parseNaverProfile(await readSmallJson(response, 32 * 1024));
+      } catch {
+        return null;
+      }
+    },
+    mapProfileToUser: (profile: Record<string, unknown>) => ({
+      // Naver's authenticated email is used only for the invite match;
+      // no Naver name, phone or profile image enters the local user record.
+      name: "Member",
+      image: undefined,
+      email: typeof profile.email === "string" ? profile.email.trim() : undefined,
+      emailVerified: false,
+    }),
+  }];
 }
 
 async function readRegistrationTicket() {
@@ -132,6 +210,59 @@ const inviteGatePlugin = () => ({
   },
 });
 
+function oauthCallbackProvider(context: { path?: string; params?: Record<string, unknown> } | null): "google" | "naver" | null {
+  const path = context?.path ?? "";
+  const parameterProvider = typeof context?.params?.id === "string"
+    ? context.params.id
+    : typeof context?.params?.providerId === "string" ? context.params.providerId : "";
+  const pathProvider = /^\/(?:oauth2\/)?callback\/(google|naver)$/.exec(path)?.[1] ?? "";
+  if (parameterProvider && parameterProvider !== "google" && parameterProvider !== "naver") {
+    throw APIError.from("FORBIDDEN", {
+      code: "INVITE_REQUIRED",
+      message: "Registration is invite-only",
+    });
+  }
+  if (parameterProvider && pathProvider && parameterProvider !== pathProvider) {
+    throw APIError.from("FORBIDDEN", {
+      code: "INVITE_REQUIRED",
+      message: "Registration is invite-only",
+    });
+  }
+  const provider = parameterProvider || pathProvider;
+  if (provider === "google" || provider === "naver") return provider;
+  if (path === "/callback/:id" || path === "/oauth2/callback/:providerId" || path.startsWith("/callback/") || path.startsWith("/oauth2/callback/")) {
+    throw APIError.from("FORBIDDEN", {
+      code: "INVITE_REQUIRED",
+      message: "Registration is invite-only",
+    });
+  }
+  return null;
+}
+
+async function requireOAuthInvite(context: { path?: string; params?: Record<string, unknown> } | null, email: string) {
+  const path = context?.path ?? "";
+  const isEmailRegistration = path === "/sign-up/email";
+  const isAllowedOAuthRegistration = Boolean(oauthCallbackProvider(context));
+  if (!isEmailRegistration && !isAllowedOAuthRegistration) {
+    throw APIError.from("FORBIDDEN", {
+      code: "INVITE_REQUIRED",
+      message: "Registration is invite-only",
+    });
+  }
+  const ticket = await readRegistrationTicket();
+  const reservationValid = ticket ? await verifyInviteReservation(ticket) : false;
+  if (!oauthInviteRegistrationAllowed({
+    oauthEmail: email,
+    inviteEmail: ticket?.email,
+    reservationValid,
+  })) {
+    throw APIError.from("FORBIDDEN", {
+      code: "INVITE_REQUIRED",
+      message: "Registration is invite-only",
+    });
+  }
+}
+
 let authInstance: ReturnType<typeof betterAuth> | null = null;
 
 export function getAuth(): ReturnType<typeof betterAuth> {
@@ -151,6 +282,15 @@ export function getAuth(): ReturnType<typeof betterAuth> {
     emailAndPassword: {
       enabled: true,
       minPasswordLength: 10,
+    },
+    socialProviders: socialProviders(),
+    account: {
+      accountLinking: {
+        enabled: false,
+        disableImplicitLinking: true,
+        allowDifferentEmails: false,
+        updateUserInfoOnLink: false,
+      },
     },
     user: {
       deleteUser: {
@@ -174,10 +314,13 @@ export function getAuth(): ReturnType<typeof betterAuth> {
         ipAddressHeaders: ["x-forwarded-for"],
       },
     },
-    plugins: [inviteGatePlugin(), nextCookies()],
+    plugins: [genericOAuth({ config: naverOAuthConfig() }), inviteGatePlugin(), nextCookies()],
     databaseHooks: {
       user: {
         create: {
+          before: async (user, context) => {
+            await requireOAuthInvite(context as { path?: string; params?: Record<string, unknown> } | null, user.email);
+          },
           after: async (user) => {
             const ticket = await readRegistrationTicket();
             if (!ticket) {

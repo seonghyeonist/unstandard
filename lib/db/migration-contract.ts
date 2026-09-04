@@ -19,6 +19,8 @@ export const REQUIRED_APPLICATION_TABLES = [
   "accounts",
   "verifications",
   "profiles",
+  "profile_basics",
+  "identity_verifications",
   "profile_private",
   "questions",
   "answers",

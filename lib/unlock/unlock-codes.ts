@@ -4,6 +4,7 @@ export const UNLOCK_ERROR_CODES = [
   "INVALID_PROFILE_ID",
   "PROFILE_NOT_FOUND",
   "PROFILE_NOT_ONBOARDED",
+  "PROFILE_SETUP_REQUIRED",
   "SELF_UNLOCK_NOT_ALLOWED",
   "QUESTION_NOT_CONFIGURED",
   "EVALUATION_FAILED",
@@ -33,6 +34,7 @@ export function unlockErrorHttpStatus(code: UnlockErrorCode): UnlockHttpStatus {
       return 403;
     case "PROFILE_NOT_FOUND":
       return 404;
+    case "PROFILE_SETUP_REQUIRED":
     case "PROFILE_NOT_ONBOARDED":
     case "QUESTION_NOT_CONFIGURED":
       return 409;
@@ -54,6 +56,7 @@ export function unlockErrorClientMessage(code: UnlockErrorCode): string {
       return "제출한 답변 형식을 확인해주세요.";
     case "PROFILE_NOT_FOUND":
       return "이 프로필을 더 이상 찾을 수 없어요.";
+    case "PROFILE_SETUP_REQUIRED":
     case "PROFILE_NOT_ONBOARDED":
       return "아직 열 수 없는 프로필이에요.";
     case "SELF_UNLOCK_NOT_ALLOWED":

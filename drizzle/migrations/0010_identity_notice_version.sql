@@ -1,0 +1,1 @@
+ALTER TABLE "identity_verifications" ADD COLUMN "notice_version" text NOT NULL;

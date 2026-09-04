@@ -64,6 +64,27 @@
       "when": 1787291584154,
       "tag": "0008_strange_joshua_kane",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1787884723544,
+      "tag": "0009_alpha_profile_identity",
+      "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1787885306429,
+      "tag": "0010_identity_notice_version",
+      "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1788416905466,
+      "tag": "0011_premium_rhodey",
+      "breakpoints": true
     }
   ]
 }

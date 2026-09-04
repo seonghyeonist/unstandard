@@ -1,5 +1,6 @@
 import "server-only";
 
+import { canAccessIntroduction, lockIntroductionProfiles } from "@/lib/db/repositories/introduction-policy";
 import { getDb } from "@/lib/db/client";
 import { getTargetProfileForUnlock } from "@/lib/db/repositories/candidates.repository";
 import {
@@ -153,6 +154,10 @@ export async function submitDbUnlockAnswer(
     return { ok: false, correlationId, code: "SELF_UNLOCK_NOT_ALLOWED" };
   }
 
+  try {
+    if (!await canAccessIntroduction(input.viewerUserId, profileId)) return { ok: false, correlationId, code: "PROFILE_SETUP_REQUIRED" };
+  } catch { return { ok: false, correlationId, code: "UNLOCK_SERVICE_UNAVAILABLE" }; }
+
   let question;
   try {
     question = await getConfiguredUnlockQuestion();
@@ -208,6 +213,8 @@ export async function submitDbUnlockAnswer(
   const db = getDb();
   try {
     const transactionResult = await db.transaction(async (tx) => {
+      await lockIntroductionProfiles(tx, input.viewerUserId, profileId);
+      if (!await canAccessIntroduction(input.viewerUserId, profileId, tx)) throw new Error("Introduction no longer permitted");
       await tx.insert(unlockAttempts).values({
         viewerUserId: input.viewerUserId,
         targetProfileId: target.profileId,
@@ -315,6 +322,7 @@ export async function getDbUnlockStatus(input: {
   }
 
   try {
+    if (!await canAccessIntroduction(input.viewerUserId, profileId)) return { ok: false, correlationId, code: "PROFILE_SETUP_REQUIRED" };
     const unlockRowCount = await countUnlocks(input.viewerUserId, target.profileId);
     const unlocked = unlockRowCount === 1;
     logUnlockEvent({
