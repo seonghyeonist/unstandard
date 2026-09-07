@@ -28,6 +28,9 @@ function resolveLoginError(errorCode?: string): string | null {
   if (errorCode === "service_unavailable") {
     return "Authentication is temporarily unavailable. Try again shortly.";
   }
+  if (errorCode === "account_not_linked") {
+    return "이 소셜 계정은 기존 UNSTANDARD 계정에 자동 연결되지 않았어요. 이미 만든 계정이라면 원래 로그인 수단으로 로그인하고, 새 가입은 초대 이메일과 같은 소셜 계정으로 진행해 주세요.";
+  }
   return null;
 }
 

@@ -8,6 +8,7 @@ export const RATE_LIMIT_POLICIES = {
   identityComplete: { limit: 10, windowMs: 10 * 60 * 1_000 },
   identityGlobal: { limit: 100, windowMs: 24 * 60 * 60 * 1_000 },
   inviteClaim: { limit: 10, windowMs: 15 * 60 * 1_000 },
+  invitePrepare: { limit: 10, windowMs: 15 * 60 * 1_000 },
   onboardingAnswer: { limit: 10, windowMs: 10 * 60 * 1_000 },
   unlockAnswer: { limit: 20, windowMs: 10 * 60 * 1_000 },
   reportCreate: { limit: 5, windowMs: 60 * 60 * 1_000 },

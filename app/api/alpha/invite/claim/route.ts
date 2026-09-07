@@ -1,13 +1,16 @@
 import { cookies } from "next/headers";
 import { isDatabaseAuthConfigured } from "@/lib/config/runtime-mode";
-import { reserveInviteForEmail } from "@/lib/auth/invite-gate";
-import { normalizeEmail } from "@/lib/auth/invite-crypto";
+import { reservePreparedInvite, verifyInviteReservation } from "@/lib/auth/invite-gate";
 import {
   createRegistrationTicket,
+  getPreparedInviteCookieName,
   getRegistrationTicketCookieName,
+  verifyPreparedInviteTicket,
+  verifyRegistrationTicket,
 } from "@/lib/auth/invite-ticket";
 import { parseRegistrationLegalSelection } from "@/lib/legal/acceptance";
 import { privateJson } from "@/lib/http/private-json";
+import { isSameOriginMutation, readSmallJson } from "@/lib/http/profile-request";
 import {
   consumeRateLimit,
   RateLimitUnavailableError,
@@ -18,10 +21,13 @@ export async function POST(request: Request) {
   if (!isDatabaseAuthConfigured()) {
     return privateJson({ error: "Registration unavailable" }, { status: 503 });
   }
+  if (!isSameOriginMutation(request)) {
+    return privateJson({ error: "Registration unavailable" }, { status: 403 });
+  }
 
   let body: unknown;
   try {
-    body = await request.json();
+    body = await readSmallJson(request);
   } catch {
     return privateJson({ error: "Invalid JSON" }, { status: 400 });
   }
@@ -31,11 +37,9 @@ export async function POST(request: Request) {
   }
 
   const input = body as Record<string, unknown>;
-  const email = normalizeEmail(String(input.email ?? ""));
-  const code = String(input.code ?? "").trim();
   const legalSelection = parseRegistrationLegalSelection(input);
 
-  if (!email.includes("@") || code.length < 8 || !legalSelection) {
+  if (!legalSelection) {
     return privateJson({ error: "Invalid invite claim" }, { status: 422 });
   }
 
@@ -57,14 +61,31 @@ export async function POST(request: Request) {
     throw error;
   }
 
-  const claim = await reserveInviteForEmail(code, email);
-  if (!claim.ok) {
-    return privateJson({ error: "Invalid invite claim" }, { status: 403 });
-  }
-
   const secret = process.env.BETTER_AUTH_SECRET?.trim();
   if (!secret) {
     return privateJson({ error: "Registration unavailable" }, { status: 503 });
+  }
+
+  const cookieStore = await cookies();
+  const existingRaw = cookieStore.get(getRegistrationTicketCookieName())?.value;
+  const existing = existingRaw ? verifyRegistrationTicket(existingRaw, secret) : null;
+  // OAuth cancellation/retry in the same browser must not consume a second
+  // reservation. The signed ticket was created only after legal acceptance.
+  if (existing && await verifyInviteReservation(existing)) {
+    return privateJson({ ok: true });
+  }
+  if (existingRaw) cookieStore.delete(getRegistrationTicketCookieName());
+
+  const preparedRaw = cookieStore.get(getPreparedInviteCookieName())?.value;
+  const prepared = preparedRaw ? verifyPreparedInviteTicket(preparedRaw, secret) : null;
+  if (!prepared) {
+    return privateJson({ error: "Invalid invite claim" }, { status: 403 });
+  }
+
+  const claim = await reservePreparedInvite(prepared.inviteId, prepared.email);
+  if (!claim.ok) {
+    cookieStore.delete(getPreparedInviteCookieName());
+    return privateJson({ error: "Invalid invite claim" }, { status: 403 });
   }
 
   const ticket = createRegistrationTicket(
@@ -74,7 +95,6 @@ export async function POST(request: Request) {
     secret,
     legalSelection,
   );
-  const cookieStore = await cookies();
   cookieStore.set(getRegistrationTicketCookieName(), ticket.token, {
     httpOnly: true,
     secure: process.env.NODE_ENV === "production",
@@ -82,6 +102,7 @@ export async function POST(request: Request) {
     path: "/",
     maxAge: ticket.maxAge,
   });
+  cookieStore.delete(getPreparedInviteCookieName());
 
   return privateJson({ ok: true });
 }

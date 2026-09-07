@@ -1,10 +1,14 @@
 import "server-only";
 
-import { and, eq, inArray, sql } from "drizzle-orm";
+import { and, desc, eq, inArray, sql } from "drizzle-orm";
 import {
+  ALPHA_BALANCE_CONSENT_VERSION,
   ALPHA_STAGE_1_CAP,
   ALPHA_STAGE_1_PHASE,
   evaluateBalanceGate,
+  isAlphaAcquisitionChannel,
+  isAlphaBalanceBucket,
+  isAlphaRecruitmentCohort,
   validateAlphaBalanceConsent,
   type AlphaAcquisitionChannel,
   type AlphaBalanceBucket,
@@ -49,6 +53,20 @@ export class Stage1InviteError extends Error {
     super(code);
     this.name = "Stage1InviteError";
   }
+}
+
+export type OperatorInviteSummary = {
+  id: string;
+  emailMasked: string;
+  status: string;
+  expiresAt: Date;
+  recruitmentCohort: string;
+  acquisitionChannel: string;
+  balanceBucket: string;
+};
+
+function maskEmail(email: string): string {
+  return email.replace(/(^.).*(@.*$)/, "$1***$2");
 }
 
 type SeatObservation = {
@@ -162,5 +180,81 @@ export async function createStage1Invite(
       occupiedSeats: seats + 1,
       balanceGate,
     };
+  });
+}
+
+/** Operator-facing status contains no raw invite capability or full email. */
+export async function listStage1Invites(): Promise<OperatorInviteSummary[]> {
+  const rows = await getDb()
+    .select({
+      id: alphaInvites.id,
+      emailNormalized: alphaInvites.emailNormalized,
+      status: alphaInvites.status,
+      expiresAt: alphaInvites.expiresAt,
+      recruitmentCohort: alphaInvites.recruitmentCohort,
+      acquisitionChannel: alphaInvites.acquisitionChannel,
+      balanceBucket: alphaInvites.balanceBucket,
+    })
+    .from(alphaInvites)
+    .where(eq(alphaInvites.targetPhase, ALPHA_STAGE_1_PHASE))
+    .orderBy(desc(alphaInvites.createdAt));
+  return rows.map((row) => ({
+    id: row.id,
+    emailMasked: maskEmail(row.emailNormalized),
+    status: row.status,
+    expiresAt: row.expiresAt,
+    recruitmentCohort: row.recruitmentCohort,
+    acquisitionChannel: row.acquisitionChannel,
+    balanceBucket: row.balanceBucket,
+  }));
+}
+
+export async function revokeStage1Invite(inviteId: string): Promise<boolean> {
+  const revoked = await getDb()
+    .update(alphaInvites)
+    .set({ status: "revoked", reservedAt: null, reservationNonceHash: null })
+    .where(and(
+      eq(alphaInvites.id, inviteId),
+      eq(alphaInvites.targetPhase, ALPHA_STAGE_1_PHASE),
+      inArray(alphaInvites.status, ["pending", "reserved"]),
+    ))
+    .returning({ id: alphaInvites.id });
+  return revoked.length === 1;
+}
+
+/** Reissue only terminal, unconsumed invitations; consumed seats are never recycled here. */
+export async function reissueStage1Invite(inviteId: string): Promise<CreateStage1InviteResult> {
+  const [row] = await getDb()
+    .select({
+      emailNormalized: alphaInvites.emailNormalized,
+      status: alphaInvites.status,
+      recruitmentCohort: alphaInvites.recruitmentCohort,
+      acquisitionChannel: alphaInvites.acquisitionChannel,
+      balanceBucket: alphaInvites.balanceBucket,
+      balanceConsentVersion: alphaInvites.balanceConsentVersion,
+      balanceConsentedOn: alphaInvites.balanceConsentedOn,
+    })
+    .from(alphaInvites)
+    .where(and(eq(alphaInvites.id, inviteId), eq(alphaInvites.targetPhase, ALPHA_STAGE_1_PHASE)))
+    .limit(1);
+  if (!row || !["revoked", "expired"].includes(row.status)) {
+    throw new Stage1InviteError("ACTIVE_EMAIL_EXISTS");
+  }
+  if (!isAlphaRecruitmentCohort(row.recruitmentCohort) ||
+      !isAlphaAcquisitionChannel(row.acquisitionChannel) ||
+      !isAlphaBalanceBucket(row.balanceBucket)) {
+    throw new Error("INVITE_METADATA_INVALID");
+  }
+  const balanceConsent = row.balanceBucket === "not_counted"
+    ? null
+    : row.balanceConsentVersion === ALPHA_BALANCE_CONSENT_VERSION && row.balanceConsentedOn
+      ? { version: ALPHA_BALANCE_CONSENT_VERSION, consentedOn: String(row.balanceConsentedOn) }
+      : null;
+  return createStage1Invite({
+    email: row.emailNormalized,
+    recruitmentCohort: row.recruitmentCohort,
+    acquisitionChannel: row.acquisitionChannel,
+    balanceBucket: row.balanceBucket,
+    balanceConsent,
   });
 }
