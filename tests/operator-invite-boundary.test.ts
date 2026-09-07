@@ -34,6 +34,17 @@ describe("operator invite boundary", () => {
     }
   });
 
+  it("rate-limits operator credential attempts and fails closed if limiter storage is unavailable", () => {
+    const login = source("app/api/alpha/operator/login/route.ts");
+    const policy = source("lib/security/rate-limit-policy.ts");
+    assert.match(login, /consumeRateLimit/);
+    assert.match(login, /scope:\s*"operatorLogin"/);
+    assert.match(login, /RateLimitUnavailableError/);
+    assert.match(login, /status:\s*429/);
+    assert.match(login, /status:\s*503/);
+    assert.match(policy, /operatorLogin:\s*\{\s*limit:\s*10,\s*windowMs:\s*15\s*\*\s*60\s*\*\s*1_000\s*\}/);
+  });
+
   it("keeps raw invite capabilities out of the status list", () => {
     const admin = source("lib/alpha/invite-admin.ts");
     const summary = admin.slice(admin.indexOf("export async function listStage1Invites"), admin.indexOf("export async function revokeStage1Invite"));
