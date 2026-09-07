@@ -51,4 +51,20 @@ describe("operator invite boundary", () => {
     assert.match(summary, /emailMasked/);
     assert.doesNotMatch(summary, /rawCode|codeHash/);
   });
+
+  it("shows time-expired invites as expired and permits direct reissue without a manual revoke", () => {
+    const admin = source("lib/alpha/invite-admin.ts");
+    assert.match(admin, /effectiveInviteStatus/);
+    assert.match(admin, /\["pending", "reserved"\]\.includes\(status\) && expiresAt <= now \? "expired" : status/);
+    const reissue = admin.slice(admin.indexOf("export async function reissueStage1Invite"));
+    assert.match(reissue, /inArray\(alphaInvites\.status, \["pending", "reserved"\]\)/);
+    assert.match(reissue, /alphaInvites\.expiresAt\} <= \$\{now\}/);
+    assert.match(reissue, /status: "expired"/);
+  });
+
+  it("describes new signup using the personal invite-link UX, not the removed invite-code form", () => {
+    const login = source("app/login/login-client.tsx");
+    assert.match(login, /개인 초대 링크/);
+    assert.doesNotMatch(login, /초대코드가 있는 등록 화면/);
+  });
 });

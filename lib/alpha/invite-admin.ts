@@ -69,6 +69,10 @@ function maskEmail(email: string): string {
   return email.replace(/(^.).*(@.*$)/, "$1***$2");
 }
 
+function effectiveInviteStatus(status: string, expiresAt: Date, now = new Date()): string {
+  return ["pending", "reserved"].includes(status) && expiresAt <= now ? "expired" : status;
+}
+
 type SeatObservation = {
   active_seats: number;
   bucket_a: number;
@@ -198,10 +202,11 @@ export async function listStage1Invites(): Promise<OperatorInviteSummary[]> {
     .from(alphaInvites)
     .where(eq(alphaInvites.targetPhase, ALPHA_STAGE_1_PHASE))
     .orderBy(desc(alphaInvites.createdAt));
+  const now = new Date();
   return rows.map((row) => ({
     id: row.id,
     emailMasked: maskEmail(row.emailNormalized),
-    status: row.status,
+    status: effectiveInviteStatus(row.status, row.expiresAt, now),
     expiresAt: row.expiresAt,
     recruitmentCohort: row.recruitmentCohort,
     acquisitionChannel: row.acquisitionChannel,
@@ -224,7 +229,21 @@ export async function revokeStage1Invite(inviteId: string): Promise<boolean> {
 
 /** Reissue only terminal, unconsumed invitations; consumed seats are never recycled here. */
 export async function reissueStage1Invite(inviteId: string): Promise<CreateStage1InviteResult> {
-  const [row] = await getDb()
+  const now = new Date();
+  const db = getDb();
+  // A row can become time-expired without another invite mutation occurring.
+  // Normalize that state here so the operator does not need a revoke-then-reissue workaround.
+  await db
+    .update(alphaInvites)
+    .set({ status: "expired", reservedAt: null, reservationNonceHash: null })
+    .where(and(
+      eq(alphaInvites.id, inviteId),
+      eq(alphaInvites.targetPhase, ALPHA_STAGE_1_PHASE),
+      inArray(alphaInvites.status, ["pending", "reserved"]),
+      sql`${alphaInvites.expiresAt} <= ${now}`,
+    ));
+
+  const [row] = await db
     .select({
       emailNormalized: alphaInvites.emailNormalized,
       status: alphaInvites.status,

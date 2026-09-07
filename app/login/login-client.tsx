@@ -140,7 +140,7 @@ export default function LoginClient({
             <div className="mt-5 border-t border-line pt-5">
               <p className="text-sm font-semibold">또는 Google/Naver로 로그인</p>
               <p className="mt-2 text-xs leading-5 text-foreground/60">
-                기존 계정만 로그인할 수 있어요. 새 가입은 초대코드가 있는 등록 화면에서 진행합니다.
+                기존 계정만 로그인할 수 있어요. 새 가입은 발급받은 개인 초대 링크에서 진행합니다.
               </p>
               <div className="mt-3 grid gap-3 sm:grid-cols-2">
                 {(["google", "naver"] as const).map((provider) => (
