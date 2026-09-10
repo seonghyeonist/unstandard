@@ -2,6 +2,10 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { readFileSync } from "node:fs";
 import { getSocialProviderAvailabilityFromEnv } from "../lib/auth/social-config-policy";
+import {
+  CLOSED_ALPHA_NEW_MEMBER_PROVIDER,
+  isClosedAlphaNewMemberProvider,
+} from "../lib/auth/new-member-provider";
 import { parseNaverProfile } from "../lib/auth/naver-profile";
 import { oauthInviteEmailMatches, oauthInviteRegistrationAllowed } from "../lib/auth/oauth-invite";
 
@@ -78,6 +82,22 @@ describe("closed-alpha OAuth invite gate", () => {
     assert.match(source, /tokenUrlParams:/);
     assert.match(source, /context\.query\?\.state/);
     assert.match(source, /parseNaverProfile/);
+  });
+
+  it("permits new members only through Google while preserving the Naver login integration", () => {
+    assert.equal(CLOSED_ALPHA_NEW_MEMBER_PROVIDER, "google");
+    assert.equal(isClosedAlphaNewMemberProvider("google"), true);
+    assert.equal(isClosedAlphaNewMemberProvider("naver"), false);
+    assert.equal(isClosedAlphaNewMemberProvider(undefined), false);
+
+    const auth = readFileSync("lib/auth/auth.ts", "utf8");
+    const register = readFileSync("components/auth/register-form.tsx", "utf8");
+    const login = readFileSync("app/login/login-client.tsx", "utf8");
+    assert.match(auth, /REGISTRATION_METHOD_UNAVAILABLE/);
+    assert.match(auth, /isClosedAlphaNewMemberProvider\(provider\)/);
+    assert.match(register, /CLOSED_ALPHA_NEW_MEMBER_PROVIDER/);
+    assert.doesNotMatch(register, /\["google", "naver"\]\s+as const/);
+    assert.match(login, /\["google", "naver"\]\s+as const/);
   });
 
   it("does not place OAuth or Didit secrets in client entrypoints", () => {

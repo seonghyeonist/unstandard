@@ -25,6 +25,7 @@ import {
 import { parseNaverProfile } from "@/lib/auth/naver-profile";
 import { oauthInviteRegistrationAllowed } from "@/lib/auth/oauth-invite";
 import { getSocialProviderAvailability } from "@/lib/auth/social-config";
+import { isClosedAlphaNewMemberProvider } from "@/lib/auth/new-member-provider";
 import { readSmallJson } from "@/lib/http/profile-request";
 
 function getTrustedOrigins(): string[] {
@@ -147,30 +148,14 @@ const inviteGatePlugin = () => ({
     before: [
       {
         matcher: (context: { path?: string }) => context.path === "/sign-up/email",
-        handler: createAuthMiddleware(async (ctx) => {
-          const ticket = await readRegistrationTicket();
-          if (!ticket) {
-            throw APIError.from("FORBIDDEN", {
-              code: "INVITE_REQUIRED",
-              message: "Registration is invite-only",
-            });
-          }
-
-          const email = normalizeEmail(String(ctx.body?.email ?? ""));
-          if (email !== ticket.email) {
-            throw APIError.from("FORBIDDEN", {
-              code: "INVITE_REQUIRED",
-              message: "Registration is invite-only",
-            });
-          }
-
-          const reservationValid = await verifyInviteReservation(ticket);
-          if (!reservationValid) {
-            throw APIError.from("FORBIDDEN", {
-              code: "INVITE_RESERVATION_INVALID",
-              message: "Invite reservation is no longer valid",
-            });
-          }
+        handler: createAuthMiddleware(async () => {
+          // Existing credential accounts can still use /sign-in/email. New
+          // password accounts are not permitted in Closed Alpha: this app has
+          // no configured email-ownership or password-recovery delivery flow.
+          throw APIError.from("FORBIDDEN", {
+            code: "REGISTRATION_METHOD_UNAVAILABLE",
+            message: "New registration is available through the invited Google account only",
+          });
         }),
       },
       {
@@ -240,13 +225,11 @@ function oauthCallbackProvider(context: { path?: string; params?: Record<string,
 }
 
 async function requireOAuthInvite(context: { path?: string; params?: Record<string, unknown> } | null, email: string) {
-  const path = context?.path ?? "";
-  const isEmailRegistration = path === "/sign-up/email";
-  const isAllowedOAuthRegistration = Boolean(oauthCallbackProvider(context));
-  if (!isEmailRegistration && !isAllowedOAuthRegistration) {
+  const provider = oauthCallbackProvider(context);
+  if (!isClosedAlphaNewMemberProvider(provider)) {
     throw APIError.from("FORBIDDEN", {
-      code: "INVITE_REQUIRED",
-      message: "Registration is invite-only",
+      code: "REGISTRATION_METHOD_UNAVAILABLE",
+      message: "New registration is available through the invited Google account only",
     });
   }
   const ticket = await readRegistrationTicket();

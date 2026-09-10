@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { authClient } from "@/lib/auth/client";
 import type { SocialProviderAvailability, SocialProviderId } from "@/lib/auth/social-config";
+import { CLOSED_ALPHA_NEW_MEMBER_PROVIDER } from "@/lib/auth/new-member-provider";
 import {
   CLOSED_ALPHA_SAFETY_RULES_VERSION,
   CLOSED_ALPHA_TERMS_VERSION,
@@ -135,15 +136,13 @@ export default function RegisterForm({
             </div>
             <div className="mt-5 border-t border-line pt-5">
               <p className="text-sm font-semibold">계정 선택</p>
-              <p className="mt-2 text-xs leading-5 text-foreground/60">초대에 등록된 이메일과 같은 Google 또는 Naver 계정만 가입할 수 있어요. 제공자 이름·전화번호·생년월일은 앱 프로필로 가져오지 않아요.</p>
-              <div className="mt-3 grid gap-3 sm:grid-cols-2">
-                {(["google", "naver"] as const).map((provider) => (
-                  <Button key={provider} type="button" className={provider === "google" ? "bg-foreground hover:bg-foreground/80" : "bg-[#03c75a] hover:bg-[#02a94d]"} disabled={busy || !legalReady || !socialProviders[provider]} onClick={() => socialMutation.mutate(provider)}>
-                    {provider === "google" ? "Google로 계속" : "Naver로 계속"}
-                  </Button>
-                ))}
+              <p className="mt-2 text-xs leading-5 text-foreground/60">초대에 등록된 이메일과 같은 Google 계정으로만 가입할 수 있어요. Google의 이름·전화번호·생년월일은 앱 프로필로 가져오지 않아요.</p>
+              <div className="mt-3">
+                <Button type="button" className="w-full bg-foreground hover:bg-foreground/80" disabled={busy || !legalReady || !socialProviders[CLOSED_ALPHA_NEW_MEMBER_PROVIDER]} onClick={() => socialMutation.mutate(CLOSED_ALPHA_NEW_MEMBER_PROVIDER)}>
+                  Google로 계속
+                </Button>
               </div>
-              {!socialProviders.google && !socialProviders.naver ? <p className="mt-2 text-xs text-foreground/60">현재 사용할 수 있는 소셜 제공자가 없어요. 초대 발급자에게 알려 주세요.</p> : null}
+              {!socialProviders[CLOSED_ALPHA_NEW_MEMBER_PROVIDER] ? <p className="mt-2 text-xs text-foreground/60">Google 가입은 현재 준비 중이에요. 초대 발급자에게 알려 주세요.</p> : null}
             </div>
           </>
         ) : null}
