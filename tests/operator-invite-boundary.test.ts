@@ -52,6 +52,20 @@ describe("operator invite boundary", () => {
     assert.doesNotMatch(summary, /rawCode|codeHash/);
   });
 
+  it("does not issue a new-user invite to an existing local identity and always uses the canonical link origin", () => {
+    const admin = source("lib/alpha/invite-admin.ts");
+    assert.match(admin, /EMAIL_ALREADY_REGISTERED/);
+    assert.match(admin, /leftJoin\(accounts, eq\(accounts\.userId, users\.id\)\)/);
+    for (const path of [
+      "app/api/alpha/operator/invites/route.ts",
+      "app/api/alpha/operator/invites/[inviteId]/reissue/route.ts",
+    ]) {
+      const route = source(path);
+      assert.match(route, /buildInviteLink\(created\.rawCode\)/);
+      assert.doesNotMatch(route, /new URL\(request\.url\)\.origin/);
+    }
+  });
+
   it("shows time-expired invites as expired and permits direct reissue without a manual revoke", () => {
     const admin = source("lib/alpha/invite-admin.ts");
     assert.match(admin, /effectiveInviteStatus/);

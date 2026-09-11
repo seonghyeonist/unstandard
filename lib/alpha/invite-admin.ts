@@ -22,6 +22,7 @@ import {
   requireInvitePepper,
 } from "@/lib/auth/invite-crypto";
 import { getDb } from "@/lib/db/client";
+import { accounts, users } from "@/lib/db/schema/auth";
 import { alphaInvites } from "@/lib/db/schema/invites";
 
 export type CreateStage1InviteInput = {
@@ -47,6 +48,7 @@ export class Stage1InviteError extends Error {
     readonly code:
       | "CAPACITY_REACHED"
       | "ACTIVE_EMAIL_EXISTS"
+      | "EMAIL_ALREADY_REGISTERED"
       | "BALANCE_SOFT_WAITLIST"
       | "BALANCE_HARD_GATE",
   ) {
@@ -105,6 +107,17 @@ export async function createStage1Invite(
 
   return db.transaction(async (tx) => {
     await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext('unstandard:alpha-stage-1:capacity'))`);
+
+    // A Stage 1 invitation is a new-Google-account fixture.  Do not issue one
+    // for a local identity that would correctly fail Better Auth's no-implicit-
+    // linking policy as account_not_linked.
+    const [existingIdentity] = await tx
+      .select({ userId: users.id, accountId: accounts.id })
+      .from(users)
+      .leftJoin(accounts, eq(accounts.userId, users.id))
+      .where(eq(users.email, email))
+      .limit(1);
+    if (existingIdentity) throw new Stage1InviteError("EMAIL_ALREADY_REGISTERED");
 
     await tx
       .update(alphaInvites)

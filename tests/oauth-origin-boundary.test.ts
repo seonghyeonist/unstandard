@@ -50,11 +50,14 @@ describe("OAuth canonical-origin boundary", () => {
 
   it("forces invite issuance, registration, login, and auth trust to the same origin", () => {
     const inviteRoute = readFileSync("app/api/alpha/operator/invites/route.ts", "utf8");
+    const reissueRoute = readFileSync("app/api/alpha/operator/invites/[inviteId]/reissue/route.ts", "utf8");
     const auth = readFileSync("lib/auth/auth.ts", "utf8");
     const register = readFileSync("components/auth/register-form.tsx", "utf8");
     const login = readFileSync("app/login/login-client.tsx", "utf8");
     assert.match(inviteRoute, /buildInviteLink\(created\.rawCode\)/);
     assert.doesNotMatch(inviteRoute, /new URL\(request\.url\)\.origin/);
+    assert.match(reissueRoute, /buildInviteLink\(created\.rawCode\)/);
+    assert.doesNotMatch(reissueRoute, /new URL\(request\.url\)\.origin/);
     assert.match(auth, /baseURL: getCanonicalAuthOrigin\(\)/);
     assert.match(auth, /return \[getCanonicalAuthOrigin\(\)\]/);
     assert.doesNotMatch(auth, /skipStateCookieCheck:\s*true/);

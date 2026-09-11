@@ -13,7 +13,7 @@ export async function POST(request: Request, context: { params: Promise<{ invite
     const created = await reissueStage1Invite(inviteId);
     return privateJson({
       invite: { id: created.inviteId, expiresAt: created.expiresAt, occupiedSeats: created.occupiedSeats },
-      inviteLink: buildInviteLink(created.rawCode, new URL(request.url).origin),
+      inviteLink: buildInviteLink(created.rawCode),
     });
   } catch (error) {
     const code = error instanceof Stage1InviteError ? error.code : "INVITE_UNAVAILABLE";
