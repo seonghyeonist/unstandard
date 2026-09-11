@@ -66,3 +66,14 @@ Didit and the other Closed Alpha release gates remain separate and unverified.
 Rollback: revert the verification change on the PR branch and revalidate Preview;
 this reopens the identified verification gap and does not authorize acceptance.
 No Production or database rollback is needed for this source-only correction.
+
+## Operator-access follow-up
+
+The founder completed the Vercel device-authorization screen. The waiting CLI
+process could not complete its token exchange because this agent runtime blocked
+network access to `api.vercel.com:443`; neither standard CLI credential location
+contained a token afterward. This records an execution-environment limitation,
+not a failed founder authorization. The connected Vercel surface can inspect and
+deploy but currently exposes no environment-variable read/write operation.
+Operator-token presence therefore remains unknown until an env-capable surface is
+available; do not generate, rotate or overwrite a token on that assumption.
