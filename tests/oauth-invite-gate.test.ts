@@ -1,6 +1,8 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { readFileSync } from "node:fs";
+import { runInNewContext } from "node:vm";
+import ts from "typescript";
 import { getSocialProviderAvailabilityFromEnv } from "../lib/auth/social-config-policy";
 import {
   CLOSED_ALPHA_NEW_MEMBER_PROVIDER,
@@ -22,9 +24,68 @@ describe("closed-alpha OAuth invite gate", () => {
   });
 
   it("requires a valid reservation in addition to a matching provider email", () => {
-    assert.equal(oauthInviteRegistrationAllowed({ oauthEmail: "member@example.com", inviteEmail: "member@example.com", reservationValid: true }), true);
-    assert.equal(oauthInviteRegistrationAllowed({ oauthEmail: "member@example.com", inviteEmail: "member@example.com", reservationValid: false }), false);
-    assert.equal(oauthInviteRegistrationAllowed({ oauthEmail: "member@example.com", inviteEmail: undefined, reservationValid: true }), false);
+    assert.equal(oauthInviteRegistrationAllowed({ oauthEmail: "member@example.com", inviteEmail: "member@example.com", reservationValid: true, oauthEmailVerified: true }), true);
+    assert.equal(oauthInviteRegistrationAllowed({ oauthEmail: "member@example.com", inviteEmail: "member@example.com", reservationValid: false, oauthEmailVerified: true }), false);
+    assert.equal(oauthInviteRegistrationAllowed({ oauthEmail: "member@example.com", inviteEmail: undefined, reservationValid: true, oauthEmailVerified: true }), false);
+    assert.equal(oauthInviteRegistrationAllowed({ oauthEmail: "other@example.com", inviteEmail: "member@example.com", reservationValid: true, oauthEmailVerified: true }), false);
+  });
+
+  it("rejects an unverified or missing Google claim even with a matching reserved invite", () => {
+    for (const oauthEmailVerified of [false, undefined, null, "true", "false", 1, 0]) {
+      assert.equal(oauthInviteRegistrationAllowed({
+        oauthEmail: "member@example.com",
+        inviteEmail: "member@example.com",
+        reservationValid: true,
+        oauthEmailVerified,
+      }), false);
+    }
+    const auth = readFileSync("lib/auth/auth.ts", "utf8");
+    assert.match(auth, /emailVerified: profile\.email_verified === true/);
+    assert.match(auth, /oauthEmailVerified: emailVerified/);
+  });
+
+  it("enforces verified Google email and invite checks in the actual user-create hook", async () => {
+    let reservationValid = true;
+    let ticket: { email: string } | null = { email: "member@example.com" };
+    let options: Record<string, unknown> = {};
+    const mocks: Record<string, unknown> = {
+      "better-auth": { betterAuth: (value: Record<string, unknown>) => { options = value; return {}; } },
+      "better-auth/adapters/drizzle": { drizzleAdapter: () => ({}) },
+      "better-auth/next-js": { nextCookies: () => ({}) },
+      "better-auth/plugins/generic-oauth": { genericOAuth: () => ({}) },
+      "better-auth/api": { APIError: { from: (_status: string, body: { code: string }) => new Error(body.code) }, createAuthMiddleware: (fn: unknown) => fn },
+      "next/headers": { cookies: async () => ({ get: () => ({ value: "synthetic-ticket" }) }) },
+      "@/lib/db/client": { getDb: () => ({}) },
+      "@/lib/auth/social-config": { getSocialProviderAvailability: () => ({ google: false, naver: false }) },
+      "@/lib/auth/new-member-provider": { isClosedAlphaNewMemberProvider },
+      "@/lib/auth/oauth-invite": { oauthInviteRegistrationAllowed },
+      "@/lib/auth/invite-ticket": { getRegistrationTicketCookieName: () => "test", verifyRegistrationTicket: () => ticket },
+      "@/lib/auth/invite-gate": { verifyInviteReservation: async () => reservationValid },
+    };
+    const exports: { getAuth?: () => unknown } = {};
+    runInNewContext(ts.transpileModule(readFileSync("lib/auth/auth.ts", "utf8"), {
+      compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 },
+    }).outputText, {
+      exports,
+      require: (id: string) => mocks[id] ?? {},
+      process: { env: { BETTER_AUTH_SECRET: "synthetic-test-secret" } },
+    });
+    exports.getAuth!();
+    const hook = (options.databaseHooks as {
+      user: { create: { before: (user: { email: string; emailVerified?: unknown }, context: { path: string }) => Promise<void> } };
+    }).user.create.before;
+    const google = { path: "/callback/google" };
+    for (const emailVerified of [false, undefined, null, "true", 1]) {
+      await assert.rejects(hook({ email: "member@example.com", emailVerified }, google), /INVITE_REQUIRED/);
+    }
+    await hook({ email: "member@example.com", emailVerified: true }, google);
+    await assert.rejects(hook({ email: "other@example.com", emailVerified: true }, google), /INVITE_REQUIRED/);
+    await assert.rejects(hook({ email: "member@example.com", emailVerified: true }, { path: "/oauth2/callback/naver" }), /REGISTRATION_METHOD_UNAVAILABLE/);
+    reservationValid = false;
+    await assert.rejects(hook({ email: "member@example.com", emailVerified: true }, google), /INVITE_REQUIRED/);
+    reservationValid = true;
+    ticket = null;
+    await assert.rejects(hook({ email: "member@example.com", emailVerified: true }, google), /INVITE_REQUIRED/);
   });
 
   it("reports Google and Naver availability only for complete clean credentials", () => {

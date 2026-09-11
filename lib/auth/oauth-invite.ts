@@ -11,7 +11,8 @@ export function oauthInviteRegistrationAllowed(input: {
   oauthEmail?: string | null;
   inviteEmail?: string | null;
   reservationValid: boolean;
+  oauthEmailVerified?: unknown;
 }): boolean {
-  return input.reservationValid && Boolean(input.oauthEmail && input.inviteEmail) &&
+  return input.oauthEmailVerified === true && input.reservationValid && Boolean(input.oauthEmail && input.inviteEmail) &&
     oauthInviteEmailMatches(input.oauthEmail ?? "", input.inviteEmail ?? "");
 }

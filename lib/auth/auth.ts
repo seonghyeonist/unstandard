@@ -224,7 +224,7 @@ function oauthCallbackProvider(context: { path?: string; params?: Record<string,
   return null;
 }
 
-async function requireOAuthInvite(context: { path?: string; params?: Record<string, unknown> } | null, email: string) {
+async function requireOAuthInvite(context: { path?: string; params?: Record<string, unknown> } | null, email: string, emailVerified: boolean) {
   const provider = oauthCallbackProvider(context);
   if (!isClosedAlphaNewMemberProvider(provider)) {
     throw APIError.from("FORBIDDEN", {
@@ -236,6 +236,9 @@ async function requireOAuthInvite(context: { path?: string; params?: Record<stri
   const reservationValid = ticket ? await verifyInviteReservation(ticket) : false;
   if (!oauthInviteRegistrationAllowed({
     oauthEmail: email,
+    // Better Auth forwards the provider claim but does not require it for
+    // new-user creation. Google mapping above accepts only boolean true.
+    oauthEmailVerified: emailVerified,
     inviteEmail: ticket?.email,
     reservationValid,
   })) {
@@ -302,7 +305,7 @@ export function getAuth(): ReturnType<typeof betterAuth> {
       user: {
         create: {
           before: async (user, context) => {
-            await requireOAuthInvite(context as { path?: string; params?: Record<string, unknown> } | null, user.email);
+            await requireOAuthInvite(context as { path?: string; params?: Record<string, unknown> } | null, user.email, user.emailVerified);
           },
           after: async (user) => {
             const ticket = await readRegistrationTicket();
