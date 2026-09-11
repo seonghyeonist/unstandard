@@ -62,7 +62,10 @@ export async function POST(request: Request) {
       },
       // The one-time capability exists only in this operator response and the
       // fragment of the copied link. It is never persisted in local storage.
-      inviteLink: buildInviteLink(created.rawCode, new URL(request.url).origin),
+      // Never derive the signup host from an operator's deployment-specific
+      // request URL. Better Auth's callback and signed state cookie use the
+      // configured canonical origin.
+      inviteLink: buildInviteLink(created.rawCode),
     });
   } catch (error) {
     const code = error instanceof Stage1InviteError ? error.code : "INVITE_UNAVAILABLE";

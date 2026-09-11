@@ -9,6 +9,7 @@ import { Card } from "@/components/ui/card";
 import { authClient } from "@/lib/auth/client";
 import type { SocialProviderAvailability, SocialProviderId } from "@/lib/auth/social-config";
 import { CLOSED_ALPHA_NEW_MEMBER_PROVIDER } from "@/lib/auth/new-member-provider";
+import { canonicalBrowserLocation } from "@/lib/auth/canonical-origin";
 import {
   CLOSED_ALPHA_SAFETY_RULES_VERSION,
   CLOSED_ALPHA_TERMS_VERSION,
@@ -17,9 +18,11 @@ import {
 type InviteState = "checking" | "ready" | "missing" | "invalid";
 
 export default function RegisterForm({
+  canonicalOrigin,
   socialProviders,
   initialInviteReady,
 }: {
+  canonicalOrigin: string;
   socialProviders: SocialProviderAvailability;
   initialInviteReady: boolean;
 }) {
@@ -40,8 +43,15 @@ export default function RegisterForm({
     ? "ready"
     : preparedState === "invalid" ? "invalid" : capability ? "checking" : "missing";
 
+  const onCanonicalOrigin = typeof window === "undefined" || window.location.origin === canonicalOrigin;
+
   useEffect(() => {
-    if (!capability) return;
+    if (window.location.origin === canonicalOrigin) return;
+    window.location.replace(canonicalBrowserLocation(canonicalOrigin, window.location));
+  }, [canonicalOrigin]);
+
+  useEffect(() => {
+    if (!onCanonicalOrigin || !capability) return;
 
     // Fragments are not sent as HTTP Referer values, and remove it before the
     // same-origin POST so an invite capability never remains in browser UI.
@@ -58,7 +68,7 @@ export default function RegisterForm({
       if (!cancelled) setPreparedState("invalid");
     });
     return () => { cancelled = true; };
-  }, [capability]);
+  }, [capability, onCanonicalOrigin]);
 
   const claimMutation = useMutation({
     mutationFn: async () => {
@@ -80,6 +90,10 @@ export default function RegisterForm({
 
   const socialMutation = useMutation({
     mutationFn: async (provider: SocialProviderId) => {
+      if (window.location.origin !== canonicalOrigin) {
+        window.location.replace(canonicalBrowserLocation(canonicalOrigin, window.location));
+        throw new Error("안전한 가입 주소로 이동 중이에요. 이동한 화면에서 다시 계속해 주세요.");
+      }
       await claimMutation.mutateAsync();
       const result = provider === "naver"
         ? await authClient.signIn.oauth2({

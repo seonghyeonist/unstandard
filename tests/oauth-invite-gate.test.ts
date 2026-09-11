@@ -57,6 +57,7 @@ describe("closed-alpha OAuth invite gate", () => {
       "next/headers": { cookies: async () => ({ get: () => ({ value: "synthetic-ticket" }) }) },
       "@/lib/db/client": { getDb: () => ({}) },
       "@/lib/auth/social-config": { getSocialProviderAvailability: () => ({ google: false, naver: false }) },
+      "@/lib/auth/canonical-origin": { getCanonicalAuthOrigin: () => "https://preview.example.com" },
       "@/lib/auth/new-member-provider": { isClosedAlphaNewMemberProvider },
       "@/lib/auth/oauth-invite": { oauthInviteRegistrationAllowed },
       "@/lib/auth/invite-ticket": { getRegistrationTicketCookieName: () => "test", verifyRegistrationTicket: () => ticket },

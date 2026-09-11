@@ -7,6 +7,7 @@ import {
   verifyPreparedInviteTicket,
   verifyRegistrationTicket,
 } from "@/lib/auth/invite-ticket";
+import { getCanonicalAuthOrigin } from "@/lib/auth/canonical-origin";
 
 export const dynamic = "force-dynamic";
 
@@ -19,5 +20,9 @@ export default async function RegisterPage() {
   const reserved = secret
     ? verifyRegistrationTicket(cookieStore.get(getRegistrationTicketCookieName())?.value ?? "", secret)
     : null;
-  return <RegisterForm socialProviders={getSocialProviderAvailability()} initialInviteReady={Boolean(prepared || reserved)} />;
+  return <RegisterForm
+    canonicalOrigin={getCanonicalAuthOrigin()}
+    socialProviders={getSocialProviderAvailability()}
+    initialInviteReady={Boolean(prepared || reserved)}
+  />;
 }

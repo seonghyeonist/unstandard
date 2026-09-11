@@ -3,15 +3,17 @@
 import Link from "next/link";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { AppShell } from "@/components/layout/app-shell";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { signInWithEmailPassword, startMockSession } from "@/app/login/actions";
 import { authClient } from "@/lib/auth/client";
 import type { SocialProviderAvailability, SocialProviderId } from "@/lib/auth/social-config";
+import { canonicalBrowserLocation } from "@/lib/auth/canonical-origin";
 
 type LoginClientProps = {
+  canonicalOrigin: string;
   mockAllowed: boolean;
   databaseAuthEnabled: boolean;
   socialProviders: SocialProviderAvailability;
@@ -35,6 +37,7 @@ function resolveLoginError(errorCode?: string): string | null {
 }
 
 export default function LoginClient({
+  canonicalOrigin,
   mockAllowed,
   databaseAuthEnabled,
   socialProviders,
@@ -45,6 +48,11 @@ export default function LoginClient({
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const loginError = resolveLoginError(errorCode);
+
+  useEffect(() => {
+    if (window.location.origin === canonicalOrigin) return;
+    window.location.replace(canonicalBrowserLocation(canonicalOrigin, window.location));
+  }, [canonicalOrigin]);
 
   const mockMutation = useMutation({
     mutationFn: async () => startMockSession(),
@@ -64,6 +72,10 @@ export default function LoginClient({
 
   const socialMutation = useMutation({
     mutationFn: async (provider: SocialProviderId) => {
+      if (window.location.origin !== canonicalOrigin) {
+        window.location.replace(canonicalBrowserLocation(canonicalOrigin, window.location));
+        throw new Error("안전한 로그인 주소로 이동 중이에요. 이동한 화면에서 다시 계속해 주세요.");
+      }
       const result = provider === "naver"
         ? await authClient.signIn.oauth2({
           providerId: provider,

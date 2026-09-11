@@ -27,31 +27,13 @@ import { oauthInviteRegistrationAllowed } from "@/lib/auth/oauth-invite";
 import { getSocialProviderAvailability } from "@/lib/auth/social-config";
 import { isClosedAlphaNewMemberProvider } from "@/lib/auth/new-member-provider";
 import { readSmallJson } from "@/lib/http/profile-request";
+import { getCanonicalAuthOrigin } from "@/lib/auth/canonical-origin";
 
 function getTrustedOrigins(): string[] {
-  const origins = new Set<string>();
-  const authUrl = process.env.BETTER_AUTH_URL?.trim();
-  if (authUrl) origins.add(authUrl.replace(/\/$/, ""));
-  const appUrl = process.env.UNSTANDARD_APP_URL?.trim();
-  if (appUrl) origins.add(appUrl.replace(/\/$/, ""));
-  for (const hostname of [
-    process.env.VERCEL_URL,
-    process.env.VERCEL_BRANCH_URL,
-  ]) {
-    const value = hostname?.trim();
-    if (!value) continue;
-
-    const origin = value.startsWith("http://") || value.startsWith("https://")
-      ? value
-      : `https://${value}`;
-
-    origins.add(origin.replace(/\/$/, ""));
-  }
-
-  if (process.env.NODE_ENV !== "production") {
-    origins.add("http://localhost:3000");
-  }
-  return [...origins];
+  // A signed OAuth state cookie is host-only. Accepting a deployment-specific
+  // origin here while Better Auth redirects to the canonical origin produces a
+  // DB verification row but no matching callback cookie.
+  return [getCanonicalAuthOrigin()];
 }
 
 function requireAuthSecret(): string {
@@ -263,7 +245,7 @@ export function getAuth(): ReturnType<typeof betterAuth> {
       usePlural: true,
     }),
     secret: requireAuthSecret(),
-    baseURL: process.env.BETTER_AUTH_URL,
+    baseURL: getCanonicalAuthOrigin(),
     trustedOrigins: getTrustedOrigins(),
     emailAndPassword: {
       enabled: true,
