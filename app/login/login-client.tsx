@@ -8,34 +8,18 @@ import { AppShell } from "@/components/layout/app-shell";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { signInWithEmailPassword, startMockSession } from "@/app/login/actions";
-import { authClient } from "@/lib/auth/client";
-import type { SocialProviderAvailability, SocialProviderId } from "@/lib/auth/social-config";
 import { canonicalBrowserLocation } from "@/lib/auth/canonical-origin";
 
 type LoginClientProps = {
   canonicalOrigin: string;
   mockAllowed: boolean;
   databaseAuthEnabled: boolean;
-  socialProviders: SocialProviderAvailability;
   errorCode?: string;
 };
 
 function resolveLoginError(errorCode?: string): string | null {
-  if (errorCode === "auth_not_configured") {
-    return "Auth is not configured for this environment.";
-  }
-  if (errorCode === "auth_callback_failed") {
-    return "Sign-in callback failed. Request a new link and open it in this browser.";
-  }
-  if (errorCode === "service_unavailable") {
-    return "Authentication is temporarily unavailable. Try again shortly.";
-  }
-  if (errorCode === "account_not_linked") {
-    return "이 소셜 계정은 기존 UNSTANDARD 계정에 자동 연결되지 않았어요. 이미 만든 계정이라면 원래 로그인 수단으로 로그인하고, 새 가입은 초대 이메일과 같은 소셜 계정으로 진행해 주세요.";
-  }
-  if (errorCode === "signup_disabled") {
-    return "이 화면의 Google/Naver 버튼은 기존 계정 로그인 전용이에요. 새 가입은 발급받은 개인 초대 링크를 다시 열어 /register에서 진행해 주세요.";
-  }
+  if (errorCode === "auth_not_configured") return "Auth is not configured for this environment.";
+  if (errorCode === "service_unavailable") return "Authentication is temporarily unavailable. Try again shortly.";
   return null;
 }
 
@@ -43,7 +27,6 @@ export default function LoginClient({
   canonicalOrigin,
   mockAllowed,
   databaseAuthEnabled,
-  socialProviders,
   errorCode,
 }: LoginClientProps) {
   const router = useRouter();
@@ -73,45 +56,13 @@ export default function LoginClient({
     },
   });
 
-  const socialMutation = useMutation({
-    mutationFn: async (provider: SocialProviderId) => {
-      if (window.location.origin !== canonicalOrigin) {
-        window.location.replace(canonicalBrowserLocation(canonicalOrigin, window.location));
-        throw new Error("안전한 로그인 주소로 이동 중이에요. 이동한 화면에서 다시 계속해 주세요.");
-      }
-      const result = provider === "naver"
-        ? await authClient.signIn.oauth2({
-          providerId: provider,
-          callbackURL: "/onboarding",
-          newUserCallbackURL: "/profile-setup",
-          errorCallbackURL: "/login",
-          requestSignUp: false,
-          disableRedirect: true,
-        })
-        : await authClient.signIn.social({
-          provider,
-          callbackURL: "/onboarding",
-          newUserCallbackURL: "/profile-setup",
-          errorCallbackURL: "/login",
-          requestSignUp: false,
-          disableRedirect: true,
-        });
-      if (result.error || !result.data?.url) {
-        throw new Error("소셜 로그인을 시작하지 못했어요. 제공자 설정과 계정 상태를 확인해 주세요.");
-      }
-      window.location.assign(result.data.url);
-    },
-  });
-
-  const socialBusy = signInMutation.isPending || socialMutation.isPending;
-
   return (
     <AppShell title="닫힌 문 앞에서" eyebrow="login">
       <Card>
         {databaseAuthEnabled ? (
           <>
             <p className="text-sm text-foreground/60">
-              Closed alpha — invite-only registration. Existing members sign in with email and password.
+              Closed Alpha — 개인 초대 링크를 받은 신규 회원은 이메일과 비밀번호로 가입합니다. 기존 회원도 같은 방식으로 로그인해요.
             </p>
             <form
               className="mt-6 space-y-3"
@@ -120,63 +71,18 @@ export default function LoginClient({
                 signInMutation.mutate();
               }}
             >
-              <label className="block text-sm text-foreground/70" htmlFor="login-email">
-                Email
-              </label>
-              <input
-                id="login-email"
-                type="email"
-                autoComplete="email"
-                className="w-full rounded-xl border border-foreground/15 bg-background px-4 py-3 text-sm"
-                value={email}
-                onChange={(event) => setEmail(event.target.value)}
-                disabled={signInMutation.isPending}
-              />
-              <label className="block text-sm text-foreground/70" htmlFor="login-password">
-                Password
-              </label>
-              <input
-                id="login-password"
-                type="password"
-                autoComplete="current-password"
-                className="w-full rounded-xl border border-foreground/15 bg-background px-4 py-3 text-sm"
-                value={password}
-                onChange={(event) => setPassword(event.target.value)}
-                disabled={signInMutation.isPending}
-              />
-              <Button
-                className="w-full"
-                type="submit"
-                disabled={socialBusy || !email.trim() || password.length < 10}
-              >
+              <label className="block text-sm text-foreground/70" htmlFor="login-email">Email</label>
+              <input id="login-email" type="email" autoComplete="email" className="w-full rounded-xl border border-foreground/15 bg-background px-4 py-3 text-sm" value={email} onChange={(event) => setEmail(event.target.value)} disabled={signInMutation.isPending} />
+              <label className="block text-sm text-foreground/70" htmlFor="login-password">Password</label>
+              <input id="login-password" type="password" autoComplete="current-password" className="w-full rounded-xl border border-foreground/15 bg-background px-4 py-3 text-sm" value={password} onChange={(event) => setPassword(event.target.value)} disabled={signInMutation.isPending} />
+              <Button className="w-full" type="submit" disabled={signInMutation.isPending || !email.trim() || password.length < 10}>
                 {signInMutation.isPending ? "Signing in…" : "Sign in"}
               </Button>
             </form>
-            <div className="mt-5 border-t border-line pt-5">
-              <p className="text-sm font-semibold">또는 Google/Naver로 로그인</p>
-              <p className="mt-2 text-xs leading-5 text-foreground/60">
-                기존 계정만 로그인할 수 있어요. 새 가입은 발급받은 개인 초대 링크에서 진행합니다.
-              </p>
-              <div className="mt-3 grid gap-3 sm:grid-cols-2">
-                {(["google", "naver"] as const).map((provider) => (
-                  <Button
-                    key={provider}
-                    type="button"
-                    className={provider === "google" ? "bg-foreground hover:bg-foreground/80" : "bg-[#03c75a] hover:bg-[#02a94d]"}
-                    disabled={socialBusy || !socialProviders[provider]}
-                    onClick={() => socialMutation.mutate(provider)}
-                  >
-                    {provider === "google" ? "Google로 로그인" : "Naver로 로그인"}
-                  </Button>
-                ))}
-              </div>
-              {!socialProviders.google && !socialProviders.naver ? (
-                <p className="mt-2 text-xs text-foreground/60">소셜 로그인은 외부 OAuth 앱 설정 후 활성화됩니다.</p>
-              ) : null}
+            <div className="mt-4 flex justify-between gap-4 text-sm">
+              <Link className="text-foreground/70 underline" href="/reset-password">비밀번호 재설정</Link>
+              <Link className="text-foreground/70 underline" href="/register">초대 링크로 가입</Link>
             </div>
-            <Link className="mt-4 inline-block text-sm text-foreground/70 underline" href="/register">
-              {errorCode === "signup_disabled" ? "초대 링크로 가입 계속하기" : "Have an invite? Create your account"}
-            </Link>
           </>
         ) : (
           <p className="text-lg leading-8 text-foreground/75">
@@ -185,33 +91,16 @@ export default function LoginClient({
         )}
 
         {mockAllowed ? (
-          <Button
-            className={`mt-6 w-full ${databaseAuthEnabled ? "bg-foreground/10 text-foreground hover:bg-foreground/15" : ""}`}
-            onClick={() => mockMutation.mutate()}
-            disabled={mockMutation.isPending}
-          >
+          <Button className={`mt-6 w-full ${databaseAuthEnabled ? "bg-foreground/10 text-foreground hover:bg-foreground/15" : ""}`} onClick={() => mockMutation.mutate()} disabled={mockMutation.isPending}>
             {mockMutation.isPending ? "문 여는 중" : "Dev mock session"}
           </Button>
         ) : null}
 
-        {!mockAllowed && !databaseAuthEnabled ? (
-          <p className="mt-4 text-sm text-danger">Database auth is required in this environment.</p>
-        ) : null}
-
+        {!mockAllowed && !databaseAuthEnabled ? <p className="mt-4 text-sm text-danger">Database auth is required in this environment.</p> : null}
         {loginError ? <p className="mt-3 text-sm text-danger">{loginError}</p> : null}
-        {mockMutation.isError ? (
-          <p className="mt-3 text-sm text-danger">{(mockMutation.error as Error).message}</p>
-        ) : null}
-        {signInMutation.isError ? (
-          <p className="mt-3 text-sm text-danger">{(signInMutation.error as Error).message}</p>
-        ) : null}
-        {socialMutation.isError ? (
-          <p className="mt-3 text-sm text-danger">{(socialMutation.error as Error).message}</p>
-        ) : null}
-
-        <Link className="mt-6 inline-block text-sm text-foreground/60 underline" href="/">
-          Back to home
-        </Link>
+        {mockMutation.isError ? <p className="mt-3 text-sm text-danger">{(mockMutation.error as Error).message}</p> : null}
+        {signInMutation.isError ? <p className="mt-3 text-sm text-danger">{(signInMutation.error as Error).message}</p> : null}
+        <Link className="mt-6 inline-block text-sm text-foreground/60 underline" href="/">Back to home</Link>
       </Card>
     </AppShell>
   );

@@ -139,6 +139,34 @@ export async function prepareInviteForRegistration(rawCode: string): Promise<Inv
   return { ok: true, inviteId: invite.id, email: invite.emailNormalized };
 }
 
+/** Validate signed prepared state against the current invite row without changing state. */
+export async function isPreparedInviteUsable(input: {
+  inviteId: string;
+  email: string;
+}): Promise<boolean> {
+  const emailNormalized = normalizeEmail(input.email);
+  if (!input.inviteId || !emailNormalized) return false;
+
+  const [invite] = await getDb()
+    .select({
+      emailNormalized: alphaInvites.emailNormalized,
+      status: alphaInvites.status,
+      expiresAt: alphaInvites.expiresAt,
+      targetPhase: alphaInvites.targetPhase,
+    })
+    .from(alphaInvites)
+    .where(eq(alphaInvites.id, input.inviteId))
+    .limit(1);
+
+  return Boolean(
+    invite &&
+      invite.emailNormalized === emailNormalized &&
+      invite.targetPhase === ALPHA_STAGE_1_PHASE &&
+      invite.status === "pending" &&
+      invite.expiresAt.getTime() > Date.now(),
+  );
+}
+
 /** Reserve a previously prepared invite after explicit legal acceptance. */
 export async function reservePreparedInvite(
   inviteId: string,

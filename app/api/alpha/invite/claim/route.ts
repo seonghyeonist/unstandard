@@ -1,11 +1,13 @@
 import { cookies } from "next/headers";
 import { isDatabaseAuthConfigured } from "@/lib/config/runtime-mode";
+import { isEmailVerificationTicketUsable } from "@/lib/auth/email-verification";
 import { reservePreparedInvite, verifyInviteReservation } from "@/lib/auth/invite-gate";
 import {
   createRegistrationTicket,
+  getEmailVerificationCookieName,
   getPreparedInviteCookieName,
   getRegistrationTicketCookieName,
-  verifyPreparedInviteTicket,
+  verifyEmailVerificationTicket,
   verifyRegistrationTicket,
 } from "@/lib/auth/invite-ticket";
 import { parseRegistrationLegalSelection } from "@/lib/legal/acceptance";
@@ -69,22 +71,32 @@ export async function POST(request: Request) {
   const cookieStore = await cookies();
   const existingRaw = cookieStore.get(getRegistrationTicketCookieName())?.value;
   const existing = existingRaw ? verifyRegistrationTicket(existingRaw, secret) : null;
-  // OAuth cancellation/retry in the same browser must not consume a second
-  // reservation. The signed ticket was created only after legal acceptance.
-  if (existing && await verifyInviteReservation(existing)) {
+  // A retry in the same browser must not reserve a second invite. The signed
+  // ticket was created only after the email proof and legal acceptance.
+  if (
+    existing &&
+    await verifyInviteReservation(existing) &&
+    await isEmailVerificationTicketUsable({
+      inviteId: existing.inviteId,
+      email: existing.email,
+      challengeId: existing.emailVerificationId,
+      exp: existing.exp,
+    })
+  ) {
     return privateJson({ ok: true });
   }
   if (existingRaw) cookieStore.delete(getRegistrationTicketCookieName());
 
-  const preparedRaw = cookieStore.get(getPreparedInviteCookieName())?.value;
-  const prepared = preparedRaw ? verifyPreparedInviteTicket(preparedRaw, secret) : null;
-  if (!prepared) {
+  const proofRaw = cookieStore.get(getEmailVerificationCookieName())?.value;
+  const proof = proofRaw ? verifyEmailVerificationTicket(proofRaw, secret) : null;
+  if (!proof || !(await isEmailVerificationTicketUsable(proof))) {
     return privateJson({ error: "Invalid invite claim" }, { status: 403 });
   }
 
-  const claim = await reservePreparedInvite(prepared.inviteId, prepared.email);
+  const claim = await reservePreparedInvite(proof.inviteId, proof.email);
   if (!claim.ok) {
     cookieStore.delete(getPreparedInviteCookieName());
+    cookieStore.delete(getEmailVerificationCookieName());
     return privateJson({ error: "Invalid invite claim" }, { status: 403 });
   }
 
@@ -92,6 +104,7 @@ export async function POST(request: Request) {
     claim.inviteId,
     claim.email,
     claim.reservationCapability,
+    proof.challengeId,
     secret,
     legalSelection,
   );
@@ -103,6 +116,7 @@ export async function POST(request: Request) {
     maxAge: ticket.maxAge,
   });
   cookieStore.delete(getPreparedInviteCookieName());
+  cookieStore.delete(getEmailVerificationCookieName());
 
   return privateJson({ ok: true });
 }

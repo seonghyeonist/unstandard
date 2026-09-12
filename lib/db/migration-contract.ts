@@ -39,6 +39,7 @@ export const REQUIRED_APPLICATION_TABLES = [
   "waitlist_entries",
   "waitlist_visit_days",
   "legal_acceptances",
+  "alpha_email_verifications",
 ] as const;
 
 export function getDrizzleMigrationsFolder(cwd = process.cwd()): string {

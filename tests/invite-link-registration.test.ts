@@ -32,18 +32,20 @@ describe("fragment invite registration state", () => {
     assert.doesNotMatch(claim, /input\.code|input\.email/);
   });
 
-  it("removes the fragment and hides implementation fields from OAuth signup UI", () => {
+  it("removes the fragment and keeps implementation fields out of direct signup UI", () => {
     const register = source("components/auth/register-form.tsx");
     assert.match(register, /window\.history\.replaceState/);
     assert.match(register, /\/api\/alpha\/invite\/prepare/);
     assert.match(register, /\/api\/alpha\/invite\/claim/);
-    assert.doesNotMatch(register, /Invite code|placeholder="Email"|new-password|닉네임 \(실명 입력 금지\)/);
-    assert.doesNotMatch(register, /signUpWithEmailPassword/);
+    assert.match(register, /new-password/);
+    assert.match(register, /이메일 인증 코드/);
+    assert.doesNotMatch(register, /Google|Naver|OAuth|signIn\.social|signIn\.oauth2/);
   });
 
-  it("renders a concrete fail-closed account linking recovery message", () => {
+  it("renders direct login and password recovery entrypoints", () => {
     const login = source("app/login/login-client.tsx");
-    assert.match(login, /account_not_linked/);
-    assert.match(login, /자동 연결되지 않았어요/);
+    assert.match(login, /비밀번호 재설정/);
+    assert.match(login, /초대 링크로 가입/);
+    assert.doesNotMatch(login, /Google|Naver|OAuth/);
   });
 });

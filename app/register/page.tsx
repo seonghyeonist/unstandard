@@ -1,9 +1,10 @@
 import RegisterForm from "@/components/auth/register-form";
 import { cookies } from "next/headers";
-import { getSocialProviderAvailability } from "@/lib/auth/social-config";
 import {
   getPreparedInviteCookieName,
+  getEmailVerificationCookieName,
   getRegistrationTicketCookieName,
+  verifyEmailVerificationTicket,
   verifyPreparedInviteTicket,
   verifyRegistrationTicket,
 } from "@/lib/auth/invite-ticket";
@@ -20,9 +21,11 @@ export default async function RegisterPage() {
   const reserved = secret
     ? verifyRegistrationTicket(cookieStore.get(getRegistrationTicketCookieName())?.value ?? "", secret)
     : null;
+  const verified = secret
+    ? verifyEmailVerificationTicket(cookieStore.get(getEmailVerificationCookieName())?.value ?? "", secret)
+    : null;
   return <RegisterForm
     canonicalOrigin={getCanonicalAuthOrigin()}
-    socialProviders={getSocialProviderAvailability()}
-    initialInviteReady={Boolean(prepared || reserved)}
+    initialInviteReady={Boolean(prepared || verified || reserved)}
   />;
 }

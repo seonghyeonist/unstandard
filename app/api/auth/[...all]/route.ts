@@ -1,24 +1,22 @@
 import { getAuth } from "@/lib/auth/auth";
-import {
-  getOAuthRequestDiagnostics,
-  getOAuthResponseDiagnostics,
-  isOAuthBoundaryPath,
-} from "@/lib/auth/oauth-boundary-diagnostics";
+
+function isDisabledOAuthPath(pathname: string): boolean {
+  return (
+    pathname === "/api/auth/sign-in/social" ||
+    pathname === "/api/auth/sign-in/oauth2" ||
+    /^\/api\/auth\/(?:callback|oauth2\/callback)\/(?:google|naver)$/.test(pathname)
+  );
+}
 
 async function handler(request: Request) {
   const pathname = new URL(request.url).pathname;
-  const diagnostics = isOAuthBoundaryPath(pathname) ? getOAuthRequestDiagnostics(request) : null;
-  const response = await getAuth().handler(request);
-  if (diagnostics) {
-    // Sanitized operational evidence only: no cookie values, OAuth state/code,
-    // tokens, invite capability, email, or secrets are included.
-    console.info("oauth_boundary", JSON.stringify({
-      ...diagnostics,
-      responseStatus: response.status,
-      setCookies: getOAuthResponseDiagnostics(response),
-    }));
+  if (isDisabledOAuthPath(pathname)) {
+    return Response.json(
+      { error: "OAuth authentication is disabled" },
+      { status: 404, headers: { "Cache-Control": "no-store" } },
+    );
   }
-  return response;
+  return getAuth().handler(request);
 }
 
 export { handler as GET, handler as POST };

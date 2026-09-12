@@ -16,6 +16,7 @@ export * from "@/lib/db/schema/alpha-activity";
 export * from "@/lib/db/schema/alpha-exposures";
 export * from "@/lib/db/schema/waitlist";
 export * from "@/lib/db/schema/legal-acceptances";
+export * from "@/lib/db/schema/email-verification";
 
 import * as authSchema from "@/lib/db/schema/auth";
 import * as profilesSchema from "@/lib/db/schema/profiles";
@@ -33,6 +34,7 @@ import * as alphaActivitySchema from "@/lib/db/schema/alpha-activity";
 import * as alphaExposuresSchema from "@/lib/db/schema/alpha-exposures";
 import * as waitlistSchema from "@/lib/db/schema/waitlist";
 import * as legalAcceptancesSchema from "@/lib/db/schema/legal-acceptances";
+import * as emailVerificationSchema from "@/lib/db/schema/email-verification";
 
 export const schema = {
   ...profileBasicsSchema,
@@ -52,4 +54,5 @@ export const schema = {
   ...alphaExposuresSchema,
   ...waitlistSchema,
   ...legalAcceptancesSchema,
+  ...emailVerificationSchema,
 };

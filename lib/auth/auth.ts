@@ -1,15 +1,17 @@
 import "server-only";
 
-import { betterAuth, type BetterAuthOptions, type GenericEndpointContext } from "better-auth";
+import { betterAuth } from "better-auth";
 import { nextCookies } from "better-auth/next-js";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { APIError, createAuthMiddleware } from "better-auth/api";
-import { genericOAuth } from "better-auth/plugins/generic-oauth";
 import { cookies } from "next/headers";
 import { eq } from "drizzle-orm";
 import { getDb } from "@/lib/db/client";
-import { users } from "@/lib/db/schema/auth";
 import { schema } from "@/lib/db/schema";
+import { users } from "@/lib/db/schema/auth";
+import { isEmailVerificationTicketUsable } from "@/lib/auth/email-verification";
+import { normalizeEmail } from "@/lib/auth/invite-crypto";
+import { isAcceptableNewPassword } from "@/lib/auth/password-policy";
 import { verifyInviteReservation } from "@/lib/auth/invite-gate";
 import {
   compensateFailedRegistration,
@@ -17,104 +19,21 @@ import {
   finalizeInviteRegistration,
   isUserInviteFinalized,
 } from "@/lib/auth/invite-finalization";
-import { normalizeEmail } from "@/lib/auth/invite-crypto";
 import {
   getRegistrationTicketCookieName,
   verifyRegistrationTicket,
 } from "@/lib/auth/invite-ticket";
-import { parseNaverProfile } from "@/lib/auth/naver-profile";
-import { oauthInviteRegistrationAllowed } from "@/lib/auth/oauth-invite";
-import { getSocialProviderAvailability } from "@/lib/auth/social-config";
-import { isClosedAlphaNewMemberProvider } from "@/lib/auth/new-member-provider";
-import { readSmallJson } from "@/lib/http/profile-request";
+import { sendPasswordResetEmail } from "@/lib/email/transactional";
 import { getCanonicalAuthOrigin } from "@/lib/auth/canonical-origin";
 
 function getTrustedOrigins(): string[] {
-  // A signed OAuth state cookie is host-only. Accepting a deployment-specific
-  // origin here while Better Auth redirects to the canonical origin produces a
-  // DB verification row but no matching callback cookie.
   return [getCanonicalAuthOrigin()];
 }
 
 function requireAuthSecret(): string {
   const secret = process.env.BETTER_AUTH_SECRET?.trim();
-  if (!secret) {
-    throw new Error("BETTER_AUTH_SECRET is not configured");
-  }
+  if (!secret) throw new Error("BETTER_AUTH_SECRET is not configured");
   return secret;
-}
-
-function socialProviders(): NonNullable<BetterAuthOptions["socialProviders"]> {
-  const availability = getSocialProviderAvailability();
-  const googleId = process.env.GOOGLE_CLIENT_ID?.trim();
-  const googleSecret = process.env.GOOGLE_CLIENT_SECRET?.trim();
-  return {
-    ...(availability.google && googleId && googleSecret ? {
-      google: {
-        clientId: googleId,
-        clientSecret: googleSecret,
-        disableImplicitSignUp: true,
-        mapProfileToUser: (profile) => ({
-          // OAuth display names are not application profile names.
-          name: "Member",
-          image: undefined,
-          emailVerified: profile.email_verified === true,
-        }),
-      },
-    } : {}),
-  };
-}
-
-function naverOAuthConfig() {
-  const clientId = process.env.NAVER_CLIENT_ID?.trim();
-  const clientSecret = process.env.NAVER_CLIENT_SECRET?.trim();
-  if (!clientId || !clientSecret || /[\r\n]/.test(clientId) || /[\r\n]/.test(clientSecret)) return [];
-
-  return [{
-    providerId: "naver",
-    authorizationUrl: "https://nid.naver.com/oauth2.0/authorize",
-    tokenUrl: "https://nid.naver.com/oauth2.0/token",
-    userInfoUrl: "https://openapi.naver.com/v1/nid/me",
-    clientId,
-    clientSecret,
-    // Naver's login API treats profile permissions as an app-console setting;
-    // do not request unrelated profile fields from the authorization screen.
-    scopes: [],
-    // Naver requires the CSRF state returned to the callback to be sent again
-    // during authorization-code exchange. Better Auth's generic adapter keeps
-    // the state in the callback query, so pass only that opaque value through.
-    tokenUrlParams: (context: GenericEndpointContext): Record<string, string> => {
-      const state = typeof context.query?.state === "string" ? context.query.state : "";
-      return state ? { state } : {};
-    },
-    disableImplicitSignUp: true,
-    getUserInfo: async (tokens: { accessToken?: string }) => {
-      if (!tokens.accessToken) return null;
-      try {
-        const response = await fetch("https://openapi.naver.com/v1/nid/me", {
-          method: "GET",
-          cache: "no-store",
-          redirect: "error",
-          headers: { Authorization: `Bearer ${tokens.accessToken}`, Accept: "application/json" },
-        });
-        if (!response.ok) {
-          await response.body?.cancel();
-          return null;
-        }
-        return parseNaverProfile(await readSmallJson(response, 32 * 1024));
-      } catch {
-        return null;
-      }
-    },
-    mapProfileToUser: (profile: Record<string, unknown>) => ({
-      // Naver's authenticated email is used only for the invite match;
-      // no Naver name, phone or profile image enters the local user record.
-      name: "Member",
-      image: undefined,
-      email: typeof profile.email === "string" ? profile.email.trim() : undefined,
-      emailVerified: false,
-    }),
-  }];
 }
 
 async function readRegistrationTicket() {
@@ -129,15 +48,17 @@ const inviteGatePlugin = () => ({
   hooks: {
     before: [
       {
-        matcher: (context: { path?: string }) => context.path === "/sign-up/email",
-        handler: createAuthMiddleware(async () => {
-          // Existing credential accounts can still use /sign-in/email. New
-          // password accounts are not permitted in Closed Alpha: this app has
-          // no configured email-ownership or password-recovery delivery flow.
-          throw APIError.from("FORBIDDEN", {
-            code: "REGISTRATION_METHOD_UNAVAILABLE",
-            message: "New registration is available through the invited Google account only",
-          });
+        matcher: (context: { path?: string }) => context.path === "/sign-up/email" || context.path === "/reset-password",
+        handler: createAuthMiddleware(async (ctx) => {
+          const candidate = ctx.path === "/reset-password"
+            ? ctx.body?.newPassword
+            : ctx.body?.password;
+          if (!isAcceptableNewPassword(candidate)) {
+            throw APIError.from("BAD_REQUEST", {
+              code: "PASSWORD_TOO_WEAK",
+              message: "Password does not meet the minimum security requirements",
+            });
+          }
         }),
       },
       {
@@ -146,8 +67,7 @@ const inviteGatePlugin = () => ({
           const email = normalizeEmail(String(ctx.body?.email ?? ""));
           if (!email) return;
 
-          const db = getDb();
-          const [existingUser] = await db
+          const [existingUser] = await getDb()
             .select({ id: users.id })
             .from(users)
             .where(eq(users.email, email))
@@ -177,56 +97,27 @@ const inviteGatePlugin = () => ({
   },
 });
 
-function oauthCallbackProvider(context: { path?: string; params?: Record<string, unknown> } | null): "google" | "naver" | null {
-  const path = context?.path ?? "";
-  const parameterProvider = typeof context?.params?.id === "string"
-    ? context.params.id
-    : typeof context?.params?.providerId === "string" ? context.params.providerId : "";
-  const pathProvider = /^\/(?:oauth2\/)?callback\/(google|naver)$/.exec(path)?.[1] ?? "";
-  if (parameterProvider && parameterProvider !== "google" && parameterProvider !== "naver") {
-    throw APIError.from("FORBIDDEN", {
-      code: "INVITE_REQUIRED",
-      message: "Registration is invite-only",
-    });
-  }
-  if (parameterProvider && pathProvider && parameterProvider !== pathProvider) {
-    throw APIError.from("FORBIDDEN", {
-      code: "INVITE_REQUIRED",
-      message: "Registration is invite-only",
-    });
-  }
-  const provider = parameterProvider || pathProvider;
-  if (provider === "google" || provider === "naver") return provider;
-  if (path === "/callback/:id" || path === "/oauth2/callback/:providerId" || path.startsWith("/callback/") || path.startsWith("/oauth2/callback/")) {
-    throw APIError.from("FORBIDDEN", {
-      code: "INVITE_REQUIRED",
-      message: "Registration is invite-only",
-    });
-  }
-  return null;
-}
-
-async function requireOAuthInvite(context: { path?: string; params?: Record<string, unknown> } | null, email: string, emailVerified: boolean) {
-  const provider = oauthCallbackProvider(context);
-  if (!isClosedAlphaNewMemberProvider(provider)) {
-    throw APIError.from("FORBIDDEN", {
-      code: "REGISTRATION_METHOD_UNAVAILABLE",
-      message: "New registration is available through the invited Google account only",
-    });
-  }
+async function requireInviteRegistration(email: string) {
   const ticket = await readRegistrationTicket();
+  const proofUsable = ticket
+    ? await isEmailVerificationTicketUsable({
+        inviteId: ticket.inviteId,
+        email: ticket.email,
+        challengeId: ticket.emailVerificationId,
+        exp: ticket.exp,
+      })
+    : false;
   const reservationValid = ticket ? await verifyInviteReservation(ticket) : false;
-  if (!oauthInviteRegistrationAllowed({
-    oauthEmail: email,
-    // Better Auth forwards the provider claim but does not require it for
-    // new-user creation. Google mapping above accepts only boolean true.
-    oauthEmailVerified: emailVerified,
-    inviteEmail: ticket?.email,
-    reservationValid,
-  })) {
+
+  if (
+    !ticket ||
+    !proofUsable ||
+    !reservationValid ||
+    normalizeEmail(email) !== ticket.email
+  ) {
     throw APIError.from("FORBIDDEN", {
       code: "INVITE_REQUIRED",
-      message: "Registration is invite-only",
+      message: "A verified personal invitation is required to create an account",
     });
   }
 }
@@ -234,15 +125,17 @@ async function requireOAuthInvite(context: { path?: string; params?: Record<stri
 let authInstance: ReturnType<typeof betterAuth> | null = null;
 
 export function getAuth(): ReturnType<typeof betterAuth> {
-  if (authInstance) {
-    return authInstance;
-  }
+  if (authInstance) return authInstance;
 
   authInstance = betterAuth({
     database: drizzleAdapter(getDb(), {
       provider: "pg",
       schema,
       usePlural: true,
+      // Better Auth's user + credential-account creation must share one
+      // PostgreSQL transaction. App-owned invite proof/finalization follows
+      // in the post-commit hook with compensation on failure.
+      transaction: true,
     }),
     secret: requireAuthSecret(),
     baseURL: getCanonicalAuthOrigin(),
@@ -250,8 +143,19 @@ export function getAuth(): ReturnType<typeof betterAuth> {
     emailAndPassword: {
       enabled: true,
       minPasswordLength: 10,
+      maxPasswordLength: 128,
+      resetPasswordTokenExpiresIn: 15 * 60,
+      revokeSessionsOnPasswordReset: true,
+      sendResetPassword: async ({ user, url }) => {
+        try {
+          await sendPasswordResetEmail({ to: user.email, url });
+        } catch {
+          // Keep reset requests enumeration-safe. Operational logs carry only
+          // a stable failure code; the address and token never enter logs.
+          console.error({ action: "password_reset_delivery_failed", code: "EMAIL_DELIVERY_FAILED" });
+        }
+      },
     },
-    socialProviders: socialProviders(),
     account: {
       accountLinking: {
         enabled: false,
@@ -273,21 +177,26 @@ export function getAuth(): ReturnType<typeof betterAuth> {
       customRules: {
         "/sign-in/email": { window: 60, max: 5 },
         "/sign-up/email": { window: 60, max: 5 },
+        "/request-password-reset": { window: 60, max: 5 },
+        "/reset-password": { window: 60, max: 10 },
         "/delete-user": { window: 3_600, max: 3 },
       },
     },
     advanced: {
       ipAddress: {
-        // Vercel overwrites this header with the public client IP.
         ipAddressHeaders: ["x-forwarded-for"],
       },
     },
-    plugins: [genericOAuth({ config: naverOAuthConfig() }), inviteGatePlugin(), nextCookies()],
+    plugins: [inviteGatePlugin(), nextCookies()],
     databaseHooks: {
       user: {
         create: {
-          before: async (user, context) => {
-            await requireOAuthInvite(context as { path?: string; params?: Record<string, unknown> } | null, user.email, user.emailVerified);
+          before: async (user) => {
+            await requireInviteRegistration(user.email);
+            // The custom pre-account challenge is the email ownership proof.
+            // Marking this true prevents Better Auth's built-in post-account
+            // verification flow from creating a second, weaker path.
+            return { data: { emailVerified: true } };
           },
           after: async (user) => {
             const ticket = await readRegistrationTicket();
@@ -302,6 +211,7 @@ export function getAuth(): ReturnType<typeof betterAuth> {
                 inviteId: ticket.inviteId,
                 userId: user.id,
                 reservationCapability: ticket.capability,
+                emailVerificationId: ticket.emailVerificationId,
                 email: user.email,
                 legalAcceptance: ticket.legalAcceptance,
               });

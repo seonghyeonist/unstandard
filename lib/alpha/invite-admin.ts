@@ -108,9 +108,8 @@ export async function createStage1Invite(
   return db.transaction(async (tx) => {
     await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext('unstandard:alpha-stage-1:capacity'))`);
 
-    // A Stage 1 invitation is a new-Google-account fixture.  Do not issue one
-    // for a local identity that would correctly fail Better Auth's no-implicit-
-    // linking policy as account_not_linked.
+    // A Stage 1 invitation is a new credential-account fixture. Do not issue
+    // one for a local identity that already has an account.
     const [existingIdentity] = await tx
       .select({ userId: users.id, accountId: accounts.id })
       .from(users)
