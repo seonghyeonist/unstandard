@@ -34,7 +34,7 @@ function resolveLoginError(errorCode?: string): string | null {
     return "이 소셜 계정은 기존 UNSTANDARD 계정에 자동 연결되지 않았어요. 이미 만든 계정이라면 원래 로그인 수단으로 로그인하고, 새 가입은 초대 이메일과 같은 소셜 계정으로 진행해 주세요.";
   }
   if (errorCode === "signup_disabled") {
-    return "이 화면의 Google/Naver 버튼은 기존 계정 로그인 전용이에요. 새 가입은 발급받은 개인 초대 링크를 열어 /register에서 진행해 주세요.";
+    return "이 화면의 Google/Naver 버튼은 기존 계정 로그인 전용이에요. 새 가입은 발급받은 개인 초대 링크를 다시 열어 /register에서 진행해 주세요.";
   }
   return null;
 }
