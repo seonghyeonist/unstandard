@@ -14,6 +14,7 @@ export function normalizeWebOrigin(value: string | undefined): string | null {
 export function getCanonicalAuthOrigin(
   env: Record<string, string | undefined> = process.env,
 ): string {
+  // Direct credential auth keeps one canonical origin for cookies and links.
   const authOrigin = normalizeWebOrigin(env.BETTER_AUTH_URL);
   const appOrigin = normalizeWebOrigin(env.UNSTANDARD_APP_URL);
   if (!authOrigin || !appOrigin) throw new Error("AUTH_CANONICAL_ORIGIN_UNAVAILABLE");
