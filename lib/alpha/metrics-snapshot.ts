@@ -11,6 +11,7 @@ import {
   withMetricsDigest,
   type AlphaGroupMetric,
 } from "@/lib/alpha/metrics";
+import { getProfileRecruitmentCounts } from "@/lib/db/repositories/profile-recruitment.repository";
 import { getDb } from "@/lib/db/client";
 
 type CountRow = { numerator: number; denominator: number };
@@ -295,6 +296,7 @@ export async function buildAlphaMetricsSnapshot(asOf = new Date()) {
     asOf: asOf.toISOString(),
     stage: ALPHA_STAGE_1_PHASE,
     capacity: { occupiedSeats, maximumSeats: ALPHA_STAGE_1_CAP },
+    profileRecruitment: await getProfileRecruitmentCounts(),
     recruitment: seatsResult.rows.map((row) => ({ ...row, count: n(row.count) })),
     metrics: {
       productLowerBounds,

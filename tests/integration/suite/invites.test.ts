@@ -278,6 +278,7 @@ describe("integration: invite reservation lifecycle", () => {
       reserved.inviteId,
       reserved.email,
       reserved.reservationCapability,
+      "challenge-id",
       AUTH_SECRET,
       TEST_LEGAL_SELECTION,
     );

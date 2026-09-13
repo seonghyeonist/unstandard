@@ -54,8 +54,8 @@ describe("founder decision scope guard", () => {
   it("publishes the optional A/B consent purpose and withdrawal boundary", () => {
     const privacy = readFileSync(join(process.cwd(), "app/privacy/page.tsx"), "utf8");
     assert.match(privacy, /동의 계약 버전·UTC 동의 날짜/u);
-    assert.match(privacy, /성별·성적 지향·정체성을 추론하거나 수집하지 않습니다/u);
+    assert.match(privacy, /이 역할 선택에서 성별·성적 지향·정체성을 추론하지 않습니다/u);
     assert.match(privacy, /정정·처리정지를 요청/u);
-    assert.match(privacy, /effective 2026-08-25/u);
+    assert.match(privacy, /effective on profile-feature deployment/u);
   });
 });

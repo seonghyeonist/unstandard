@@ -1,3 +1,4 @@
+import { addSyntheticVerifiedBasics } from "../profile-fixture";
 import assert from "node:assert/strict";
 import { after, describe, it } from "node:test";
 import { inArray, sql } from "drizzle-orm";
@@ -68,6 +69,8 @@ describe("integration: persistence invariants", () => {
     const db = createIntegrationDb(url);
     const sender = await insertUserWithProfile(db, `message-sender-${Date.now()}`);
     const recipient = await insertUserWithProfile(db, `message-recipient-${Date.now()}`);
+    await addSyntheticVerifiedBasics(db, sender.userId, "male");
+    await addSyntheticVerifiedBasics(db, recipient.userId, "female");
     const unlocked = await createUnlock({
       viewerUserId: sender.userId,
       profileId: recipient.profileId,

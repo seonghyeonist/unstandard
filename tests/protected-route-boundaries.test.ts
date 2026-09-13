@@ -7,7 +7,10 @@ const source = (relativePath: string) => readFileSync(join(process.cwd(), relati
 
 describe("protected route boundaries", () => {
   it("server-protects app and onboarding layouts", () => {
-    assert.match(source("app/app/layout.tsx"), /requirePageUser\(\)/);
+    assert.match(source("app/app/layout.tsx"), /requirePageUser\(\{ requireOnboarded: false \}\)/);
+    for (const path of ["home", "profile/[id]", "answer/[profileId]", "chat/[matchId]"]) {
+      assert.match(source(`app/app/${path}/layout.tsx`), /requireIntroduction: true/);
+    }
     assert.match(source("app/onboarding/layout.tsx"), /requirePageUser\(\{ requireOnboarded: false \}\)/);
   });
 

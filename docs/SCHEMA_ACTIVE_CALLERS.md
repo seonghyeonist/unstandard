@@ -7,7 +7,7 @@ Every table in the rebuild schema is tied to an active caller or an explicit alp
 | `users` | Better Auth adapter (`lib/auth/auth.ts`), `getAuthenticatedUser()` (`lib/auth/server.ts`), invite finalization (`lib/auth/invite-finalization.ts`) | `invite_finalized_at` blocks unfinalized invite signups |
 | `sessions` | Better Auth session lifecycle | Cascade delete from `users` |
 | `accounts` | Better Auth email/password provider | Cascade delete from `users` |
-| `verifications` | Better Auth verification flows | Reserved for email verification expansion |
+| `verifications` | Better Auth password-reset token lifecycle | Separate from pre-account invite email challenges |
 | `profiles` | `ensureProfileForUser()` (`lib/db/repositories/profile-bootstrap.ts`), onboarding persistence | Unique per `user_id` |
 | `profile_private` | Private profile content loaders | Cascade delete from `profiles` |
 | `questions` | `scripts/db/seed.ts`, onboarding answer route | Seed idempotency tested in integration |
@@ -17,6 +17,7 @@ Every table in the rebuild schema is tied to an active caller or an explicit alp
 | `blocks` | `lib/db/repositories/blocks.repository.ts`, integration suite | No public HTTP route yet |
 | `unlocks` | `lib/db/repositories/unlocks.repository.ts`, database unlock API, integration suite | Database runtime uses DB rows; cookie path is local mock only |
 | `alpha_invites` | `lib/auth/invite-gate.ts`, `lib/alpha/invite-admin.ts`, operator CLI, claim API | Atomic reserve/consume; DB trigger enforces 50 Stage 1 seats |
+| `alpha_email_verifications` | `lib/auth/email-verification.ts`, `/api/alpha/invite/email/send`, `/api/alpha/invite/email/verify`, invite finalization | Pre-account HMAC challenge; attempts/expiry/one-time consumption are separate from Better Auth `verifications` |
 | `app_config` | `scripts/db/seed.ts` | Alpha closed flag |
 | `rate_limits` | Better Auth + `lib/security/rate-limit.ts` | Shared serverless-safe limiter state |
 | `support_requests` | `POST /api/support`, Settings support form | User-owned; cascade delete |

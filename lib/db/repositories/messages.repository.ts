@@ -1,6 +1,7 @@
 import "server-only";
 
-import { and, desc, eq, or } from "drizzle-orm";
+import { and, desc, eq, or, sql } from "drizzle-orm";
+import { canAccessIntroduction, lockIntroductionProfiles, introductionPairSql } from "@/lib/db/repositories/introduction-policy";
 import { getDb } from "@/lib/db/client";
 import { lockConversationPair } from "@/lib/db/repositories/conversation-lock";
 import { blocks } from "@/lib/db/schema/blocks";
@@ -24,7 +25,8 @@ export type ConversationError =
   | "SELF_MESSAGE"
   | "NOT_ONBOARDED"
   | "NOT_UNLOCKED"
-  | "BLOCKED";
+  | "BLOCKED"
+  | "PROFILE_SETUP_REQUIRED";
 
 type AuthorizationResult =
   | { ok: true; targetUserId: string }
@@ -37,6 +39,8 @@ async function authorizeConversation(
   lockForWrite = false,
 ): Promise<AuthorizationResult> {
   if (!isUuid(targetProfileId)) return { ok: false, code: "INVALID_PROFILE_ID" };
+
+  if (lockForWrite) await lockIntroductionProfiles(db, viewerUserId, targetProfileId);
 
   const [target] = await db
     .select({ userId: profiles.userId, onboardedAt: profiles.onboardedAt })
@@ -66,6 +70,8 @@ async function authorizeConversation(
     )
     .limit(1);
   if (block) return { ok: false, code: "BLOCKED" };
+
+  if (!await canAccessIntroduction(viewerUserId, targetProfileId, db)) return { ok: false, code: "PROFILE_SETUP_REQUIRED" };
 
   const [unlock] = await db
     .select({ id: unlocks.id })
@@ -98,7 +104,7 @@ export async function listConversation(input: {
     })
     .from(messages)
     .where(
-      or(
+      and(introductionPairSql(input.viewerUserId, sql`${authorization.targetUserId}`), or(
         and(
           eq(messages.senderUserId, input.viewerUserId),
           eq(messages.recipientUserId, authorization.targetUserId),
@@ -107,7 +113,7 @@ export async function listConversation(input: {
           eq(messages.senderUserId, authorization.targetUserId),
           eq(messages.recipientUserId, input.viewerUserId),
         ),
-      ),
+      )),
     )
     .orderBy(desc(messages.createdAt), desc(messages.id))
     .limit(200);

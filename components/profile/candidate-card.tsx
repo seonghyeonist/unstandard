@@ -10,7 +10,7 @@ export function CandidateCard({ candidate }: { candidate: Candidate }) {
           <div>
             <h2 className="text-2xl font-black tracking-[-0.04em]">{candidate.nickname}</h2>
             <p className="mt-1 text-sm text-foreground/60">
-              {typeof candidate.age === "number" ? `${candidate.age} · ` : ""}
+              {typeof candidate.age === "number" ? `입력 시 만 ${candidate.age}세 · ` : ""}
               {candidate.city}
             </p>
           </div>

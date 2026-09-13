@@ -42,6 +42,10 @@ export const EXPECTED_MIGRATION_LEDGER = [
     file: "0008_strange_joshua_kane.sql",
     hash: "18edb235efccd44fdfaed909ada1e759d45dd39c5d4a580986e24498c2c4b5b3",
   },
+  { file: "0009_alpha_profile_identity.sql", hash: "153b215b4c8ef1ed0e7b42175ceba810e050372ff157031a73bcdbc6acc8477b" },
+  { file: "0010_identity_notice_version.sql", hash: "2da6d6365c0785bb89450d4531441981547564f00395886a7f211c25019f0f00" },
+  { file: "0011_premium_rhodey.sql", hash: "3648cb4aee3e85e87057f2912b2fec8c13f211c2afb69d33b4880ae74f24e659" },
+  { file: "0012_blue_lady_ursula.sql", hash: "163ca3f5604e1e24b58e95c03fb3cee66fb4d145c3a1c843c5e6ac321c9fe1c2" },
 ] as const;
 
 export const EXPECTED_MIGRATION_HASHES = EXPECTED_MIGRATION_LEDGER.map(

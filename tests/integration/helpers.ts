@@ -1,4 +1,4 @@
-import { Pool } from "@neondatabase/serverless";
+import { Pool, neonConfig } from "@neondatabase/serverless";
 import { drizzle } from "drizzle-orm/neon-serverless";
 import { assertTestDatabaseEnv } from "@/lib/config/database-env";
 import { configureNeonWebSocket } from "@/lib/db/neon-websocket";
@@ -8,6 +8,9 @@ import { assertDatabaseReachable } from "@/lib/readiness/integration-database";
 import type { DbExecutor } from "@/lib/db/types";
 
 configureNeonWebSocket();
+// Match the production client: ordinary Pool queries use fetch, while
+// transaction paths retain the WebSocket transport they require.
+neonConfig.poolQueryViaFetch = true;
 
 export type IntegrationDb = DbExecutor;
 

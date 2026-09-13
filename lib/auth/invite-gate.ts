@@ -23,6 +23,10 @@ export type InviteConsumeResult =
   | { ok: true }
   | { ok: false; code: "NOT_RESERVED" | "NONCE_MISMATCH" | "EXPIRED" | "ALREADY_CONSUMED" };
 
+export type InvitePrepareResult =
+  | { ok: true; inviteId: string; email: string }
+  | { ok: false; code: "INVALID" | "EXPIRED" | "REVOKED" | "CONSUMED" };
+
 export async function reserveInviteForEmail(
   rawCode: string,
   email: string,
@@ -92,6 +96,111 @@ export async function reserveInviteForEmail(
   }
   if (existing.expiresAt.getTime() < Date.now() || existing.status === "expired") {
     return { ok: false, code: "EXPIRED" };
+  }
+
+  return { ok: false, code: "INVALID" };
+}
+
+/**
+ * Validates an invite capability without changing its state. This is used only
+ * by the same-origin fragment exchange; GET, link preview and prefetch paths
+ * never call a reservation or consumption function.
+ */
+export async function prepareInviteForRegistration(rawCode: string): Promise<InvitePrepareResult> {
+  const code = rawCode.trim();
+  if (code.length < 8) return { ok: false, code: "INVALID" };
+
+  const pepper = requireInvitePepper();
+  const codeHash = hashInviteCode(code, pepper);
+  const db = getDb();
+  const [invite] = await db
+    .select({
+      id: alphaInvites.id,
+      emailNormalized: alphaInvites.emailNormalized,
+      status: alphaInvites.status,
+      expiresAt: alphaInvites.expiresAt,
+      targetPhase: alphaInvites.targetPhase,
+    })
+    .from(alphaInvites)
+    .where(eq(alphaInvites.codeHash, codeHash))
+    .limit(1);
+
+  if (!invite || invite.targetPhase !== ALPHA_STAGE_1_PHASE) return { ok: false, code: "INVALID" };
+  if (invite.status === "revoked") return { ok: false, code: "REVOKED" };
+  if (invite.status === "consumed") return { ok: false, code: "CONSUMED" };
+  if (invite.expiresAt.getTime() <= Date.now() || invite.status === "expired") {
+    return { ok: false, code: "EXPIRED" };
+  }
+  // A reservation is bound to the browser that passed legal consent. Do not
+  // let a second browser obtain fresh pre-registration state from the same
+  // capability while the first reservation is still live.
+  if (invite.status !== "pending") return { ok: false, code: "INVALID" };
+
+  return { ok: true, inviteId: invite.id, email: invite.emailNormalized };
+}
+
+/** Validate signed prepared state against the current invite row without changing state. */
+export async function isPreparedInviteUsable(input: {
+  inviteId: string;
+  email: string;
+}): Promise<boolean> {
+  const emailNormalized = normalizeEmail(input.email);
+  if (!input.inviteId || !emailNormalized) return false;
+
+  const [invite] = await getDb()
+    .select({
+      emailNormalized: alphaInvites.emailNormalized,
+      status: alphaInvites.status,
+      expiresAt: alphaInvites.expiresAt,
+      targetPhase: alphaInvites.targetPhase,
+    })
+    .from(alphaInvites)
+    .where(eq(alphaInvites.id, input.inviteId))
+    .limit(1);
+
+  return Boolean(
+    invite &&
+      invite.emailNormalized === emailNormalized &&
+      invite.targetPhase === ALPHA_STAGE_1_PHASE &&
+      invite.status === "pending" &&
+      invite.expiresAt.getTime() > Date.now(),
+  );
+}
+
+/** Reserve a previously prepared invite after explicit legal acceptance. */
+export async function reservePreparedInvite(
+  inviteId: string,
+  email: string,
+): Promise<InviteReserveResult> {
+  const pepper = requireInvitePepper();
+  const emailNormalized = normalizeEmail(email);
+  const reservationCapability = generateReservationNonce();
+  const reservationNonceHash = hashReservationNonce(reservationCapability, pepper);
+  const db = getDb();
+  const now = new Date();
+
+  await releaseStaleReservedInvites();
+
+  const reserved = await db
+    .update(alphaInvites)
+    .set({
+      status: "reserved",
+      reservedAt: now,
+      reservationNonceHash,
+    })
+    .where(
+      and(
+        eq(alphaInvites.id, inviteId),
+        eq(alphaInvites.emailNormalized, emailNormalized),
+        eq(alphaInvites.targetPhase, ALPHA_STAGE_1_PHASE),
+        eq(alphaInvites.status, "pending"),
+        gt(alphaInvites.expiresAt, now),
+      ),
+    )
+    .returning({ id: alphaInvites.id });
+
+  if (reserved.length === 1) {
+    return { ok: true, inviteId, email: emailNormalized, reservationCapability };
   }
 
   return { ok: false, code: "INVALID" };

@@ -71,3 +71,20 @@ describe("unlock observability redaction", () => {
     assert.match(lines[0], /\[redacted\]/);
   });
 });
+
+describe("profile client fail-closed responses", () => {
+  it("never substitutes mock candidates or profiles after authorization errors", async () => {
+    const { getCandidates } = await import("../lib/api/candidates");
+    const { getProfile } = await import("../lib/api/profiles");
+    const originalFetch = globalThis.fetch;
+    try {
+      for (const status of [401, 403, 409, 503]) {
+        globalThis.fetch = async () => new Response("{}", { status });
+        await assert.rejects(getCandidates(), new RegExp(String(status)));
+        await assert.rejects(getProfile("c1"), new RegExp(String(status)));
+      }
+      globalThis.fetch = async () => { throw new Error("network down"); };
+      await assert.rejects(getCandidates(), /network down/);
+    } finally { globalThis.fetch = originalFetch; }
+  });
+});

@@ -116,7 +116,7 @@ function attestation(
       },
       privacyNoticeUrl: "https://alpha.example.com/privacy",
       accountDeletionTestReference: "delete-integration-123",
-      rateLimitPolicyVersion: "closed-alpha-v2",
+      rateLimitPolicyVersion: "closed-alpha-v3",
       measurementContractVersion: "alpha-stage1-kpi-v1",
       metricsCommand: "npm run alpha:metrics",
       supplyBalanceProcedureReference: "docs/CLOSED_ALPHA_OPERATIONS_RUNBOOK.md#supply",
@@ -270,7 +270,7 @@ describe("Closed-alpha launch separation", () => {
     );
   });
 
-  it("builds a digest-bound artifact only after technical and operational PASS", () => {
+  it("keeps the launch artifact closed until the identity provider notice is approved", () => {
     const report = buildProductionReadinessReport({
       environment: environment(),
       database: database(),
@@ -282,15 +282,21 @@ describe("Closed-alpha launch separation", () => {
       hostname: "alpha.example.com",
       verifiedAt: NOW,
     });
-    const artifact = buildClosedAlphaLaunchArtifact({
+    const result = evaluateClosedAlphaLaunch({
+      production,
+      attestation: attestation(),
+      nowMs: Date.parse(NOW) + 60_000,
+    });
+    assert.equal(result.ok, false);
+    assert.equal(
+      result.gates.find((item) => item.name === "identity_provider_notice")?.code,
+      "IDENTITY_PROVIDER_NOTICE_NOT_READY",
+    );
+    assert.throws(() => buildClosedAlphaLaunchArtifact({
       production,
       attestation: attestation(),
       generatedAt: new Date(Date.parse(NOW) + 60_000).toISOString(),
-    });
-
-    assert.equal(artifact.ok, true);
-    assert.match(artifact.contentDigest, /^[a-f0-9]{64}$/u);
-    assert.equal(artifact.gitSha, SHA);
+    }));
   });
 
   it("accepts the time-bounded Neon Free exception only with every compensating control", () => {
@@ -312,7 +318,7 @@ describe("Closed-alpha launch separation", () => {
       nowMs: Date.parse(NOW) + 60_000,
     });
 
-    assert.equal(result.ok, true);
+    assert.equal(result.ok, false);
     assert.equal(
       result.gates.find((item) => item.name === "production_database_safety")?.status,
       "PASS",
