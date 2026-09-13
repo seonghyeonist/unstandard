@@ -1,5 +1,7 @@
 # 2026-09-04 Didit workflow + Neon disposable validation handoff
 
+> **SUPERSEDED — 2026-09-13 / HISTORICAL_AUDIT_NOT_EXECUTABLE.** OAuth는 Closed Alpha 인증 경로에서 폐지되었다. 이 보관 문서에 남아 있는 OAuth secret·authenticated OAuth smoke-test·provider setup references는 취소된 과거 계획이며 실행 지시가 아니다. 현재 인증 기준은 invite-gated email ownership code + legal acceptance + email/password credentials이다. Didit·Neon 관찰값도 현재 출시 승인으로 재사용하지 않는다.
+
 ## Verdict
 
 **TECH_PREPARED_AWAITING_EXTERNAL_DIDIT_BINDING**

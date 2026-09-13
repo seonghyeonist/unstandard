@@ -1,5 +1,7 @@
 # 2026-09-04 Google / Naver OAuth 외부 설정 가이드
 
+> **SUPERSEDED — 2026-09-13 / HISTORICAL_AUDIT_NOT_EXECUTABLE.** OAuth는 Closed Alpha 인증 경로에서 폐지되었다. 이 가이드의 provider credential·callback allowlist·OAuth smoke-test 절차는 취소되었고 보관용 provenance로만 유지한다. 현재 기준은 invite-gated email ownership code + legal acceptance + email/password credentials이며, 이 문서에서 외부 OAuth 앱이나 credential을 만들지 않는다.
+
 대상: UNSTANDARD Closed Alpha / Draft PR #80
 
 **PREVIEW_FIRST / SERVER_ONLY_SECRETS / EXACT_CALLBACK / INVITE_GATED**

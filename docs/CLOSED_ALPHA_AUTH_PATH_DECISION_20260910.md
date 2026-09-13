@@ -2,8 +2,10 @@
 
 ## Scope and non-goals
 
-This decision applies to PR #80's Preview branch. It replaces Google/Naver as
-the Closed Alpha new-member path with a direct credential flow:
+This decision applies to PR #80's Preview branch. OAuth is retired from the
+Closed Alpha authentication surface: Google/Naver are not supported as a
+signup, login, callback, or account-linking path. The supported path is the
+direct credential flow:
 
 `/register#invite=<capability>` → server-validated invite → email ownership
 code → versioned legal acceptance → Better Auth credential account →
@@ -12,7 +14,7 @@ code → versioned legal acceptance → Better Auth credential account →
 Existing members use email/password. Password recovery uses Better Auth's
 short-lived, one-time reset token and the configured transactional email
 adapter. Production, main, external OAuth applications and existing provider
-rows are outside this change.
+rows are outside this change and must not be treated as active app paths.
 
 ## Current branch evidence
 
@@ -37,13 +39,13 @@ rows are outside this change.
   the application transaction then consumes the email proof and invite and
   records legal acceptance, with failed-finalization compensation preserved.
 - Account linking remains disabled. Existing credential accounts are never
-  overwritten by invite signup. An existing OAuth-only account can obtain a
-  credential through an email reset link only after current mailbox ownership
-  is proved; provider rows are not deleted here.
+  overwritten by invite signup. Existing provider rows, if any, are retained
+  only as historical database records; no OAuth sign-in or linking path is
+  supported by this branch and provider rows are not deleted here.
 - Google/Naver UI, provider configuration and callbacks are removed from this
   branch. Legacy OAuth endpoint paths return 404 and do not enter Better Auth.
-  External OAuth credentials/apps are retained for separate, explicitly
-  approved cleanup.
+  External OAuth credentials/apps are not configured or used by this branch;
+  any external cleanup is a separate, explicitly approved operation.
 
 ## Email delivery boundary
 

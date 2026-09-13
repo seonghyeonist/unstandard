@@ -1,5 +1,7 @@
 # Google email verification — 2026-09-11
 
+> **SUPERSEDED — 2026-09-13 / HISTORICAL_AUDIT_NOT_EXECUTABLE.** OAuth는 Closed Alpha 인증 경로에서 폐지되었다. 이 문서는 Google/Naver provider 검토의 보관용 증거일 뿐이며, provider credential·callback·live smoke test를 만들거나 실행하기 위한 지시가 아니다. 현재 기준은 invite-gated email ownership code + legal acceptance + email/password credentials이다.
+
 Scope: PR #80 Preview; reviewed parent `20102ae2775b9151ccb9b47f54ede1d681a823f4`.
 This is source/test evidence, not successful live Google acceptance.
 

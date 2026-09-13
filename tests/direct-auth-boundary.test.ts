@@ -37,6 +37,23 @@ describe("closed-alpha direct-auth boundary", () => {
     assert.match(source("lib/db/schema/auth.ts"), /export const accounts/);
   });
 
+  it("marks retired OAuth documents as historical instead of executable guidance", () => {
+    const historicalOAuthDocs = [
+      "docs/ALPHA_PROFILE_IDENTITY_20260828.md",
+      "docs/HANDOFF_20260828_PROFILE_IDENTITY_REMAINING.md",
+      "docs/GOOGLE_EMAIL_VERIFICATION_20260911.md",
+      "docs/HANDOFF_20260903_OAUTH_DIDIT_EXTERNAL_SETUP.md",
+      "docs/HANDOFF_20260904_DIDIT_KEY_OAUTH_NEXT.md",
+      "docs/HANDOFF_20260904_DIDIT_WORKFLOW_NEON_VALIDATION.md",
+      "docs/OAUTH_CLOSED_ALPHA_AUTH_20260903.md",
+      "docs/OAUTH_EXTERNAL_SETUP_GUIDE_20260904.md",
+    ];
+
+    for (const doc of historicalOAuthDocs) {
+      assert.match(source(doc), /SUPERSEDED[\s\S]*2026-09-13/);
+    }
+  });
+
   it("keeps reset delivery generic and revokes sessions after a successful reset", () => {
     const auth = source("lib/auth/auth.ts");
     const reset = source("components/auth/reset-password-form.tsx");

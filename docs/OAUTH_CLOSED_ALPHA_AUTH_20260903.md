@@ -1,5 +1,7 @@
 # Closed Alpha OAuth 인증 경계
 
+> **SUPERSEDED — 2026-09-13 / HISTORICAL_AUDIT_NOT_EXECUTABLE.** OAuth는 Closed Alpha 인증 경로에서 폐지되었다. 이 문서는 폐기된 Google/Naver 설계의 보관본이며 provider credential·callback·OAuth smoke test의 실행 지시가 아니다. 현재 기준은 [Closed Alpha 인증 경로 결정](./CLOSED_ALPHA_AUTH_PATH_DECISION_20260910.md)의 invite-gated email ownership code + legal acceptance + email/password credentials 흐름이다.
+
 작성: 2026-09-03 · Better Auth 1.6.23 기준
 
 **INVITE_GATED / GOOGLE_AND_NAVER_ONLY / PASSWORD_AUTH_PRESERVED**

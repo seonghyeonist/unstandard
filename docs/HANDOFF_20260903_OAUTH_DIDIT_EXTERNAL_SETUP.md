@@ -1,5 +1,7 @@
 # 2026-09-03 외부 설정·검증 인수인계
 
+> **SUPERSEDED — 2026-09-13 / HISTORICAL_AUDIT_NOT_EXECUTABLE.** OAuth는 Closed Alpha 인증 경로에서 폐지되었다. 이 문서의 Google/Naver credential·callback·provider smoke-test 지시는 취소되었으며, 보관용 provenance로만 유지한다. 현재 인증 기준은 invite-gated email ownership code + legal acceptance + email/password credentials이다. Didit 관련 항목도 이 문서만으로 완료로 판정하지 않는다.
+
 ## 현재 판정
 
 **TECH_PREPARED_AWAITING_EXTERNAL_ACCOUNTS**
