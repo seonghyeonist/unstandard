@@ -1,5 +1,7 @@
 # Closed Alpha authentication-path decision — direct invite signup
 
+> **ACTIVE PREVIEW DECISION — 2026-09-13.** OAuth retirement is effective for this branch; use this document as the current authentication-path source of truth.
+
 ## Scope and non-goals
 
 This decision applies to PR #80's Preview branch. OAuth is retired from the
