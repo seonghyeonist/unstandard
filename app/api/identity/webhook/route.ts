@@ -6,8 +6,9 @@ import { privateJson } from "@/lib/http/private-json";
 import { readSmallJson } from "@/lib/http/profile-request";
 import { parseDiditIdentityConfig } from "@/lib/identity/didit";
 import { verifyDiditWebhookSignature, verifyDiditWebhookSimpleSignature } from "@/lib/identity/didit-webhook";
-import { IDENTITY_PROVIDER_NOTICE_READY } from "@/lib/identity/notice";
 import { identityRepository } from "@/lib/db/repositories/identity.repository";
+import { getIdentityReadiness } from "@/lib/server/identity/provider";
+import { logIdentityEvent } from "@/lib/server/identity/identity-logger";
 import { createIdentityService } from "@/lib/server/identity/service";
 
 const sessionWebhookSchema = z.object({
@@ -22,14 +23,22 @@ const sessionWebhookSchema = z.object({
 }).passthrough();
 
 export async function POST(request: Request) {
+  const readiness = getIdentityReadiness();
   const config = parseDiditIdentityConfig(process.env);
-  if (!IDENTITY_PROVIDER_NOTICE_READY || !config?.webhookSecret) {
+  if (!readiness.available || !config?.webhookSecret) {
+    logIdentityEvent({
+      event: "identity.webhook.provider_unavailable",
+      stage: "webhook",
+      status: "error",
+      code: readiness.available ? "WEBHOOK_NOT_CONFIGURED" : readiness.code,
+    });
     return privateJson({ error: "Webhook unavailable" }, { status: 404 });
   }
   let body: unknown;
   try {
     body = await readSmallJson(request, 256 * 1024);
   } catch {
+    logIdentityEvent({ event: "identity.webhook.invalid_body", stage: "webhook", status: "error", code: "INVALID_BODY" });
     return privateJson({ error: "Invalid webhook" }, { status: 400 });
   }
   const envelope = sessionWebhookSchema.safeParse(body);
@@ -51,10 +60,12 @@ export async function POST(request: Request) {
       secret: config.webhookSecret,
     });
   if (!v2Verified && !simpleVerified) {
+    logIdentityEvent({ event: "identity.webhook.signature_invalid", stage: "webhook", status: "error", code: "SIGNATURE_INVALID" });
     return privateJson({ error: "Invalid webhook" }, { status: 401 });
   }
 
   if (envelope.success && envelope.data.workflow_id && envelope.data.workflow_id !== config.workflowId) {
+    logIdentityEvent({ event: "identity.webhook.workflow_mismatch", stage: "webhook", status: "error", code: "WORKFLOW_MISMATCH" });
     return privateJson({ error: "Invalid webhook" }, { status: 401 });
   }
 
@@ -67,11 +78,14 @@ export async function POST(request: Request) {
         if (!requestRow || requestRow.requestId !== envelope.data.vendor_data || requestRow.status === "verified") return;
         await createIdentityService().complete(requestRow.userId, requestRow.requestId);
       } catch {
+        logIdentityEvent({ event: "identity.webhook.complete_failed", stage: "webhook", status: "error", code: "ASYNC_COMPLETE_FAILED" });
         // Didit retries 5xx/404; no provider or decision payload is logged here.
       }
     });
   } catch {
+    logIdentityEvent({ event: "identity.webhook.schedule_failed", stage: "webhook", status: "error", code: "SCHEDULE_FAILED" });
     return privateJson({ error: "Webhook unavailable" }, { status: 503 });
   }
+  logIdentityEvent({ event: "identity.webhook.accepted", stage: "webhook", status: "ok", code: "WEBHOOK_ACCEPTED" });
   return privateJson({ accepted: true }, { status: 202 });
 }

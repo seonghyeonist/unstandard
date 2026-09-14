@@ -4,6 +4,7 @@ import { readFileSync } from "node:fs";
 import { createHmac } from "node:crypto";
 import { createDiditIdentityProvider, parseDiditIdentityConfig } from "../lib/identity/didit";
 import { identityService } from "../lib/identity/service";
+import { classifyIdentityReadiness } from "../lib/identity/readiness";
 import {
   IDENTITY_BIOMETRIC_CONSENT_VERSION,
   IDENTITY_NOTICE_VERSION,
@@ -157,11 +158,22 @@ describe("identity verification boundary", () => {
     const result = await identityService(f.deps).complete(request.userId, request.requestId);
     assert.deepEqual(result, { ok: false, code: "PROVIDER_UNAVAILABLE" });
   });
-  it("production factory stays closed and migration has no raw identity columns", () => {
+  it("emits PII-free diagnostic codes when a provider call fails", async () => {
+    const f = fixture(); const events: unknown[] = [];
+    f.provider.verify = async () => { throw new Error("synthetic raw-name private-number"); };
+    await identityService({ ...f.deps, log: (event) => events.push(event) }).complete(request.userId, request.requestId);
+    assert.match(JSON.stringify(events), /canonical_decision_request_failed/);
+    assert.doesNotMatch(JSON.stringify(events), /raw-name|private-number/);
+  });
+  it("keeps the production factory closed and classifies readiness without raw identity columns", () => {
     const factory = readFileSync("lib/server/identity/provider.ts", "utf8");
-    assert.match(factory, /return null/);
-    assert.match(factory, /if \(!IDENTITY_PROVIDER_NOTICE_READY\) return null/);
+    assert.match(factory, /provider: null/);
+    assert.match(factory, /classifyIdentityReadiness/);
+    assert.doesNotMatch(factory, /if \(!IDENTITY_PROVIDER_NOTICE_READY\) return null/);
     assert.equal(IDENTITY_PROVIDER_NOTICE_READY, false, "release must publish reviewed provider terms before enabling");
+    assert.equal(classifyIdentityReadiness(env, false), "NOTICE_NOT_READY");
+    assert.equal(classifyIdentityReadiness({ ...env, DIDIT_WEBHOOK_SECRET: undefined }, true), "WEBHOOK_NOT_CONFIGURED");
+    assert.equal(classifyIdentityReadiness(env, true), "READY");
     const migration = readFileSync("drizzle/migrations/0011_premium_rhodey.sql", "utf8");
     assert.doesNotMatch(migration, /\b(real_name|phone_number|phone|birth_date|ci|di|otp)\b/i);
     assert.doesNotMatch(migration, /UPDATE\s+profiles/i);
@@ -336,9 +348,10 @@ describe("Didit webhook boundary", () => {
     assert.equal(verifyDiditWebhookSimpleSignature({ timestamp, sessionId: webhook.session_id, status: webhook.status, webhookType: webhook.webhook_type, signature, secret: env.DIDIT_WEBHOOK_SECRET, nowSeconds: webhook.timestamp }), true);
     assert.equal(verifyDiditWebhookSimpleSignature({ timestamp, sessionId: webhook.session_id, status: "Declined", webhookType: webhook.webhook_type, signature, secret: env.DIDIT_WEBHOOK_SECRET, nowSeconds: webhook.timestamp }), false);
   });
-  it("keeps the production webhook endpoint closed with the notice gate", () => {
+  it("keeps the production webhook endpoint closed through the readiness gate", () => {
     const route = readFileSync("app/api/identity/webhook/route.ts", "utf8");
-    assert.match(route, /if \(!IDENTITY_PROVIDER_NOTICE_READY \|\| !config\?\.webhookSecret\)/);
+    assert.match(route, /getIdentityReadiness/);
+    assert.match(route, /if \(!readiness\.available \|\| !config\?\.webhookSecret\)/);
     assert.match(route, /status: 404/);
     assert.equal(IDENTITY_PROVIDER_NOTICE_READY, false);
   });

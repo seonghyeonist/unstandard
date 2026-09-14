@@ -29,6 +29,7 @@ export type ProfileSetupView = {
   eligible: boolean;
   verification: "not_started" | "pending" | "purge_pending" | "verified" | "expired";
   verificationAvailable: boolean;
+  verificationAvailabilityReason?: "not_ready" | "temporarily_unavailable";
   pendingIdentityRequestId?: string;
 };
 

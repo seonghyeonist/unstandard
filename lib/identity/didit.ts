@@ -26,6 +26,11 @@ const configSchema = z.object({
 });
 
 export type DiditIdentityConfig = z.infer<typeof configSchema>;
+export type DiditDiagnostic = (event: {
+  operation: "start" | "verify" | "purge";
+  code: string;
+  status?: number;
+}) => void;
 
 /** Pure parser; the publication/contract gate belongs to the server factory. */
 export function parseDiditIdentityConfig(env: Record<string, string | undefined>): DiditIdentityConfig | null {
@@ -127,6 +132,7 @@ export function createDiditIdentityProvider(
   config: DiditIdentityConfig,
   fetcher: typeof fetch = fetch,
   clock: () => Date = () => new Date(),
+  diagnostic?: DiditDiagnostic,
 ): IdentityProvider {
   const headers = {
     "x-api-key": config.apiKey,
@@ -152,11 +158,15 @@ export function createDiditIdentityProvider(
         }),
       });
       if (!response.ok) {
+        diagnostic?.({ operation: "start", code: "SESSION_CREATE_FAILED", status: response.status });
         await response.body?.cancel();
         throw new Error("Didit session creation failed");
       }
       const parsed = createSessionSchema.safeParse(await readSmallJson(response, 32 * 1024));
-      if (!parsed.success) throw new Error("Invalid Didit session response");
+      if (!parsed.success) {
+        diagnostic?.({ operation: "start", code: "SESSION_RESPONSE_INVALID" });
+        throw new Error("Invalid Didit session response");
+      }
       return identityLaunchSchema.parse({
         type: "didit",
         providerReference: parsed.data.session_id,
@@ -175,13 +185,17 @@ export function createDiditIdentityProvider(
           headers,
         });
         if (!response.ok) {
+          diagnostic?.({ operation: "verify", code: "CANONICAL_DECISION_FETCH_FAILED", status: response.status });
           await response.body?.cancel();
           return null;
         }
         const parsed = decisionSchema.safeParse(await readSmallJson(response, 256 * 1024));
         if (!parsed.success || parsed.data.session_id !== providerReference ||
           parsed.data.vendor_data !== requestId || parsed.data.workflow_id !== config.workflowId ||
-          !hasExactWorkflowFeatures(parsed.data.features)) return null;
+          !hasExactWorkflowFeatures(parsed.data.features)) {
+          diagnostic?.({ operation: "verify", code: "DECISION_INVALID" });
+          return null;
+        }
 
         const idVerified = parsed.data.id_verifications.some((item) => isApproved(item.status));
         const livenessVerified = parsed.data.liveness_checks.some((item) => isApproved(item.status));
@@ -189,7 +203,10 @@ export function createDiditIdentityProvider(
         const deviceIpVerified = parsed.data.ip_analyses.some((item) => isApproved(item.status));
         const verifiedAt = clock();
         const idWithAdult = parsed.data.id_verifications.find((item) => isApproved(item.status) && isAdultAt(item.date_of_birth, verifiedAt));
-        if (!idVerified || !livenessVerified || !faceMatchVerified || !deviceIpVerified || !idWithAdult) return null;
+        if (!idVerified || !livenessVerified || !faceMatchVerified || !deviceIpVerified || !idWithAdult) {
+          diagnostic?.({ operation: "verify", code: "DECISION_NOT_APPROVED" });
+          return null;
+        }
 
         return {
           requestId,
@@ -202,6 +219,7 @@ export function createDiditIdentityProvider(
           adultVerified: true,
         };
       } catch {
+        diagnostic?.({ operation: "verify", code: "CANONICAL_DECISION_REQUEST_FAILED" });
         // Provider errors/raw responses must never enter logs, traces or UI errors.
         return null;
       }
@@ -223,14 +241,18 @@ export function createDiditIdentityProvider(
           }),
         });
         if (response.status !== 200) {
+          diagnostic?.({ operation: "purge", code: "SESSION_PURGE_FAILED", status: response.status });
           await response.body?.cancel();
           return false;
         }
         const parsed = deleteSessionSchema.safeParse(await readSmallJson(response, 32 * 1024));
-        return parsed.success && parsed.data.session_id === providerReference &&
+        const accepted = parsed.success && parsed.data.session_id === providerReference &&
           (parsed.data.face_retention_outcome === "deleted" || parsed.data.face_retention_outcome === "none") &&
           parsed.data.biometric_template_uuid === null;
+        if (!accepted) diagnostic?.({ operation: "purge", code: "SESSION_PURGE_RESPONSE_INVALID" });
+        return accepted;
       } catch {
+        diagnostic?.({ operation: "purge", code: "SESSION_PURGE_REQUEST_FAILED" });
         return false;
       }
     },

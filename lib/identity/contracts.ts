@@ -67,3 +67,13 @@ export type IdentityResult =
   | { ok: true; requestId: string; launch?: IdentityLaunch }
   | { ok: false; code: "PROVIDER_UNAVAILABLE" | "PROFILE_REQUIRED" | "VERIFICATION_FAILED" | "PURGE_PENDING" | "TOO_MANY_REQUESTS" };
 export type IdentityLimiter = (scope: "identityStart" | "identityComplete" | "identityGlobal", subject: string) => Promise<boolean>;
+export type IdentityLogStage = "readiness" | "start" | "complete" | "provider" | "webhook";
+export type IdentityLogEvent = {
+  event: string;
+  stage: IdentityLogStage;
+  status: "ok" | "error";
+  code: string;
+  providerStatus?: number;
+  durationMs?: number;
+};
+export type IdentityEventLogger = (event: IdentityLogEvent) => void;

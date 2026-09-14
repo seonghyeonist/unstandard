@@ -1,5 +1,6 @@
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
+import { readFileSync } from "node:fs";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { ProfileBasicsForm } from "../components/profile/profile-basics-form";
 import assert from "node:assert/strict";
@@ -73,5 +74,12 @@ describe("basic profile server-rendered form", () => {
     assert.match(html, /인증 결과 확인/); assert.match(html, /확인 대기/);
     assert.doesNotMatch(html, new RegExp(pendingIdentityRequestId));
     assert.doesNotMatch(html, /type="tel"|name="realName"|name="phone"|name="birth/);
+  });
+  it("keeps the form mounted across refetch and exposes explicit save-state feedback", () => {
+    const source = readFileSync("components/profile/profile-basics-form.tsx", "utf8");
+    assert.doesNotMatch(source, /<ProfileBasicsForm key=/);
+    assert.match(source, /저장 완료/);
+    assert.match(source, /aria-live="polite"/);
+    assert.match(source, /setConsent\(false\)/);
   });
 });

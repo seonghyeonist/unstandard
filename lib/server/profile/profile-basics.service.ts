@@ -2,7 +2,7 @@ import "server-only";
 import { profileBasicsSchema } from "@/lib/profile/basics";
 import { identityRepository } from "@/lib/db/repositories/identity.repository";
 import { profileBasicsRepository } from "@/lib/db/repositories/profile-basics.repository";
-import { getIdentityProvider } from "@/lib/server/identity/provider";
+import { getIdentityProvider, getIdentityReadiness } from "@/lib/server/identity/provider";
 
 async function purgeIdentityBeforeProfileMutation(userId: string): Promise<void> {
   const current = await identityRepository.findCurrent(userId);
@@ -14,7 +14,12 @@ async function purgeIdentityBeforeProfileMutation(userId: string): Promise<void>
 }
 
 export async function readProfileSetup(userId: string) {
-  return { ...await profileBasicsRepository.read(userId), verificationAvailable: getIdentityProvider() !== null };
+  const readiness = getIdentityReadiness();
+  return {
+    ...await profileBasicsRepository.read(userId),
+    verificationAvailable: readiness.available,
+    verificationAvailabilityReason: readiness.publicReason ?? undefined,
+  };
 }
 export async function saveProfileBasics(userId: string, input: unknown) {
   const parsed = profileBasicsSchema.parse(input);
