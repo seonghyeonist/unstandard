@@ -1,5 +1,10 @@
 # Vercel Git delivery reconnect probe — 2026-09-12
 
+> **SUPERSEDED — 2026-09-14.** The Git-linked delivery condition recorded in
+> this historical probe is resolved. Do not use the older deployment/SHA below
+> as current evidence; use `docs/HANDOFF_20260914_PROFILE_IDENTITY_REPAIR.md`
+> and the live PR #80/Vercel metadata instead.
+
 This non-runtime document records the recovery probe for PR #80.
 
 - Vercel project: `unstandard-m9qj`
