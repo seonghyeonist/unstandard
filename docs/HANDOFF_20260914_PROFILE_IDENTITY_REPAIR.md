@@ -1,8 +1,7 @@
-# Profile + identity integration repair handoff — 2026-09-14
+# Profile + identity integration repair handoff — 2026-09-16
 
-> **CURRENT HANDOFF.** This document records the code repair and the live
-> Preview evidence available before this documentation-only follow-up commit.
-> Re-read PR #80's current head before any later smoke test.
+> **CURRENT HANDOFF (revalidated 2026-09-16).** This document records the code repair and the current Preview evidence snapshot.
+> Re-read PR #80's current head and exact deployment before any later smoke test.
 
 ## Executive verdict
 
@@ -22,16 +21,16 @@ Neon branch were not changed.
 
 ## Exact provenance
 
-The implementation commit for this handoff is:
+The implementation/evidence snapshot for this handoff is:
 
 ```text
 GitHub repository: seonghyeonist/unstandard
 PR: #80 (OPEN / DRAFT)
 Branch: feat/alpha-profile-identity-20260828
-Implementation commit: 6622eb5e64e2f97dd2458712eebc9861fa1c399c
+Implementation/evidence commit: 6a04bbdd44fb7788fcbfa27abdb8534cabe1bfc5
 Vercel project: unstandard-m9qj
-Vercel deployment: dpl_6sEsz9HB5Y5H8FRUfo9iyXWxSkkS
-Vercel Git SHA: 6622eb5e64e2f97dd2458712eebc9861fa1c399c
+Vercel deployment: dpl_BK3HDeSwG5bN977vtYxYTLGRwFpJ
+Vercel Git SHA: 6a04bbdd44fb7788fcbfa27abdb8534cabe1bfc5
 Vercel source/state: git / READY
 Preview branch alias: unstandard-m9qj-git-feat-alpha-profile-identi-5d46bc-unstandard.vercel.app
 Neon project: unstandard-alpha-preview-app-db (raspy-fog-00907976)
@@ -39,7 +38,27 @@ Neon branch: pr80-verification-clean-20260904 (br-hidden-rice-aj5bed7o)
 ```
 
 The Neon branch is non-default and non-primary. It was used only for
-count/schema reads; no provider or identity data was created during this pass.
+count/schema reads; no provider or identity data was created during this read-only revalidation.
+
+## Preview delivery constraint confirmed on 2026-09-16
+
+The current Git-linked Preview is protected by Vercel Authentication: an
+unauthenticated request to the exact Preview returned a Vercel SSO `302`
+before the application route. This is a deployment-access constraint, not
+evidence that the application route itself is broken.
+
+Before hosted Didit E2E, both the external `POST /api/identity/webhook`
+delivery and the `GET /api/identity/return` browser callback need a reviewed
+reachability design. Vercel documents an automation-bypass query parameter for
+webhook URLs and a Preview-domain exception; Didit documents that webhook
+destinations must be publicly reachable over HTTPS and return a 2xx response.
+See [Vercel Protection Bypass for Automation](https://vercel.com/docs/deployment-protection/methods-to-bypass-deployment-protection/protection-bypass-automation)
+and [Didit Webhooks](https://docs.didit.me/integration/webhooks).
+
+No bypass secret or exception was created in this pass. Do not put a shared
+app/CI secret in a callback URL. The remaining choice is a dedicated
+non-production public callback/webhook surface, or a narrowly reviewed
+Preview exception/bypass arrangement with rotation and log/referrer review.
 
 ## Root causes and repairs
 
