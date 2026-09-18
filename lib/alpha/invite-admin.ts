@@ -1,10 +1,14 @@
 import "server-only";
 
-import { and, eq, inArray, sql } from "drizzle-orm";
+import { and, desc, eq, inArray, sql } from "drizzle-orm";
 import {
+  ALPHA_BALANCE_CONSENT_VERSION,
   ALPHA_STAGE_1_CAP,
   ALPHA_STAGE_1_PHASE,
   evaluateBalanceGate,
+  isAlphaAcquisitionChannel,
+  isAlphaBalanceBucket,
+  isAlphaRecruitmentCohort,
   validateAlphaBalanceConsent,
   type AlphaAcquisitionChannel,
   type AlphaBalanceBucket,
@@ -18,6 +22,7 @@ import {
   requireInvitePepper,
 } from "@/lib/auth/invite-crypto";
 import { getDb } from "@/lib/db/client";
+import { accounts, users } from "@/lib/db/schema/auth";
 import { alphaInvites } from "@/lib/db/schema/invites";
 
 export type CreateStage1InviteInput = {
@@ -43,12 +48,31 @@ export class Stage1InviteError extends Error {
     readonly code:
       | "CAPACITY_REACHED"
       | "ACTIVE_EMAIL_EXISTS"
+      | "EMAIL_ALREADY_REGISTERED"
       | "BALANCE_SOFT_WAITLIST"
       | "BALANCE_HARD_GATE",
   ) {
     super(code);
     this.name = "Stage1InviteError";
   }
+}
+
+export type OperatorInviteSummary = {
+  id: string;
+  emailMasked: string;
+  status: string;
+  expiresAt: Date;
+  recruitmentCohort: string;
+  acquisitionChannel: string;
+  balanceBucket: string;
+};
+
+function maskEmail(email: string): string {
+  return email.replace(/(^.).*(@.*$)/, "$1***$2");
+}
+
+function effectiveInviteStatus(status: string, expiresAt: Date, now = new Date()): string {
+  return ["pending", "reserved"].includes(status) && expiresAt <= now ? "expired" : status;
 }
 
 type SeatObservation = {
@@ -83,6 +107,16 @@ export async function createStage1Invite(
 
   return db.transaction(async (tx) => {
     await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext('unstandard:alpha-stage-1:capacity'))`);
+
+    // A Stage 1 invitation is a new credential-account fixture. Do not issue
+    // one for a local identity that already has an account.
+    const [existingIdentity] = await tx
+      .select({ userId: users.id, accountId: accounts.id })
+      .from(users)
+      .leftJoin(accounts, eq(accounts.userId, users.id))
+      .where(eq(users.email, email))
+      .limit(1);
+    if (existingIdentity) throw new Stage1InviteError("EMAIL_ALREADY_REGISTERED");
 
     await tx
       .update(alphaInvites)
@@ -162,5 +196,96 @@ export async function createStage1Invite(
       occupiedSeats: seats + 1,
       balanceGate,
     };
+  });
+}
+
+/** Operator-facing status contains no raw invite capability or full email. */
+export async function listStage1Invites(): Promise<OperatorInviteSummary[]> {
+  const rows = await getDb()
+    .select({
+      id: alphaInvites.id,
+      emailNormalized: alphaInvites.emailNormalized,
+      status: alphaInvites.status,
+      expiresAt: alphaInvites.expiresAt,
+      recruitmentCohort: alphaInvites.recruitmentCohort,
+      acquisitionChannel: alphaInvites.acquisitionChannel,
+      balanceBucket: alphaInvites.balanceBucket,
+    })
+    .from(alphaInvites)
+    .where(eq(alphaInvites.targetPhase, ALPHA_STAGE_1_PHASE))
+    .orderBy(desc(alphaInvites.createdAt));
+  const now = new Date();
+  return rows.map((row) => ({
+    id: row.id,
+    emailMasked: maskEmail(row.emailNormalized),
+    status: effectiveInviteStatus(row.status, row.expiresAt, now),
+    expiresAt: row.expiresAt,
+    recruitmentCohort: row.recruitmentCohort,
+    acquisitionChannel: row.acquisitionChannel,
+    balanceBucket: row.balanceBucket,
+  }));
+}
+
+export async function revokeStage1Invite(inviteId: string): Promise<boolean> {
+  const revoked = await getDb()
+    .update(alphaInvites)
+    .set({ status: "revoked", reservedAt: null, reservationNonceHash: null })
+    .where(and(
+      eq(alphaInvites.id, inviteId),
+      eq(alphaInvites.targetPhase, ALPHA_STAGE_1_PHASE),
+      inArray(alphaInvites.status, ["pending", "reserved"]),
+    ))
+    .returning({ id: alphaInvites.id });
+  return revoked.length === 1;
+}
+
+/** Reissue only terminal, unconsumed invitations; consumed seats are never recycled here. */
+export async function reissueStage1Invite(inviteId: string): Promise<CreateStage1InviteResult> {
+  const now = new Date();
+  const db = getDb();
+  // A row can become time-expired without another invite mutation occurring.
+  // Normalize that state here so the operator does not need a revoke-then-reissue workaround.
+  await db
+    .update(alphaInvites)
+    .set({ status: "expired", reservedAt: null, reservationNonceHash: null })
+    .where(and(
+      eq(alphaInvites.id, inviteId),
+      eq(alphaInvites.targetPhase, ALPHA_STAGE_1_PHASE),
+      inArray(alphaInvites.status, ["pending", "reserved"]),
+      sql`${alphaInvites.expiresAt} <= ${now}`,
+    ));
+
+  const [row] = await db
+    .select({
+      emailNormalized: alphaInvites.emailNormalized,
+      status: alphaInvites.status,
+      recruitmentCohort: alphaInvites.recruitmentCohort,
+      acquisitionChannel: alphaInvites.acquisitionChannel,
+      balanceBucket: alphaInvites.balanceBucket,
+      balanceConsentVersion: alphaInvites.balanceConsentVersion,
+      balanceConsentedOn: alphaInvites.balanceConsentedOn,
+    })
+    .from(alphaInvites)
+    .where(and(eq(alphaInvites.id, inviteId), eq(alphaInvites.targetPhase, ALPHA_STAGE_1_PHASE)))
+    .limit(1);
+  if (!row || !["revoked", "expired"].includes(row.status)) {
+    throw new Stage1InviteError("ACTIVE_EMAIL_EXISTS");
+  }
+  if (!isAlphaRecruitmentCohort(row.recruitmentCohort) ||
+      !isAlphaAcquisitionChannel(row.acquisitionChannel) ||
+      !isAlphaBalanceBucket(row.balanceBucket)) {
+    throw new Error("INVITE_METADATA_INVALID");
+  }
+  const balanceConsent = row.balanceBucket === "not_counted"
+    ? null
+    : row.balanceConsentVersion === ALPHA_BALANCE_CONSENT_VERSION && row.balanceConsentedOn
+      ? { version: ALPHA_BALANCE_CONSENT_VERSION, consentedOn: String(row.balanceConsentedOn) }
+      : null;
+  return createStage1Invite({
+    email: row.emailNormalized,
+    recruitmentCohort: row.recruitmentCohort,
+    acquisitionChannel: row.acquisitionChannel,
+    balanceBucket: row.balanceBucket,
+    balanceConsent,
   });
 }

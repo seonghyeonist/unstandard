@@ -1,9 +1,17 @@
 import { createHmac } from "node:crypto";
 
-export const RATE_LIMIT_POLICY_VERSION = "closed-alpha-v2" as const;
+export const RATE_LIMIT_POLICY_VERSION = "closed-alpha-v3" as const;
 
 export const RATE_LIMIT_POLICIES = {
+  profileBasics: { limit: 10, windowMs: 60 * 60 * 1_000 },
+  identityStart: { limit: 3, windowMs: 24 * 60 * 60 * 1_000 },
+  identityComplete: { limit: 10, windowMs: 10 * 60 * 1_000 },
+  identityGlobal: { limit: 100, windowMs: 24 * 60 * 60 * 1_000 },
   inviteClaim: { limit: 10, windowMs: 15 * 60 * 1_000 },
+  invitePrepare: { limit: 10, windowMs: 15 * 60 * 1_000 },
+  inviteEmailSend: { limit: 5, windowMs: 15 * 60 * 1_000 },
+  inviteEmailVerify: { limit: 10, windowMs: 15 * 60 * 1_000 },
+  operatorLogin: { limit: 10, windowMs: 15 * 60 * 1_000 },
   onboardingAnswer: { limit: 10, windowMs: 10 * 60 * 1_000 },
   unlockAnswer: { limit: 20, windowMs: 10 * 60 * 1_000 },
   reportCreate: { limit: 5, windowMs: 60 * 60 * 1_000 },

@@ -27,7 +27,7 @@ export function OnboardingQuestionForm() {
     mutationFn: submitOnboardingAnswer,
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ["current-user"] });
-      router.push("/app/home");
+      router.push("/profile-setup");
     },
   });
 

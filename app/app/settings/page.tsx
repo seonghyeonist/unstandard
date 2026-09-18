@@ -83,6 +83,7 @@ export default function SettingsPage() {
   return (
     <AppShell title="설정" eyebrow="alpha">
       <AuthGuard requireOnboarded={false}>
+        <Card className="mb-5"><Link href="/profile-setup" className="font-semibold underline">기본 프로필 수정·인증·소개 참여 철회</Link></Card>
         <Card>
           <p className="text-sm leading-6 text-foreground/70">
             Closed alpha staging session. User id prefix: <span className="font-mono">{idPrefix}</span>

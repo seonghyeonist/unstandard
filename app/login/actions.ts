@@ -1,8 +1,13 @@
 "use server";
 
-import { headers } from "next/headers";
+import { cookies, headers } from "next/headers";
 import { isDatabaseAuthConfigured, isMockAuthAllowed } from "@/lib/config/auth-mode";
 import { getAuth } from "@/lib/auth/auth";
+import { isAcceptableNewPassword } from "@/lib/auth/password-policy";
+import {
+  getRegistrationTicketCookieName,
+  verifyRegistrationTicket,
+} from "@/lib/auth/invite-ticket";
 import { setMockSessionUser, clearMockSessionUser } from "@/lib/auth/mock-session.server";
 
 const MOCK_USER_ID = "11111111-1111-1111-1111-111111111111";
@@ -45,46 +50,59 @@ export async function signInWithEmailPassword(email: string, password: string) {
   }
 
   const auth = getAuth();
-  const result = await auth.api.signInEmail({
-    body: {
-      email: normalized,
-      password,
-    },
-    headers: await headers(),
-  });
+  let result;
+  try {
+    result = await auth.api.signInEmail({
+      body: {
+        email: normalized,
+        password,
+      },
+      headers: await headers(),
+    });
+  } catch {
+    throw new Error("Email or password is incorrect.");
+  }
 
   if (!result?.user) {
-    throw new Error("Sign-in failed.");
+    throw new Error("Email or password is incorrect.");
   }
 
   return { ok: true as const };
 }
 
-export async function signUpWithEmailPassword(name: string, email: string, password: string) {
+export async function completeInviteSignup(password: string) {
   if (!isDatabaseAuthConfigured()) {
     throw new Error("Database auth is not configured for this environment.");
   }
 
-  const normalized = email.trim();
-  if (!normalized || !normalized.includes("@")) {
-    throw new Error("Enter a valid email address.");
+  if (!isAcceptableNewPassword(password)) {
+    throw new Error("Password does not meet the minimum security requirements.");
   }
-  if (password.length < 10) {
-    throw new Error("Password must be at least 10 characters.");
-  }
+
+  const secret = process.env.BETTER_AUTH_SECRET?.trim();
+  const cookieStore = await cookies();
+  const ticket = secret
+    ? verifyRegistrationTicket(cookieStore.get(getRegistrationTicketCookieName())?.value ?? "", secret)
+    : null;
+  if (!ticket) throw new Error("Invite verification expired. Start again from your invitation link.");
 
   const auth = getAuth();
-  const result = await auth.api.signUpEmail({
-    body: {
-      name: name.trim() || "Member",
-      email: normalized,
-      password,
-    },
-    headers: await headers(),
-  });
+  let result;
+  try {
+    result = await auth.api.signUpEmail({
+      body: {
+        name: "Member",
+        email: ticket.email,
+        password,
+      },
+      headers: await headers(),
+    });
+  } catch {
+    throw new Error("Could not create this account. Try signing in or resetting the password if the email is already registered.");
+  }
 
   if (!result?.user) {
-    throw new Error("Registration failed.");
+    throw new Error("Could not create this account.");
   }
 
   return { ok: true as const };
