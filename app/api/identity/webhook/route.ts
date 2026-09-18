@@ -73,7 +73,7 @@ export async function POST(request: Request) {
   // A valid webhook is only a signal to perform the canonical provider lookup.
   // Completion happens before acknowledgement: transient provider/purge/rate
   // limit failures return 503 so Didit can retry. This avoids acknowledging a
-  // delivery while an after() callback is still an untracked best-effort task.
+  // delivery while an untracked best-effort background task is still running.
   let requestRow;
   try {
     requestRow = await identityRepository.findByProviderReference(envelope.data.session_id);
