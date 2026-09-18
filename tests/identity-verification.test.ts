@@ -358,11 +358,11 @@ describe("Didit webhook boundary", () => {
   });
   it("does not acknowledge before canonical completion and keeps transient failures retryable", () => {
     const route = readFileSync("app/api/identity/webhook/route.ts", "utf8");
-    assert.doesNotMatch(route, /from "next\\/server"/);
-    assert.doesNotMatch(route, /\\bafter\\(/);
-    assert.match(route, /await createIdentityService\\(\\)\\.complete/);
-    assert.match(route, /COMPLETE_RETRYABLE/);
-    assert.match(route, /status: 503/);
+    assert.equal(route.includes('from "next/server"'), false);
+    assert.equal(route.includes("after("), false);
+    assert.equal(route.includes("await createIdentityService().complete"), true);
+    assert.equal(route.includes("COMPLETE_RETRYABLE"), true);
+    assert.equal(route.includes("status: 503"), true);
   });
 
   it("uses privacy erasure for user-requested profile withdrawal", () => {
