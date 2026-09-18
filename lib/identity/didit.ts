@@ -54,7 +54,7 @@ export function parseDiditIdentityConfig(env: Record<string, string | undefined>
 }
 
 const providerResponseId = identityProviderReferenceSchema;
-const featureResultSchema = z.object({ status: z.string().trim().min(1).max(64) }).passthrough();
+const featureResultSchema = z.object({ status: z.string().trim().min(1).max(64) }).strip();
 const idVerificationSchema = featureResultSchema.extend({
   date_of_birth: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
 });
@@ -64,23 +64,23 @@ const decisionSchema = z.object({
   workflow_id: z.string().uuid(),
   vendor_data: identityRequestIdSchema,
   status: z.literal("Approved"),
-  features: z.array(z.union([z.string(), z.object({ feature: z.string() }).passthrough()])),
+  features: z.array(z.union([z.string(), z.object({ feature: z.string() }).strip()])),
   id_verifications: z.array(idVerificationSchema).min(1),
   liveness_checks: z.array(featureResultSchema).min(1),
   face_matches: z.array(featureResultSchema).min(1),
   ip_analyses: z.array(featureResultSchema).min(1),
-}).passthrough();
+}).strip();
 
 const createSessionSchema = z.object({
   session_id: providerResponseId,
   url: z.string().url(),
-}).passthrough();
+}).strip();
 
 const deleteSessionSchema = z.object({
   session_id: providerResponseId,
   face_retention_outcome: z.enum(["deleted", "retained_with_user", "none", "ineligible_no_vendor_user"]),
   biometric_template_uuid: identityProviderReferenceSchema.nullable(),
-}).passthrough();
+}).strip();
 
 const REQUIRED_FEATURES = ["ID_VERIFICATION", "LIVENESS", "FACE_MATCH", "IP_ANALYSIS"] as const;
 
@@ -224,7 +224,7 @@ export function createDiditIdentityProvider(
         return null;
       }
     },
-    async purge({ requestId, providerReference }) {
+    async purge({ requestId, providerReference, deletionInstruction = "operational_session_delete" }) {
       const url = diditSessionUrl(providerReference, "delete/");
       if (!url || !identityRequestIdSchema.safeParse(requestId).success) return false;
       try {
@@ -236,7 +236,7 @@ export function createDiditIdentityProvider(
           headers: { ...headers, "Content-Type": "application/json" },
           body: JSON.stringify({
             retain_face_embeddings: false,
-            deletion_instruction: "operational_session_delete",
+            deletion_instruction: deletionInstruction,
             instruction_id: requestId,
           }),
         });

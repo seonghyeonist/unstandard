@@ -51,7 +51,7 @@ export interface IdentityProvider {
   readonly id: string;
   start(input: { requestId: string }): Promise<IdentityLaunch>;
   verify(input: { requestId: string; providerReference: string }): Promise<IdentityProof | null>;
-  purge(input: { requestId: string; providerReference: string }): Promise<boolean>;
+  purge(input: { requestId: string; providerReference: string; deletionInstruction?: "operational_session_delete" | "privacy_erasure" }): Promise<boolean>;
 }
 export interface IdentityRepository {
   begin(userId: string, provider: string, biometricConsentVersion: string, now: Date): Promise<IdentityRequest | null>;

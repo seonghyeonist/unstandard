@@ -14,7 +14,7 @@
 - `GET /v3/session/{session_id}/decision/`의 V3 복수 배열에서 ID verification, passive liveness, face match, IP analysis가 모두 `Approved`인지 확인하고, 승인된 ID의 생년월일로 현재 시점 만 19세 이상을 계산한다.
 - provider-neutral proof는 `requestId`, `providerReference`, `verifiedAt`, `documentVerified`, `livenessVerified`, `faceMatchVerified`, `deviceIpVerified`, `adultVerified`뿐이다. Didit 원문, 얼굴 영상/이미지, 이름, 문서번호, 생년월일, 주소, media URL은 저장·응답·로그로 넘기지 않는다.
 - 확인 전에 `DELETE /v3/session/{session_id}/delete/`를 호출한다. 응답의 `face_retention_outcome`가 `deleted` 또는 얼굴 템플릿이 없음을 뜻하는 `none`이고 얼굴 템플릿 식별값이 null일 때만 `verified`로 올린다. 404·보류·보존·불명확한 `none` 응답은 성공으로 처리하지 않는다.
-- 웹훅은 Didit 문서의 `X-Signature-V2` 또는 단순 envelope 서명을 5분 timestamp freshness·constant-time HMAC 비교로 검증하고, 어느 경우에도 canonical GET을 다시 한다. `status.updated`와 `data.updated` 재전송은 DB 상태에 의해 멱등 처리된다.
+- 웹훅은 Didit 문서의 `X-Signature-V2`를 우선 검증하고, deprecated simple envelope 서명은 canonical GET 재조회와 함께 제한적 호환 경로로만 허용한다. 5분 timestamp freshness·constant-time HMAC 비교를 적용한다. 유효한 webhook은 `after()`에 맡기고 202를 먼저 반환하지 않고 canonical completion을 시도하며, provider/purge/rate-limit 일시 실패는 503으로 반환해 Didit retry를 유도한다. `status.updated`와 `data.updated` 재전송은 DB 상태에 의해 멱등 처리된다.
 
 ## 저장 상태와 접근 제어
 
@@ -40,7 +40,7 @@ Didit의 한국 안내 페이지에는 한국 신분증으로 주민등록증, �
 ## 구현 파일과 검증
 
 - `lib/identity/didit.ts`: config, session create, canonical decision, purge adapter.
-- `lib/identity/didit-webhook.ts`, `app/api/identity/webhook/route.ts`: V2 HMAC, freshness, queue signal, canonical re-fetch.
+- `lib/identity/didit-webhook.ts`, `app/api/identity/webhook/route.ts`: V2 HMAC, freshness, canonical re-fetch, retryable completion acknowledgement.
 - `lib/identity/contracts.ts`, `lib/identity/service.ts`, `lib/db/repositories/identity.repository.ts`: provider-neutral proof와 purge-before-unlock state machine.
 - `lib/identity/browser-flow.ts`, `components/profile/profile-basics-form.tsx`: consent + hosted redirect. Didit session token은 client로 보내지 않는다.
 - `tests/identity-verification.test.ts`: 합성 HTTP에서 request minimization, V3 array checks, adult calculation, purge outcome, PII non-persistence, browser untrusted callback, webhook signature를 검증한다.

@@ -1,6 +1,5 @@
 import "server-only";
 
-import { after } from "next/server";
 import { z } from "zod";
 import { privateJson } from "@/lib/http/private-json";
 import { readSmallJson } from "@/lib/http/profile-request";
@@ -34,6 +33,7 @@ export async function POST(request: Request) {
     });
     return privateJson({ error: "Webhook unavailable" }, { status: 404 });
   }
+
   let body: unknown;
   try {
     body = await readSmallJson(request, 256 * 1024);
@@ -41,6 +41,7 @@ export async function POST(request: Request) {
     logIdentityEvent({ event: "identity.webhook.invalid_body", stage: "webhook", status: "error", code: "INVALID_BODY" });
     return privateJson({ error: "Invalid webhook" }, { status: 400 });
   }
+
   const envelope = sessionWebhookSchema.safeParse(body);
   const timestamp = request.headers.get("x-timestamp");
   const v2Verified = envelope.success && timestamp === String(envelope.data.timestamp) &&
@@ -69,23 +70,45 @@ export async function POST(request: Request) {
     return privateJson({ error: "Invalid webhook" }, { status: 401 });
   }
 
-  // The webhook is only a queue signal. The callback re-fetches the canonical
-  // decision and the repository's verified state makes retries idempotent.
+  // A valid webhook is only a signal to perform the canonical provider lookup.
+  // Completion happens before acknowledgement: transient provider/purge/rate
+  // limit failures return 503 so Didit can retry. This avoids acknowledging a
+  // delivery while an after() callback is still an untracked best-effort task.
+  let requestRow;
   try {
-    after(async () => {
-      try {
-        const requestRow = await identityRepository.findByProviderReference(envelope.data.session_id);
-        if (!requestRow || requestRow.requestId !== envelope.data.vendor_data || requestRow.status === "verified") return;
-        await createIdentityService().complete(requestRow.userId, requestRow.requestId);
-      } catch {
-        logIdentityEvent({ event: "identity.webhook.complete_failed", stage: "webhook", status: "error", code: "ASYNC_COMPLETE_FAILED" });
-        // Didit retries 5xx/404; no provider or decision payload is logged here.
-      }
-    });
+    requestRow = await identityRepository.findByProviderReference(envelope.data.session_id);
   } catch {
-    logIdentityEvent({ event: "identity.webhook.schedule_failed", stage: "webhook", status: "error", code: "SCHEDULE_FAILED" });
+    logIdentityEvent({ event: "identity.webhook.lookup_failed", stage: "webhook", status: "error", code: "REQUEST_LOOKUP_RETRYABLE" });
     return privateJson({ error: "Webhook unavailable" }, { status: 503 });
   }
-  logIdentityEvent({ event: "identity.webhook.accepted", stage: "webhook", status: "ok", code: "WEBHOOK_ACCEPTED" });
-  return privateJson({ accepted: true }, { status: 202 });
+
+  if (!requestRow || requestRow.requestId !== envelope.data.vendor_data || requestRow.status === "verified") {
+    logIdentityEvent({ event: "identity.webhook.ignored", stage: "webhook", status: "ok", code: "NO_PENDING_REQUEST" });
+    return privateJson({ accepted: true }, { status: 200 });
+  }
+
+  let result;
+  try {
+    result = await createIdentityService().complete(requestRow.userId, requestRow.requestId);
+  } catch {
+    logIdentityEvent({ event: "identity.webhook.complete_failed", stage: "webhook", status: "error", code: "COMPLETE_RETRYABLE" });
+    return privateJson({ error: "Webhook unavailable" }, { status: 503 });
+  }
+
+  if (!result.ok) {
+    const retryable = result.code === "PROVIDER_UNAVAILABLE" ||
+      result.code === "PURGE_PENDING" ||
+      result.code === "TOO_MANY_REQUESTS";
+    logIdentityEvent({
+      event: "identity.webhook.complete_failed",
+      stage: "webhook",
+      status: retryable ? "error" : "ok",
+      code: retryable ? "COMPLETE_RETRYABLE" : "COMPLETE_NOT_APPROVED",
+    });
+    if (retryable) return privateJson({ error: "Webhook unavailable" }, { status: 503 });
+    return privateJson({ accepted: true }, { status: 202 });
+  }
+
+  logIdentityEvent({ event: "identity.webhook.accepted", stage: "webhook", status: "ok", code: "WEBHOOK_COMPLETED" });
+  return privateJson({ accepted: true }, { status: 200 });
 }

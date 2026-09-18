@@ -268,6 +268,7 @@ describe("Didit V3 canonical adapter (synthetic HTTP only)", () => {
       assert.equal(String(url), `https://verification.didit.me/v3/session/${providerReference}/delete/`);
       assert.equal(init?.method, "DELETE"); assert.equal(init?.redirect, "error"); assert.equal(init?.cache, "no-store");
       assert.deepEqual(JSON.parse(String(init?.body)), { retain_face_embeddings: false, deletion_instruction: "operational_session_delete", instruction_id: requestId });
+      assert.equal(new Headers(init?.headers).get("Content-Type"), "application/json");
       return Response.json({ session_id: providerReference, face_retention_outcome: "deleted", biometric_template_uuid: null });
     });
     assert.equal(await provider.purge({ requestId, providerReference }), true);
@@ -354,5 +355,18 @@ describe("Didit webhook boundary", () => {
     assert.match(route, /if \(!readiness\.available \|\| !config\?\.webhookSecret\)/);
     assert.match(route, /status: 404/);
     assert.equal(IDENTITY_PROVIDER_NOTICE_READY, false);
+  });
+  it("does not acknowledge before canonical completion and keeps transient failures retryable", () => {
+    const route = readFileSync("app/api/identity/webhook/route.ts", "utf8");
+    assert.doesNotMatch(route, /from "next\\/server"/);
+    assert.doesNotMatch(route, /\\bafter\\(/);
+    assert.match(route, /await createIdentityService\\(\\)\\.complete/);
+    assert.match(route, /COMPLETE_RETRYABLE/);
+    assert.match(route, /status: 503/);
+  });
+
+  it("uses privacy erasure for user-requested profile withdrawal", () => {
+    const service = readFileSync("lib/server/profile/profile-basics.service.ts", "utf8");
+    assert.match(service, /deletionInstruction: "privacy_erasure"/);
   });
 });

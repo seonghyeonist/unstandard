@@ -8,7 +8,7 @@ async function purgeIdentityBeforeProfileMutation(userId: string): Promise<void>
   const current = await identityRepository.findCurrent(userId);
   if (!current?.providerReference || current.status === "verified") return;
   const provider = getIdentityProvider();
-  if (!provider || !await provider.purge({ requestId: current.requestId, providerReference: current.providerReference })) {
+  if (!provider || !await provider.purge({ requestId: current.requestId, providerReference: current.providerReference, deletionInstruction: "privacy_erasure" })) {
     throw new Error("Identity provider purge is pending");
   }
 }
