@@ -130,3 +130,43 @@ If any evidence is withdrawn, a notice changes, a webhook secret is uncertain, a
 - Didit [Create Session](https://docs.didit.me/sessions-api/create-session)
 
 **Decision:** Until L1–L10 are approved and the notice is published, `IDENTITY_PROVIDER_NOTICE_READY=false`, `DIDIT_CONFIG=BLOCKED_LEGAL_NOTICE`, `DIDIT_E2E=NOT_RUN`, and `CLOSED_ALPHA_READY=NO`.
+
+## 9. 2026-09-18 evidence-closure pass
+
+This section records the closure work completed on the PR branch. It does not promote the identity gate and it is not a legal opinion.
+
+### Public-provider baseline correction
+
+The current public Didit material supports an EU/Ireland default processing baseline and names public infrastructure/subprocessor information. That corrects the earlier shorthand that no subprocessor baseline was public. It still does not prove which Business Terms, DPA version, subprocessors, region, support access, or transfer mechanism the UNSTANDARD account accepted. Public baseline and account-bound evidence remain separate dispositions.
+
+The current public Delete Session documentation also distinguishes operational session deletion from privacy erasure. The implementation must retain the provider instruction identifier as an audit reference and must not treat an HTTP response alone as an erasure certificate. Model-training opt-out remains a separate organization setting and is not inferred from retention or deletion configuration.
+
+### Actual application data path
+
+The observed Preview deployment runs the identity server functions in Vercel region `iad1` (Washington, D.C., USA). The connected Neon project is in `aws-us-east-2` (Ohio, USA). The resulting engineering data map is:
+
+1. Didit Hosted: identity document, face/liveness and provider-side verification processing, subject to the account-specific configuration that is still not proven.
+2. Didit to Vercel: webhook envelope and the server-side canonical decision request/response path. The current backend reads only the fields needed for the four checks and the age rule, but the provider workflow Returned Data configuration is not yet evidenced.
+3. Vercel to Neon: opaque request/user/profile references, status, timestamps, notice/consent versions, and purge state. Count-only/schema verification found no identity verification row on the isolated branch.
+
+Didit EU residency therefore cannot be used as a statement that the complete UNSTANDARD identity path is EU-only. The Korean notice and transfer analysis must include the actual Vercel and Neon locations if those services remain in the path.
+
+### Webhook acknowledgement and erasure changes
+
+The PR branch now completes the canonical provider decision synchronously before acknowledging a valid matching webhook. Transient provider/lookup/purge states return HTTP 503 so the provider retry contract can apply; deterministic non-approval returns a non-retry response. This removes the previous untracked `after()` acknowledgement gap in which a 202 could be committed before completion failed.
+
+This is a retry-safe acknowledgement mitigation, not proof of live delivery, sub-five-second completion, durable queue processing, or end-to-end reconciliation. Didit documentation describes a five-second timeout and limited retries, so delivery history, latency, and an idempotent reconciliation path remain release evidence items.
+
+Profile withdrawal now requests the provider's `privacy_erasure` instruction. Account-wide deletion-rights handling, retained-template inventory, and real provider erasure evidence remain separate blockers; no provider data was deleted by this pass.
+
+### Gate remains closed
+
+The code and documentation changes do not change the release decision. Keep:
+
+- `IDENTITY_PROVIDER_NOTICE_READY=false`
+- `DIDIT_CONFIG=BLOCKED_LEGAL_NOTICE`
+- `DIDIT_E2E=NOT_RUN`
+- `DIDIT_LIVE_COLLECTION=BLOCKED`
+- `CLOSED_ALPHA_READY=NO`
+
+The exact current Git SHA, CI result, and Git-linked Vercel deployment must be re-read after every subsequent branch update. A successful build or Preview deployment is not account-level legal evidence.
