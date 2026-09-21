@@ -19,17 +19,34 @@ export function canonicalizeDiditWebhook(payload: unknown): string {
   return JSON.stringify(sortAndShorten(payload));
 }
 
+function isFreshTimestamp(timestampValue: string, nowSeconds: number): boolean {
+  if (!/^\d+$/.test(timestampValue)) return false;
+  const timestamp = Number(timestampValue);
+  return Number.isSafeInteger(timestamp) && Math.abs(nowSeconds - timestamp) <= 300;
+}
+
 /** V2 authenticates the complete decision body; the route may also use the documented envelope fallback. */
 export function verifyDiditWebhookSignature(input: {
   payload: unknown; signature: string | null; timestamp: string | null; secret: string;
   nowSeconds?: number;
 }): boolean {
-  if (!input.signature || !input.timestamp || !/^\d+$/.test(input.timestamp)) return false;
-  if (!/^[0-9a-fA-F]{64}$/.test(input.signature)) return false;
-  const timestamp = Number(input.timestamp);
+  if (!input.signature || !input.timestamp || !/^[0-9a-fA-F]{64}$/.test(input.signature)) return false;
   const now = input.nowSeconds ?? Math.floor(Date.now() / 1000);
-  if (!Number.isSafeInteger(timestamp) || Math.abs(now - timestamp) > 300) return false;
+  if (!isFreshTimestamp(input.timestamp, now)) return false;
   const expected = createHmac("sha256", input.secret).update(canonicalizeDiditWebhook(input.payload), "utf8").digest();
+  const actual = Buffer.from(input.signature, "hex");
+  return expected.length === actual.length && timingSafeEqual(expected, actual);
+}
+
+/** Verify Didit's legacy raw-body signature before any JSON re-encoding. */
+export function verifyDiditWebhookRawSignature(input: {
+  rawBody: Uint8Array; signature: string | null; timestamp: string | null; secret: string;
+  nowSeconds?: number;
+}): boolean {
+  if (!input.signature || !input.timestamp || !/^[0-9a-fA-F]{64}$/.test(input.signature)) return false;
+  const now = input.nowSeconds ?? Math.floor(Date.now() / 1000);
+  if (!isFreshTimestamp(input.timestamp, now)) return false;
+  const expected = createHmac("sha256", input.secret).update(input.rawBody).digest();
   const actual = Buffer.from(input.signature, "hex");
   return expected.length === actual.length && timingSafeEqual(expected, actual);
 }
@@ -40,10 +57,9 @@ export function verifyDiditWebhookSimpleSignature(input: {
   webhookType: string | null; signature: string | null; secret: string; nowSeconds?: number;
 }): boolean {
   if (!input.signature || !input.timestamp || !input.sessionId || !input.status || !input.webhookType) return false;
-  if (!/^[0-9a-fA-F]{64}$/.test(input.signature) || !/^\d+$/.test(input.timestamp)) return false;
-  const timestamp = Number(input.timestamp);
+  if (!/^[0-9a-fA-F]{64}$/.test(input.signature)) return false;
   const now = input.nowSeconds ?? Math.floor(Date.now() / 1000);
-  if (!Number.isSafeInteger(timestamp) || Math.abs(now - timestamp) > 300) return false;
+  if (!isFreshTimestamp(input.timestamp, now)) return false;
   const expected = createHmac("sha256", input.secret)
     .update(`${input.timestamp}:${input.sessionId}:${input.status}:${input.webhookType}`, "utf8")
     .digest();
