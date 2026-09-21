@@ -114,6 +114,32 @@ The Korean notice must not call Didit active, state a deletion guarantee, or
 state a region/subprocessor/transfer fact until the controller-approved,
 account-bound evidence package exists.
 
+## Exact-head post-binding verification
+
+At the post-binding verification point, source commit
+`4f09108dabf2c7612b1ac567e0f31080c88e7732` had both PR-triggered GitHub
+workflows green: Rebuild CI #155 and CI #215. Vercel Preview deployment
+`dpl_BNjR6smvxPejUVazrdB77KAyqXrj` reached `READY` from that exact commit
+in `iad1`, on the PR branch alias.
+
+The exact Preview alias returned `200` for `/privacy`. A `GET` to the
+POST-only webhook route returned the expected `405`. Didit's provider-supplied
+webhook test fixture was sent to the active `PR80 Preview` destination; the
+console reported `404`, and Vercel recorded
+`POST /api/identity/webhook 404` with
+`identity.webhook.provider_unavailable / NOTICE_NOT_READY`. This proves
+callback reachability and the intended fail-closed notice gate, not successful
+identity verification or provider-data acceptance.
+
+A new non-default Neon branch
+`pr80-exact-final-20260921-4f09108` was used for the database check. The
+PR's 0009–0013 migrations were applied only there. The current schema-aware
+synthetic policy fixture passed, including age 19, consent withdrawal,
+revision freshness, opposite-gender eligibility, block exclusion, database
+constraints, and deletion cleanup; post-run counts for synthetic users,
+profiles, basics, identity rows, and blocks were all zero. The primary/default
+Neon branch was not changed.
+
 ## Current L1–L10 disposition
 
 | Gate | Disposition | Concrete evidence |
@@ -126,7 +152,7 @@ account-bound evidence package exists.
 | L6 Workflow | CONDITIONAL_PASS | Exact Sandbox workflow, Korea/document scope, age 19, and Preview workflow binding are evidenced; legal approval and live collection authorization are absent. |
 | L7 Webhook | CONDITIONAL_PASS | Sandbox Preview destination is active for two events; code verifies fresh signatures and persists schedule before `202`, but no completed delivery/retry record exists. |
 | L8 Preview environment | CONDITIONAL_PASS | Required values are present in the PR Preview branch, including a masked webhook secret; Production is not selected. |
-| L9 Reachability | BLOCKED | The new exact-head deployment still needs the post-binding route/runtime probe; no real identity callback is claimed. |
+| L9 Reachability | CONDITIONAL_PASS | Exact-head Preview route probes and the provider-supplied webhook test reached the route; the deliberate 404 `NOTICE_NOT_READY` fail-closed response is not an identity E2E pass. |
 | L10 Synthetic identity | BLOCKED | No controller-approved vendor/synthetic test subject and consent fixture is available. |
 
 ## Gate state
