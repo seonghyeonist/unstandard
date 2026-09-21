@@ -8,7 +8,6 @@ import { verifyDiditWebhookSignature, verifyDiditWebhookSimpleSignature } from "
 import { identityRepository } from "@/lib/db/repositories/identity.repository";
 import { getIdentityReadiness } from "@/lib/server/identity/provider";
 import { logIdentityEvent } from "@/lib/server/identity/identity-logger";
-import { createIdentityService } from "@/lib/server/identity/service";
 
 const sessionWebhookSchema = z.object({
   event_id: z.string().uuid(),
@@ -70,10 +69,10 @@ export async function POST(request: Request) {
     return privateJson({ error: "Invalid webhook" }, { status: 401 });
   }
 
-  // A valid webhook is only a signal to perform the canonical provider lookup.
-  // Completion happens before acknowledgement: transient provider/purge/rate
-  // limit failures return 503 so Didit can retry. This avoids acknowledging a
-  // delivery while an untracked best-effort background task is still running.
+  // A valid webhook is only a signal to schedule canonical provider lookup.
+  // Didit has a five-second response budget, whereas decision lookup plus
+  // provider purge may take longer. Persist the bounded work item before 202;
+  // the reconciliation command owns canonical lookup and purge afterwards.
   let requestRow;
   try {
     requestRow = await identityRepository.findByProviderReference(envelope.data.session_id);
@@ -87,28 +86,24 @@ export async function POST(request: Request) {
     return privateJson({ accepted: true }, { status: 200 });
   }
 
-  let result;
-  try {
-    result = await createIdentityService().complete(requestRow.userId, requestRow.requestId);
-  } catch {
-    logIdentityEvent({ event: "identity.webhook.complete_failed", stage: "webhook", status: "error", code: "COMPLETE_RETRYABLE" });
-    return privateJson({ error: "Webhook unavailable" }, { status: 503 });
-  }
-
-  if (!result.ok) {
-    const retryable = result.code === "PROVIDER_UNAVAILABLE" ||
-      result.code === "PURGE_PENDING" ||
-      result.code === "TOO_MANY_REQUESTS";
-    logIdentityEvent({
-      event: "identity.webhook.complete_failed",
-      stage: "webhook",
-      status: retryable ? "error" : "ok",
-      code: retryable ? "COMPLETE_RETRYABLE" : "COMPLETE_NOT_APPROVED",
-    });
-    if (retryable) return privateJson({ error: "Webhook unavailable" }, { status: 503 });
+  if (envelope.data.status !== "Approved") {
+    logIdentityEvent({ event: "identity.webhook.ignored", stage: "webhook", status: "ok", code: "NON_APPROVED_STATUS" });
     return privateJson({ accepted: true }, { status: 202 });
   }
 
-  logIdentityEvent({ event: "identity.webhook.accepted", stage: "webhook", status: "ok", code: "WEBHOOK_COMPLETED" });
-  return privateJson({ accepted: true }, { status: 200 });
+  let scheduled;
+  try {
+    scheduled = await identityRepository.markCompletionRequested(requestRow, envelope.data.event_id, new Date());
+  } catch {
+    logIdentityEvent({ event: "identity.webhook.schedule_failed", stage: "webhook", status: "error", code: "SCHEDULE_RETRYABLE" });
+    return privateJson({ error: "Webhook unavailable" }, { status: 503 });
+  }
+
+  if (!scheduled) {
+    logIdentityEvent({ event: "identity.webhook.ignored", stage: "webhook", status: "ok", code: "REQUEST_NOT_SCHEDULABLE" });
+    return privateJson({ accepted: true }, { status: 200 });
+  }
+
+  logIdentityEvent({ event: "identity.webhook.scheduled", stage: "webhook", status: "ok", code: "RECONCILIATION_SCHEDULED" });
+  return privateJson({ accepted: true }, { status: 202 });
 }

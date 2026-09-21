@@ -187,7 +187,10 @@ export function createDiditIdentityProvider(
         if (!response.ok) {
           diagnostic?.({ operation: "verify", code: "CANONICAL_DECISION_FETCH_FAILED", status: response.status });
           await response.body?.cancel();
-          return null;
+          // A missing session is conclusive; access/configuration, quota and
+          // server failures must remain retryable in the durable reconciler.
+          if (response.status === 400 || response.status === 404) return null;
+          throw new Error("Didit canonical decision temporarily unavailable");
         }
         const parsed = decisionSchema.safeParse(await readSmallJson(response, 256 * 1024));
         if (!parsed.success || parsed.data.session_id !== providerReference ||
@@ -220,8 +223,9 @@ export function createDiditIdentityProvider(
         };
       } catch {
         diagnostic?.({ operation: "verify", code: "CANONICAL_DECISION_REQUEST_FAILED" });
-        // Provider errors/raw responses must never enter logs, traces or UI errors.
-        return null;
+        // Do not convert transport/configuration failures into a declined
+        // decision. The caller retains its durable work item for retry.
+        throw new Error("Didit canonical decision unavailable");
       }
     },
     async purge({ requestId, providerReference, deletionInstruction = "operational_session_delete" }) {
@@ -240,6 +244,14 @@ export function createDiditIdentityProvider(
             instruction_id: requestId,
           }),
         });
+        // Didit specifies 404 for both an unknown and an already-deleted
+        // session. The reference comes only from our bound, server-side row,
+        // so an already-absent session is an idempotent successful purge.
+        if (response.status === 404) {
+          diagnostic?.({ operation: "purge", code: "SESSION_PURGE_ALREADY_ABSENT", status: response.status });
+          await response.body?.cancel();
+          return true;
+        }
         if (response.status !== 200) {
           diagnostic?.({ operation: "purge", code: "SESSION_PURGE_FAILED", status: response.status });
           await response.body?.cancel();

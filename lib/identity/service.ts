@@ -8,6 +8,7 @@ import {
   type IdentityProof,
   type IdentityResult,
   type IdentityEventLogger,
+  type IdentityRequest,
 } from "@/lib/identity/contracts";
 
 export function identityService(deps: {
@@ -36,6 +37,28 @@ export function identityService(deps: {
       proof.documentVerified === true && proof.livenessVerified === true && proof.faceMatchVerified === true &&
       proof.deviceIpVerified === true && proof.adultVerified === true &&
       Number.isFinite(proof.verifiedAt.getTime()) && proof.verifiedAt >= new Date(0) && proof.verifiedAt <= completedAt;
+  }
+
+  async function purgeRejectedOrExpiredRequest(
+    request: IdentityRequest & { providerReference: string },
+    provider: IdentityProvider,
+  ): Promise<IdentityResult> {
+    let purged: boolean;
+    try {
+      purged = await provider.purge({ requestId: request.requestId, providerReference: request.providerReference });
+    } catch {
+      purged = false;
+    }
+    if (!purged) {
+      report("complete", "error", "PURGE_PENDING");
+      return { ok: false, code: "PURGE_PENDING" };
+    }
+    if (!await deps.repository.removePending(request)) {
+      report("complete", "error", "PURGE_STATE_WRITE_FAILED");
+      return { ok: false, code: "PURGE_PENDING" };
+    }
+    report("complete", "error", "VERIFICATION_FAILED");
+    return { ok: false, code: "VERIFICATION_FAILED" };
   }
 
   return {
@@ -145,11 +168,11 @@ export function identityService(deps: {
           return { ok: false, code: "VERIFICATION_FAILED" };
         }
         const providerReference = request.providerReference;
+        const boundRequest = { ...request, providerReference };
 
         if (request.status === "pending") {
           if (request.expiresAt <= time) {
-            report("complete", "error", "REQUEST_EXPIRED");
-            return { ok: false, code: "VERIFICATION_FAILED" };
+            return purgeRejectedOrExpiredRequest(boundRequest, p);
           }
           let proof: IdentityProof | null;
           try {
@@ -161,10 +184,11 @@ export function identityService(deps: {
           const completedAt = now();
           if (!proof || !hasCompleteProof(proof, { requestId: request.requestId, providerReference }, completedAt) || proof.verifiedAt < request.requestedAt ||
             request.expiresAt <= completedAt || completedAt.getTime() - proof.verifiedAt.getTime() >= IDENTITY_REQUEST_TTL_MS ||
-            request.biometricConsentVersion !== IDENTITY_BIOMETRIC_CONSENT_VERSION ||
-            !await deps.repository.markVerifiedUnpurged(request, proof, completedAt)) {
-            report("complete", "error", "DECISION_INVALID");
-            return { ok: false, code: "VERIFICATION_FAILED" };
+            request.biometricConsentVersion !== IDENTITY_BIOMETRIC_CONSENT_VERSION) {
+            return purgeRejectedOrExpiredRequest(boundRequest, p);
+          }
+          if (!await deps.repository.markVerifiedUnpurged(request, proof, completedAt)) {
+            return purgeRejectedOrExpiredRequest(boundRequest, p);
           }
         }
 

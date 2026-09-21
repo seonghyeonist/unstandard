@@ -3,6 +3,7 @@ import { describe, it } from "node:test";
 import { readFileSync } from "node:fs";
 import { createHmac } from "node:crypto";
 import { createDiditIdentityProvider, parseDiditIdentityConfig } from "../lib/identity/didit";
+import { reconcileIdentityCompletions } from "../lib/identity/reconciliation";
 import { identityService } from "../lib/identity/service";
 import { classifyIdentityReadiness } from "../lib/identity/readiness";
 import {
@@ -31,6 +32,8 @@ const request: IdentityRequest = {
   biometricConsentVersion: IDENTITY_BIOMETRIC_CONSENT_VERSION,
   requestedAt: new Date(now.getTime() - 1000),
   expiresAt: new Date(now.getTime() + 60_000),
+  completionRequestedAt: null,
+  completionEventId: null,
   verifiedAt: null,
   providerPurgedAt: null,
   status: "pending",
@@ -48,6 +51,21 @@ function fixture() {
     find: async (userId, id) => userId === current.userId && id === current.requestId ? current : null,
     findByProviderReference: async (reference) => reference === current.providerReference ? current : null,
     bindProviderReference: async (_request, reference) => { current.providerReference = reference; return true; },
+    markCompletionRequested: async (_request, eventId, at) => {
+      current.completionEventId = eventId;
+      current.completionRequestedAt = at;
+      return true;
+    },
+    listCompletionRequests: async () => (
+      current.completionRequestedAt ||
+      current.status === "verified_unpurged" ||
+      (current.status === "pending" && current.expiresAt <= now)
+    ) ? [current] : [],
+    clearCompletionRequested: async () => {
+      current.completionEventId = null;
+      current.completionRequestedAt = null;
+      return true;
+    },
     markVerifiedUnpurged: async (_request, proof) => {
       current.status = "verified_unpurged";
       current.verifiedAt = proof.verifiedAt;
@@ -113,9 +131,10 @@ describe("identity verification boundary", () => {
     const f = fixture(); assert.equal((await identityService(f.deps).complete("attacker", request.requestId)).ok, false);
     assert.equal(f.calls(), 0);
   });
-  it("rejects expiry before provider call", async () => {
+  it("purges an expired session without a canonical decision lookup", async () => {
     const f = fixture(); f.repo.find = async () => ({ ...request, expiresAt: now });
-    assert.equal((await identityService(f.deps).complete(request.userId, request.requestId)).ok, false); assert.equal(f.calls(), 0);
+    assert.deepEqual(await identityService(f.deps).complete(request.userId, request.requestId), { ok: false, code: "VERIFICATION_FAILED" });
+    assert.equal(f.calls(), 1, "provider purge only");
   });
   it("limits spending before start; storage outage is fail closed", async () => {
     for (const unavailable of [false, true]) {
@@ -157,6 +176,14 @@ describe("identity verification boundary", () => {
     const f = fixture(); f.provider.verify = async () => { throw new Error("synthetic raw-name private-number"); };
     const result = await identityService(f.deps).complete(request.userId, request.requestId);
     assert.deepEqual(result, { ok: false, code: "PROVIDER_UNAVAILABLE" });
+  });
+  it("purges and removes a conclusive non-approved request before allowing a retry", async () => {
+    const f = fixture(); let purges = 0;
+    f.provider.verify = async () => null;
+    f.provider.purge = async () => { purges++; return true; };
+    assert.deepEqual(await identityService(f.deps).complete(request.userId, request.requestId), { ok: false, code: "VERIFICATION_FAILED" });
+    assert.equal(purges, 1, "conclusive rejection is purged before the row is removed");
+    assert.equal(f.repo.findCurrent ? (await f.repo.findCurrent(request.userId))?.providerReference : undefined, null);
   });
   it("emits PII-free diagnostic codes when a provider call fails", async () => {
     const f = fixture(); const events: unknown[] = [];
@@ -283,7 +310,7 @@ describe("Didit V3 canonical adapter (synthetic HTTP only)", () => {
       assert.equal(await p.purge({ requestId, providerReference }), false);
     }
     const missing = createDiditIdentityProvider(config, async () => new Response(null, { status: 404 }));
-    assert.equal(await missing.purge({ requestId, providerReference }), false);
+    assert.equal(await missing.purge({ requestId, providerReference }), true, "Didit defines 404 as already deleted or unknown; a bound session is idempotently absent");
   });
   it("fails closed on malformed, oversized and non-JSON responses", async () => {
     for (const response of [
@@ -295,6 +322,10 @@ describe("Didit V3 canonical adapter (synthetic HTTP only)", () => {
       const provider = createDiditIdentityProvider(config, async () => response);
       await assert.rejects(provider.start({ requestId }));
     }
+  });
+  it("keeps transient canonical decision failures retryable", async () => {
+    const provider = createDiditIdentityProvider(config, async () => new Response(null, { status: 503 }));
+    await assert.rejects(provider.verify({ requestId, providerReference }));
   });
 });
 
@@ -356,17 +387,53 @@ describe("Didit webhook boundary", () => {
     assert.match(route, /status: 404/);
     assert.equal(IDENTITY_PROVIDER_NOTICE_READY, false);
   });
-  it("does not acknowledge before canonical completion and keeps transient failures retryable", () => {
+  it("durably schedules canonical completion before acknowledgement and keeps storage failures retryable", () => {
     const route = readFileSync("app/api/identity/webhook/route.ts", "utf8");
     assert.equal(route.includes('from "next/server"'), false);
     assert.equal(route.includes("after("), false);
-    assert.equal(route.includes("await createIdentityService().complete"), true);
-    assert.equal(route.includes("COMPLETE_RETRYABLE"), true);
+    assert.equal(route.includes("await createIdentityService().complete"), false);
+    assert.equal(route.includes("markCompletionRequested"), true);
+    assert.equal(route.includes("RECONCILIATION_SCHEDULED"), true);
     assert.equal(route.includes("status: 503"), true);
   });
 
   it("uses privacy erasure for user-requested profile withdrawal", () => {
     const service = readFileSync("lib/server/profile/profile-basics.service.ts", "utf8");
     assert.match(service, /deletionInstruction: "privacy_erasure"/);
+  });
+});
+
+describe("identity webhook reconciliation", () => {
+  it("processes a bounded durable request sequentially and clears terminal non-approvals", async () => {
+    const f = fixture();
+    await f.repo.markCompletionRequested(request, "77777777-7777-4777-8777-777777777777", now);
+    const first = await reconcileIdentityCompletions({ repository: f.repo, service: identityService(f.deps), limit: 1 });
+    assert.deepEqual(first, { selected: 1, verified: 1, retryable: 0, cleared: 0 });
+
+    const rejected = fixture();
+    await rejected.repo.markCompletionRequested(request, "88888888-8888-4888-8888-888888888888", now);
+    rejected.provider.verify = async () => null;
+    const second = await reconcileIdentityCompletions({ repository: rejected.repo, service: identityService(rejected.deps), limit: 1 });
+    assert.deepEqual(second, { selected: 1, verified: 0, retryable: 0, cleared: 1 });
+    assert.deepEqual(await rejected.repo.listCompletionRequests(1), []);
+  });
+
+  it("retries unpurged and expired provider sessions without requiring another browser callback", async () => {
+    const unpurged = fixture();
+    unpurged.provider.purge = async () => true;
+    await unpurged.repo.markVerifiedUnpurged(request, unpurged.proof, now);
+    const first = await reconcileIdentityCompletions({ repository: unpurged.repo, service: identityService(unpurged.deps) });
+    assert.deepEqual(first, { selected: 1, verified: 1, retryable: 0, cleared: 0 });
+
+    const originalExpiry = request.expiresAt;
+    request.expiresAt = new Date(now.getTime() - 1);
+    const expired = fixture();
+    try {
+      const second = await reconcileIdentityCompletions({ repository: expired.repo, service: identityService(expired.deps) });
+      assert.deepEqual(second, { selected: 1, verified: 0, retryable: 0, cleared: 1 });
+      assert.equal(expired.calls(), 1);
+    } finally {
+      request.expiresAt = originalExpiry;
+    }
   });
 });

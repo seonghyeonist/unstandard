@@ -30,6 +30,8 @@ export type IdentityRequest = {
   biometricConsentVersion: string;
   requestedAt: Date;
   expiresAt: Date;
+  completionRequestedAt: Date | null;
+  completionEventId: string | null;
   verifiedAt: Date | null;
   providerPurgedAt: Date | null;
   status: "pending" | "verified_unpurged" | "verified";
@@ -60,6 +62,9 @@ export interface IdentityRepository {
   find(userId: string, requestId: string): Promise<IdentityRequest | null>;
   findByProviderReference(providerReference: string): Promise<IdentityRequest | null>;
   bindProviderReference(request: IdentityRequest, providerReference: string): Promise<boolean>;
+  markCompletionRequested(request: IdentityRequest, eventId: string, now: Date): Promise<boolean>;
+  listCompletionRequests(limit: number): Promise<IdentityRequest[]>;
+  clearCompletionRequested(request: IdentityRequest): Promise<boolean>;
   markVerifiedUnpurged(request: IdentityRequest, proof: IdentityProof, now: Date): Promise<boolean>;
   markVerified(request: IdentityRequest, purgedAt: Date): Promise<boolean>;
 }

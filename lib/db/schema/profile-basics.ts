@@ -32,6 +32,10 @@ export const identityVerifications = pgTable("identity_verifications", {
   noticeVersion: text("notice_version").notNull(),
   requestedAt: timestamp("requested_at", { withTimezone: true }).notNull(),
   expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+  // A verified Didit webhook only schedules canonical completion. This stores
+  // no provider payload, document data, or biometric material.
+  completionRequestedAt: timestamp("completion_requested_at", { withTimezone: true }),
+  completionEventId: uuid("completion_event_id"),
   verifiedAt: timestamp("verified_at", { withTimezone: true }),
   providerPurgedAt: timestamp("provider_purged_at", { withTimezone: true }),
 }, (t) => [

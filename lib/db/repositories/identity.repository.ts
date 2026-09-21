@@ -1,7 +1,7 @@
 import "server-only";
 
 import { randomUUID } from "node:crypto";
-import { and, eq } from "drizzle-orm";
+import { and, asc, eq, inArray, isNotNull, isNull, lte, or } from "drizzle-orm";
 import { getDb } from "@/lib/db/client";
 import { profileBasics, identityVerifications } from "@/lib/db/schema/profile-basics";
 import { profiles } from "@/lib/db/schema/profiles";
@@ -26,6 +26,8 @@ function toIdentityRequest(row: typeof identityVerifications.$inferSelect): Iden
     biometricConsentVersion: row.biometricConsentVersion,
     requestedAt: row.requestedAt,
     expiresAt: row.expiresAt,
+    completionRequestedAt: row.completionRequestedAt,
+    completionEventId: row.completionEventId,
     verifiedAt: row.verifiedAt,
     providerPurgedAt: row.providerPurgedAt,
   };
@@ -92,6 +94,8 @@ export const identityRepository: IdentityRepository = {
         biometricConsentVersion,
         requestedAt: now,
         expiresAt: new Date(now.getTime() + IDENTITY_REQUEST_TTL_MS),
+        completionRequestedAt: null,
+        completionEventId: null,
         verifiedAt: null,
         providerPurgedAt: null,
       };
@@ -160,6 +164,76 @@ export const identityRepository: IdentityRepository = {
           eq(identityVerifications.requestId, request.requestId),
           eq(identityVerifications.provider, request.provider),
           eq(identityVerifications.status, "pending"),
+        ),
+      )
+      .returning({ userId: identityVerifications.userId });
+    return updated.length === 1;
+  },
+
+  async markCompletionRequested(request, eventId, now) {
+    if (!request.providerReference) return false;
+    const updated = await getDb()
+      .update(identityVerifications)
+      .set({
+        completionRequestedAt: now,
+        completionEventId: eventId,
+      })
+      .where(
+        and(
+          eq(identityVerifications.userId, request.userId),
+          eq(identityVerifications.requestId, request.requestId),
+          eq(identityVerifications.provider, request.provider),
+          eq(identityVerifications.providerReference, request.providerReference),
+          isNull(identityVerifications.completionRequestedAt),
+          or(
+            eq(identityVerifications.status, "pending"),
+            eq(identityVerifications.status, "verified_unpurged"),
+          ),
+        ),
+      )
+      .returning({ userId: identityVerifications.userId });
+    return updated.length === 1;
+  },
+
+  async listCompletionRequests(limit) {
+    const boundedLimit = Math.max(1, Math.min(Math.trunc(limit), 50));
+    const rows = await getDb()
+      .select()
+      .from(identityVerifications)
+      .where(
+        and(
+          isNotNull(identityVerifications.providerReference),
+          or(
+            eq(identityVerifications.status, "pending"),
+            eq(identityVerifications.status, "verified_unpurged"),
+          ),
+          // A missing Approved webhook must not leave an external session
+          // behind forever. Expired pending sessions and any unpurged verified
+          // row are re-entered through the same bounded, idempotent path.
+          or(
+            isNotNull(identityVerifications.completionRequestedAt),
+            eq(identityVerifications.status, "verified_unpurged"),
+            and(
+              eq(identityVerifications.status, "pending"),
+              lte(identityVerifications.expiresAt, new Date()),
+            ),
+          ),
+        ),
+      )
+      .orderBy(asc(identityVerifications.completionRequestedAt))
+      .limit(boundedLimit);
+    return rows.map(toIdentityRequest);
+  },
+
+  async clearCompletionRequested(request) {
+    const updated = await getDb()
+      .update(identityVerifications)
+      .set({ completionRequestedAt: null, completionEventId: null })
+      .where(
+        and(
+          eq(identityVerifications.userId, request.userId),
+          eq(identityVerifications.requestId, request.requestId),
+          inArray(identityVerifications.status, ["pending", "verified_unpurged"]),
         ),
       )
       .returning({ userId: identityVerifications.userId });
