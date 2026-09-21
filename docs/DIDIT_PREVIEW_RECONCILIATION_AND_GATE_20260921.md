@@ -140,6 +140,41 @@ constraints, and deletion cleanup; post-run counts for synthetic users,
 profiles, basics, identity rows, and blocks were all zero. The primary/default
 Neon branch was not changed.
 
+## Latest exact-head verification — 2026-09-21
+
+The documentation correction above is the only change after the previous
+implementation verification. The new exact head was independently verified:
+
+- HEAD: `4355968b9ec961d00e309dcfa64e54e4c2845966`
+- Rebuild CI #157 / run `35653677691`: SUCCESS
+- CI #217 / run `35653677706`: SUCCESS
+- Vercel Preview deployment `dpl_HaGWojNmBtyzLnhBuNxsZyjajphH`: READY,
+  Git source SHA exact, branch exact, region `iad1`, and the existing PR
+  branch alias is attached.
+- Direct deployment probes returned `/privacy → 200` and
+  `GET /api/identity/webhook → 405` as expected for a POST-only route.
+  No provider identity collection was enabled or claimed on this docs-only
+  head. The earlier provider fixture's `404 NOTICE_NOT_READY` remains
+  historical evidence for the preceding implementation head, not a new
+  identity E2E pass.
+
+A new disposable Neon branch
+`pr80-recheck-20260921-28ca-expiring`
+(`br-snowy-grass-ajz5bj7f`) was created from the untouched primary/default
+branch `main` (`br-bitter-wave-ajs8dy0u`). On that branch:
+
+- PR migrations 0009–0013 were applied and the Drizzle ledger was verified at
+  14 rows with exact current migration hashes and timestamps.
+- `identity_verifications` contains only opaque references, status,
+  timestamps, consent/notice versions, and purge evidence; no raw identity,
+  document, media, biometric, or payload columns exist.
+- A synthetic-only row passed
+  `pending → verified_unpurged → verified`, with non-null purge evidence,
+  then account cascade deletion left zero residual users, profiles,
+  profile basics, or identity rows.
+- The branch is non-default and set to expire automatically; the primary/default
+  branch was not mutated.
+
 ## Current L1–L10 disposition
 
 | Gate | Disposition | Concrete evidence |
@@ -152,7 +187,7 @@ Neon branch was not changed.
 | L6 Workflow | CONDITIONAL_PASS | Exact Sandbox workflow, Korea/document scope, age 19, and Preview workflow binding are evidenced; legal approval and live collection authorization are absent. |
 | L7 Webhook | CONDITIONAL_PASS | Sandbox Preview destination is active for two events; code verifies fresh signatures and persists schedule before `202`, but no completed delivery/retry record exists. |
 | L8 Preview environment | CONDITIONAL_PASS | Required values are present in the PR Preview branch, including a masked webhook secret; Production is not selected. |
-| L9 Reachability | CONDITIONAL_PASS | Exact-head Preview route probes and the provider-supplied webhook test reached the route; the deliberate 404 `NOTICE_NOT_READY` fail-closed response is not an identity E2E pass. |
+| L9 Reachability | CONDITIONAL_PASS | Current exact-head deployment probes returned `/privacy` 200 and the POST-only webhook route 405; the earlier 404 `NOTICE_NOT_READY` fixture is historical and no identity E2E pass is claimed. |
 | L10 Synthetic identity | BLOCKED | No controller-approved vendor/synthetic test subject and consent fixture is available. |
 
 ## Gate state
