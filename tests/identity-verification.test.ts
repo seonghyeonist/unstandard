@@ -15,7 +15,12 @@ import {
 } from "../lib/identity/contracts";
 import { IDENTITY_PROVIDER_NOTICE_READY } from "../lib/identity/notice";
 import { completeBrowserIdentity, startBrowserIdentity } from "../lib/identity/browser-flow";
-import { canonicalizeDiditWebhook, verifyDiditWebhookSimpleSignature, verifyDiditWebhookSignature } from "../lib/identity/didit-webhook";
+import {
+  canonicalizeDiditWebhook,
+  verifyDiditWebhookRawSignature,
+  verifyDiditWebhookSimpleSignature,
+  verifyDiditWebhookSignature,
+} from "../lib/identity/didit-webhook";
 import { GET as identityReturn } from "../app/api/identity/return/route";
 
 const now = new Date("2026-08-28T00:00:00Z");
@@ -371,6 +376,24 @@ describe("Didit webhook boundary", () => {
     assert.equal(verifyDiditWebhookSignature({ payload: { ...webhook, status: "Declined" }, signature, timestamp: String(webhook.timestamp), secret: env.DIDIT_WEBHOOK_SECRET, nowSeconds: webhook.timestamp }), false);
     assert.equal(verifyDiditWebhookSignature({ payload: webhook, signature, timestamp: String(webhook.timestamp - 301), secret: env.DIDIT_WEBHOOK_SECRET, nowSeconds: webhook.timestamp }), false);
     assert.equal(verifyDiditWebhookSignature({ payload: webhook, signature: "short", timestamp: String(webhook.timestamp), secret: env.DIDIT_WEBHOOK_SECRET, nowSeconds: webhook.timestamp }), false);
+  });
+  it("verifies Didit's raw-body signature fallback", () => {
+    const rawBody = new TextEncoder().encode(JSON.stringify(webhook));
+    const signature = createHmac("sha256", env.DIDIT_WEBHOOK_SECRET).update(rawBody).digest("hex");
+    assert.equal(verifyDiditWebhookRawSignature({
+      rawBody,
+      signature,
+      timestamp: String(webhook.timestamp),
+      secret: env.DIDIT_WEBHOOK_SECRET,
+      nowSeconds: webhook.timestamp,
+    }), true);
+    assert.equal(verifyDiditWebhookRawSignature({
+      rawBody: new TextEncoder().encode(JSON.stringify({ ...webhook, status: "Declined" })),
+      signature,
+      timestamp: String(webhook.timestamp),
+      secret: env.DIDIT_WEBHOOK_SECRET,
+      nowSeconds: webhook.timestamp,
+    }), false);
   });
   it("accepts the documented simple envelope signature only for canonical re-fetch", () => {
     const timestamp = String(webhook.timestamp);
