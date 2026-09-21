@@ -10,30 +10,60 @@ approval to collect live identity data.
 ## Scope and safety boundary
 
 - PR #80 remains open, draft, and unmerged. Production Vercel, `main`,
-  production environment variables/domains, and the default Neon branch are
+  production environment variables/domains, and the default Neon branch remain
   out of scope.
 - The Didit console was inspected in **Sandbox/test mode** only. No live
   application setting was changed, no actual identity was submitted, and no
   secret or provider/session identifier is recorded in this repository.
 - `IDENTITY_PROVIDER_NOTICE_READY=false` remains mandatory. There is no
   environment override for that gate.
+- The Vercel Preview secret was corrected to be Preview-branch-only. The
+  Production copy was removed; no Production identity secret is intended or
+  required.
 
 ## Current Sandbox account observations
 
-The connected Didit organization has a Sandbox application and existing
-Sandbox API-key material. The following facts were read from the account UI:
+The connected Didit organization has a Sandbox application and active Sandbox
+API-key material. The following facts were read from the account UI:
 
 - the application is in test mode;
+- the Free KYC workflow ID is
+  `906530b5-e097-481d-aaae-21b7b5e71fbb`;
+- South Korea is the only enabled country, with National ID card and Driver's
+  license document methods;
+- the minimum age is saved as **19** and was re-opened after saving to verify
+  the persisted value;
+- Returned Data has only **date of birth** selected from the 35 optional
+  points; the provider-mandated status, warning, and node ID remain the only
+  additional system fields;
 - session retention is set to one month;
 - the biometric-template setting is `delete with session`;
-- a Preview-only destination named `PR80 Preview` is active for two events at
-  the `/api/identity/webhook` route on the PR branch alias;
+- a Preview-only destination named `PR80 Preview` is active for
+  `status.updated` and `data.updated` at the
+  `/api/identity/webhook` route on the PR branch alias;
 - delivery history contains no completed delivery yet.
 
-Those observations are intentionally insufficient to claim that the API key,
-workflow ID, webhook secret, identity flag, or app URL are bound correctly in
-Vercel Preview. Their values and scopes were not exposed by the connected
-Vercel surface. No setting was relaxed to bypass the legal notice gate.
+These settings establish a minimized Sandbox configuration, but they do not
+establish controller-approved legal scope, account-bound contract/role
+evidence, a real identity-provider deletion result, or permission to collect
+live identity data.
+
+## Preview environment binding
+
+The connected Vercel project was rechecked after the Sandbox configuration
+readback. For the PR branch `feat/alpha-profile-identity-20260828`, the
+Preview environment shows the required server-only binding:
+
+- `UNSTANDARD_IDENTITY_ENABLED=true`;
+- the exact Sandbox `DIDIT_WORKFLOW_ID`;
+- a masked `DIDIT_API_KEY`;
+- `UNSTANDARD_APP_URL`;
+- a masked `DIDIT_WEBHOOK_SECRET`.
+
+The webhook secret is present only on that Preview branch. The current
+Preview code still fails closed before provider processing because the
+notice-ready constant remains false. No Production environment variable,
+domain, deployment target, or main/default Neon branch was changed.
 
 ## Webhook and orphan-session closure
 
@@ -43,16 +73,20 @@ schedule before replying `202`; it never waits for a canonical provider
 decision or provider deletion in that delivery window. A database failure
 returns `503`, so an untracked job is never acknowledged.
 
+The implementation accepts the documented V2 HMAC form and legacy compatibility
+forms, enforces the Didit five-minute timestamp freshness window, binds the
+header timestamp to the signed envelope, and uses constant-time comparison.
 `npm run identity:reconcile` is the bounded operator reconciliation command.
 It refuses to execute unless the normal provider readiness gate is available,
 accepts only `IDENTITY_RECONCILE_LIMIT=1..50`, and writes count-only output.
+
 For each scheduled row it fetches the canonical decision server-side and
 preserves the existing `pending -> verified_unpurged -> verified` ordering.
 It also revisits expired pending rows with a bound provider session and every
-`verified_unpurged` row, so an abandoned browser flow or a local failure after
-provider completion is retried for deletion without requiring another browser
-callback. Transient provider/purge failures remain scheduled; conclusive
-rejection/expiry is purged before the pending local row is removed.
+`verified_unpurged` row, so an abandoned browser flow or a local failure
+after provider completion is retried for deletion without requiring another
+browser callback. Transient provider/purge failures remain scheduled;
+conclusive rejection/expiry is purged before the pending local row is removed.
 
 The implementation stores only opaque local/provider references, status,
 timestamps, consent/notice versions, and purge evidence. It does not persist
@@ -86,13 +120,13 @@ account-bound evidence package exists.
 | --- | --- | --- |
 | L1 Contract/roles | BLOCKED_EVIDENCE | Console legal surfaces did not expose UNSTANDARD's accepted terms/DPA version, entity, or acceptance time. |
 | L2 Region/subprocessors | BLOCKED_EVIDENCE | No account-bound proof of processing/biometric region, support access, binding subprocessors, or transfer mechanism was available. |
-| L3 Data minimization | BLOCKED | Current Sandbox Returned Data/document-method settings have not been evidenced as the approved minimum scope. |
+| L3 Data minimization | CONDITIONAL_PASS | Sandbox workflow readback proves Korea-only documents, age 19, and one optional Returned Data point (DOB) plus provider-mandated system fields; controller-approved minimum scope is still absent. |
 | L4 Retention/erasure | CONDITIONAL_PASS | Sandbox shows one-month retention and delete-with-session templates; code has purge-before-verified and retry cleanup, but provider deletion E2E is still absent. |
 | L5 Korean notice | BLOCKED | Current notice intentionally says Didit is inactive; controller-approved final factual notice is absent. |
-| L6 Workflow | BLOCKED_EVIDENCE | Sandbox workflows exist, but exact approved Korean document/age scope and Vercel Preview workflow binding are not proven. |
-| L7 Webhook | CONDITIONAL_PASS | Sandbox Preview destination is active; code persists schedule before `202`, but no real delivery/retry record exists. |
-| L8 Preview environment | BLOCKED_EVIDENCE | The connected Vercel surface did not reveal presence/scope/branch binding for required server-only values. |
-| L9 Reachability | BLOCKED | No current exact-head callback delivery or webhook runtime probe has been proven. |
+| L6 Workflow | CONDITIONAL_PASS | Exact Sandbox workflow, Korea/document scope, age 19, and Preview workflow binding are evidenced; legal approval and live collection authorization are absent. |
+| L7 Webhook | CONDITIONAL_PASS | Sandbox Preview destination is active for two events; code verifies fresh signatures and persists schedule before `202`, but no completed delivery/retry record exists. |
+| L8 Preview environment | CONDITIONAL_PASS | Required values are present in the PR Preview branch, including a masked webhook secret; Production is not selected. |
+| L9 Reachability | BLOCKED | The new exact-head deployment still needs the post-binding route/runtime probe; no real identity callback is claimed. |
 | L10 Synthetic identity | BLOCKED | No controller-approved vendor/synthetic test subject and consent fixture is available. |
 
 ## Gate state
