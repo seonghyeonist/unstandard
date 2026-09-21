@@ -4,6 +4,8 @@
 
 **TECHNICAL_PREPARATION_ONLY / LIVE_AUTHENTICATION_BLOCKED / NOT_READY_FOR_PRODUCTION**
 
+> **Superseded implementation note (2026-09-21):** the webhook path now durably records a bounded completion request before acknowledging Didit, and `npm run identity:reconcile` processes pending, expired, and `verified_unpurged` rows outside the provider timeout. The current account/evidence record is [DIDIT_PREVIEW_RECONCILIATION_AND_GATE_20260921.md](./DIDIT_PREVIEW_RECONCILIATION_AND_GATE_20260921.md).
+
 이 문서는 Didit hosted KYC를 Unstandard의 초대제 Closed Alpha에 연결하기 위한 코드·계약 경계다. 실제 Didit 계정, 유료 계약, 실사용자 인증, Production 환경변경을 의미하지 않는다. `lib/identity/notice.ts`의 `IDENTITY_PROVIDER_NOTICE_READY=false`가 유지되므로 환경변수만으로 수집이 켜지지 않는다.
 
 ## 범위
@@ -14,7 +16,7 @@
 - `GET /v3/session/{session_id}/decision/`의 V3 복수 배열에서 ID verification, passive liveness, face match, IP analysis가 모두 `Approved`인지 확인하고, 승인된 ID의 생년월일로 현재 시점 만 19세 이상을 계산한다.
 - provider-neutral proof는 `requestId`, `providerReference`, `verifiedAt`, `documentVerified`, `livenessVerified`, `faceMatchVerified`, `deviceIpVerified`, `adultVerified`뿐이다. Didit 원문, 얼굴 영상/이미지, 이름, 문서번호, 생년월일, 주소, media URL은 저장·응답·로그로 넘기지 않는다.
 - 확인 전에 `DELETE /v3/session/{session_id}/delete/`를 호출한다. 응답의 `face_retention_outcome`가 `deleted` 또는 얼굴 템플릿이 없음을 뜻하는 `none`이고 얼굴 템플릿 식별값이 null일 때만 `verified`로 올린다. 404·보류·보존·불명확한 `none` 응답은 성공으로 처리하지 않는다.
-- 웹훅은 Didit 문서의 `X-Signature-V2`를 우선 검증하고, deprecated simple envelope 서명은 canonical GET 재조회와 함께 제한적 호환 경로로만 허용한다. 5분 timestamp freshness·constant-time HMAC 비교를 적용한다. 유효한 webhook은 canonical completion과 purge를 동기적으로 시도한 뒤 응답하며, provider/purge/rate-limit 일시 실패는 503으로 반환해 Didit retry를 유도한다. 별도의 durable reconciliation worker는 구현되어 있지 않다. `status.updated`와 `data.updated` 재전송은 DB 상태에 의해 멱등 처리된다.
+- 웹훅은 Didit 문서의 `X-Signature-V2`를 우선 검증하고, deprecated simple envelope 서명은 canonical GET 재조회와 함께 제한적 호환 경로로만 허용한다. 5분 timestamp freshness·constant-time HMAC 비교를 적용한다. 유효한 webhook은 provider 조회·purge를 동기적으로 기다리지 않고, 로컬 DB에 bounded completion work item을 먼저 기록한 뒤 202로 응답한다. DB 기록 실패는 503으로 반환해 Didit retry를 유도한다. `npm run identity:reconcile`가 canonical provider 조회·purge를 provider timeout 밖에서 순차적으로 처리하며, `status.updated`와 `data.updated` 재전송은 DB 상태에 의해 멱등 처리된다.
 
 ## 저장 상태와 접근 제어
 
