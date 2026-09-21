@@ -4,7 +4,11 @@ import { z } from "zod";
 import { privateJson } from "@/lib/http/private-json";
 import { readSmallJson } from "@/lib/http/profile-request";
 import { parseDiditIdentityConfig } from "@/lib/identity/didit";
-import { verifyDiditWebhookSignature, verifyDiditWebhookSimpleSignature } from "@/lib/identity/didit-webhook";
+import {
+  verifyDiditWebhookRawSignature,
+  verifyDiditWebhookSignature,
+  verifyDiditWebhookSimpleSignature,
+} from "@/lib/identity/didit-webhook";
 import { identityRepository } from "@/lib/db/repositories/identity.repository";
 import { getIdentityReadiness } from "@/lib/server/identity/provider";
 import { logIdentityEvent } from "@/lib/server/identity/identity-logger";
@@ -34,7 +38,11 @@ export async function POST(request: Request) {
   }
 
   let body: unknown;
+  let rawBody: Uint8Array | null = null;
   try {
+    const raw = await request.clone().arrayBuffer();
+    if (raw.byteLength > 256 * 1024) throw new Error("Invalid body");
+    rawBody = new Uint8Array(raw);
     body = await readSmallJson(request, 256 * 1024);
   } catch {
     logIdentityEvent({ event: "identity.webhook.invalid_body", stage: "webhook", status: "error", code: "INVALID_BODY" });
@@ -50,6 +58,13 @@ export async function POST(request: Request) {
       timestamp,
       secret: config.webhookSecret,
     });
+  const rawVerified = envelope.success && rawBody !== null && timestamp === String(envelope.data.timestamp) &&
+    verifyDiditWebhookRawSignature({
+      rawBody,
+      signature: request.headers.get("x-signature"),
+      timestamp,
+      secret: config.webhookSecret,
+    });
   const simpleVerified = envelope.success && timestamp === String(envelope.data.timestamp) &&
     verifyDiditWebhookSimpleSignature({
       timestamp,
@@ -59,7 +74,7 @@ export async function POST(request: Request) {
       signature: request.headers.get("x-signature-simple"),
       secret: config.webhookSecret,
     });
-  if (!v2Verified && !simpleVerified) {
+  if (!v2Verified && !rawVerified && !simpleVerified) {
     logIdentityEvent({ event: "identity.webhook.signature_invalid", stage: "webhook", status: "error", code: "SIGNATURE_INVALID" });
     return privateJson({ error: "Invalid webhook" }, { status: 401 });
   }
