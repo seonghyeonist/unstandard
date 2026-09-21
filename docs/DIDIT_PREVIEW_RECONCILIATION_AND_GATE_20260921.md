@@ -140,10 +140,13 @@ constraints, and deletion cleanup; post-run counts for synthetic users,
 profiles, basics, identity rows, and blocks were all zero. The primary/default
 Neon branch was not changed.
 
-## Latest exact-head verification — 2026-09-21
+## Predecessor exact-head verification snapshot — 2026-09-21
 
-The documentation correction above is the only change after the previous
-implementation verification. The new exact head was independently verified:
+The following is retained as a historical snapshot for predecessor commit
+`4355968b9ec961d00e309dcfa64e54e4c2845966`. Because this evidence file is
+itself versioned on the PR branch, a later documentation commit changes the
+branch HEAD. The final exact-head CI/Vercel packet is therefore maintained in
+PR #80's closure body after the final deployment.
 
 - HEAD: `4355968b9ec961d00e309dcfa64e54e4c2845966`
 - Rebuild CI #157 / run `35653677691`: SUCCESS
@@ -187,7 +190,7 @@ branch `main` (`br-bitter-wave-ajs8dy0u`). On that branch:
 | L6 Workflow | CONDITIONAL_PASS | Exact Sandbox workflow, Korea/document scope, age 19, and Preview workflow binding are evidenced; legal approval and live collection authorization are absent. |
 | L7 Webhook | CONDITIONAL_PASS | Sandbox Preview destination is active for two events; code verifies fresh signatures and persists schedule before `202`, but no completed delivery/retry record exists. |
 | L8 Preview environment | CONDITIONAL_PASS | Required values are present in the PR Preview branch, including a masked webhook secret; Production is not selected. |
-| L9 Reachability | CONDITIONAL_PASS | Current exact-head deployment probes returned `/privacy` 200 and the POST-only webhook route 405; the earlier 404 `NOTICE_NOT_READY` fixture is historical and no identity E2E pass is claimed. |
+| L9 Reachability | CONDITIONAL_PASS | The predecessor snapshot records `/privacy` 200 and the POST-only webhook route 405; the final exact-head route evidence is in the PR #80 closure body, and no identity E2E pass is claimed. |
 | L10 Synthetic identity | BLOCKED | No controller-approved vendor/synthetic test subject and consent fixture is available. |
 
 ## Gate state
