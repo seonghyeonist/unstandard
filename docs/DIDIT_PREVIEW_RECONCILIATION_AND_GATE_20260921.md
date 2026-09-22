@@ -32,6 +32,8 @@ The controller authorized the four remaining workstreams for the closed-alpha re
 - The hosted provider page visibly identified itself as **SANDBOX** and **test data only / no real call**. After language selection it exposed no document/selfie input or start control, so no approved synthetic identity decision and no webhook delivery were generated.
 - The Didit verification list showed the exact synthetic row as **시작 안 함**. It was deleted from the console with **세션과 함께 생체 인식 템플릿 삭제** selected; after reload the row was absent and the list reported no available data.
 - This proves console-level cleanup for an unstarted Sandbox session. It is not a provider decision/webhook-delivery/canonical-decision/purge E2E pass. Full E2E remains not run because the provider test page did not expose a usable test fixture and the Preview app has no available test login/session fixture; `IDENTITY_PROVIDER_NOTICE_READY=false` remains fail-closed.
+- A second unstarted session (`unstandard-sandbox-e2e-20260922-approve`) was created while checking Didit's documented Sandbox scenario path. The hosted page still exposed only the desktop QR steps; no scenario picker or sample-document control was available. It was deleted with the same biometric-template option, and a final reload showed `0개 검증` / `사용 가능한 데이터 없음`. 
+
 
 ### Legal notice disposition
 
