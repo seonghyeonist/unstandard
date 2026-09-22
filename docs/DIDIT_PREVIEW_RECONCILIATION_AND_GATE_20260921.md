@@ -8,6 +8,27 @@ This snapshot records a fresh read-only recheck after the final exact-head
 verification packet. It does not enable collection, change Production, or
 replace the legal/controller gates below.
 
+## Approval and account-control follow-up — 2026-09-22
+
+The controller authorized the four remaining workstreams for the closed-alpha review. That instruction is recorded as a decision to proceed with evidence collection; it is not, by itself, an account-bound DPA signature, a provider-region attestation, or proof that a provider setting changed.
+
+### Public contract and transfer facts read on 2026-09-22
+
+- Didit's Business Terms are dated **September 4, 2026**. They state that model training is allowed by default and that an organization owner or administrator may opt out under Organization Settings. The opt-out is described as applying to historical and newly collected data for future training, fine-tuning, evaluation, validation, dataset curation, and training-data exports.
+- The Business Terms' Annex 2 DPA says Didit's primary processing infrastructure is in the EEA and that transfers outside the EEA use an applicable lawful mechanism such as SCCs, UK/Swiss addenda, or an adequacy decision. It also says the current sub-processor list and processing locations are available after an NDA, so the public terms are not account-specific sub-processor evidence.
+- The same DPA says verification-flow retention defaults to unlimited unless the client configures a shorter application value, with an allowed configuration range of 30 days to 10 years. The Sandbox application readback is one month, and biometric templates are configured to delete with the session.
+- The public Verification Privacy Notice states that verification data may be processed outside the country where the flow began and that appropriate transfer safeguards apply where required. It distinguishes operational session deletion from privacy erasure, which also purges retained biometric templates.
+
+### Account-control result
+
+- The connected Sandbox account user was read back as organization owner. The model-improvement control was initially **Allowed**.
+- Multiple normal UI switch interactions did not change the control's checked state. The page remained **Allowed** after refresh, so no save action was issued that would have preserved the still-allowed state. The audit-log view showed no corresponding model-improvement write event.
+- Therefore the requested Didit opt-out is **not completed**. No identity session, real or synthetic, was submitted while this control remained unresolved. Didit support ticket **#59707** remains the account-specific channel for contract/DPA, processing-region, sub-processor, and permitted-test-flow confirmation.
+
+### Legal notice disposition
+
+The existing Korean privacy page continues to say that Didit is not an active processor, and the code gate remains deliberately fail-closed. A final Didit-active Korean notice must not be published or used to open collection until the Sandbox control reads opted out and the account-specific contract/region evidence is available. The controller-approved scope can be applied to the draft once those two account facts are read back.
+
 ### Preview and CI
 
 - Before this documentation commit, the exact branch HEAD was
