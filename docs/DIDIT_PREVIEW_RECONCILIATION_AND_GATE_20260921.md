@@ -22,12 +22,20 @@ The controller authorized the four remaining workstreams for the closed-alpha re
 ### Account-control result
 
 - The connected Sandbox account user was read back as organization owner. The model-improvement control was initially **Allowed**.
-- Multiple normal UI switch interactions did not change the control's checked state. The page remained **Allowed** after refresh, so no save action was issued that would have preserved the still-allowed state. The audit-log view showed no corresponding model-improvement write event.
-- Therefore the requested Didit opt-out is **not completed**. No identity session, real or synthetic, was submitted while this control remained unresolved. Didit support ticket **#59707** remains the account-specific channel for contract/DPA, processing-region, sub-processor, and permitted-test-flow confirmation.
+- On 2026-09-22, the owner switched the control off, confirmed the explicit “모델 개선에서 옵트아웃하시겠습니까?” dialog, and received the Didit toast **“모델 개선 옵트아웃이 저장되었습니다”**.
+- After a three-second wait and a full page reload, the account readback remained **옵트아웃됨** with DOM state `aria-checked=false` and `data-state=unchecked`. The audit-log page showed only read requests in the visible latest rows and no corresponding model-improvement write row; the persistent account-setting readback is the primary evidence. No document, selfie, or real identity was submitted.
+- Didit support ticket **#59707** remains the account-specific channel for contract/DPA, processing-region, sub-processor, and permitted-test-flow confirmation.
+
+### Sandbox synthetic-session cleanup attempt — 2026-09-22
+
+- A Free KYC Sandbox session was created with the synthetic internal reference `unstandard-sandbox-e2e-20260922`; no personal identity value was used.
+- The hosted provider page visibly identified itself as **SANDBOX** and **test data only / no real call**. After language selection it exposed no document/selfie input or start control, so no approved synthetic identity decision and no webhook delivery were generated.
+- The Didit verification list showed the exact synthetic row as **시작 안 함**. It was deleted from the console with **세션과 함께 생체 인식 템플릿 삭제** selected; after reload the row was absent and the list reported no available data.
+- This proves console-level cleanup for an unstarted Sandbox session. It is not a provider decision/webhook-delivery/canonical-decision/purge E2E pass. Full E2E remains not run because the provider test page did not expose a usable test fixture and the Preview app has no available test login/session fixture; `IDENTITY_PROVIDER_NOTICE_READY=false` remains fail-closed.
 
 ### Legal notice disposition
 
-The existing Korean privacy page continues to say that Didit is not an active processor, and the code gate remains deliberately fail-closed. A final Didit-active Korean notice must not be published or used to open collection until the Sandbox control reads opted out and the account-specific contract/region evidence is available. The controller-approved scope can be applied to the draft once those two account facts are read back.
+The existing Korean privacy page continues to say that Didit is not an active processor, and the code gate remains deliberately fail-closed. The Sandbox model-improvement control now reads opted out. A final Didit-active Korean notice must still not be published or used to open collection until the account-specific contract/DPA, processing-region, sub-processor, and transfer evidence is available. The controller-approved scope can be applied to the draft once those remaining account facts are read back.
 
 ### Preview and CI
 
@@ -54,11 +62,10 @@ The existing Korean privacy page continues to say that Didit is not an active pr
 - The active `PR80 Preview` webhook is v3 with **2 of 11** events
   (`status.updated`, `data.updated`); the console reports no completed
   delivery.
-- The organization-level Didit model-improvement control currently reads
-  **Allowed**. This is a new privacy gate: no identity collection may be
-  enabled until the controller decides and the setting is read back as
-  opted out if that is the approved policy. No change was made in this
-  recheck.
+- The organization-level Didit model-improvement control now reads
+  **옵트아웃됨** after the owner confirmed the opt-out dialog. A full reload
+  retained `aria-checked=false` and `data-state=unchecked`. No identity
+  collection was enabled and no document/selfie/real identity was submitted.
 
 ### Isolated Neon readback
 
@@ -260,7 +267,7 @@ branch `main` (`br-bitter-wave-ajs8dy0u`). On that branch:
 | L1 Contract/roles | BLOCKED_EVIDENCE | Console legal surfaces did not expose UNSTANDARD's accepted terms/DPA version, entity, or acceptance time. |
 | L2 Region/subprocessors | BLOCKED_EVIDENCE | No account-bound proof of processing/biometric region, support access, binding subprocessors, or transfer mechanism was available. |
 | L3 Data minimization | CONDITIONAL_PASS | Sandbox workflow readback proves Korea-only documents, age 19, and one optional Returned Data point (DOB) plus provider-mandated system fields; controller-approved minimum scope is still absent. |
-| L4 Retention/erasure | CONDITIONAL_PASS | Sandbox shows one-month retention and delete-with-session templates; code has purge-before-verified and retry cleanup, but provider deletion E2E is still absent. |
+| L4 Retention/erasure | CONDITIONAL_PASS | Sandbox shows one-month retention and delete-with-session templates; the unstarted synthetic session disappeared after console deletion with biometric-template deletion selected; provider decision/deletion E2E is still absent. |
 | L5 Korean notice | BLOCKED | Current notice intentionally says Didit is inactive; controller-approved final factual notice is absent. |
 | L6 Workflow | CONDITIONAL_PASS | Exact Sandbox workflow, Korea/document scope, age 19, and Preview workflow binding are evidenced; legal approval and live collection authorization are absent. |
 | L7 Webhook | CONDITIONAL_PASS | Sandbox Preview destination is active for two events; code verifies fresh signatures and persists schedule before `202`, but no completed delivery/retry record exists. |
@@ -272,7 +279,8 @@ branch `main` (`br-bitter-wave-ajs8dy0u`). On that branch:
 
 ```text
 DIDIT_CONFIG=BLOCKED_LEGAL_NOTICE
-DIDIT_E2E=NOT_RUN
+DIDIT_E2E=PARTIAL_SANDBOX_SESSION_CLEANUP_ONLY
+DIDIT_PROVIDER_DECISION_DELIVERY=NOT_RUN
 DIDIT_LIVE_COLLECTION=BLOCKED
 IDENTITY_PROVIDER_NOTICE_READY=false
 CLOSED_ALPHA_READY=NO
