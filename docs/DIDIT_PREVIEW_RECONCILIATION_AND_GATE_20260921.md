@@ -2,6 +2,60 @@
 
 Status: **BLOCKED_EVIDENCE — fail closed**
 
+## Revalidation snapshot — 2026-09-22
+
+This snapshot records a fresh read-only recheck after the final exact-head
+verification packet. It does not enable collection, change Production, or
+replace the legal/controller gates below.
+
+### Preview and CI
+
+- Before this documentation commit, the exact branch HEAD was
+  `bbf2d7e237d29a9bd637ef0e05906d77170f1f0b`.
+- GitHub Actions for that HEAD remain green: CI #219
+  (`35654156620`) and Rebuild CI #159 (`35654156668`).
+- Vercel deployment `dpl_4qqBkaJ99UYn9dgxyRT5R1KaK4xX` is READY and reports
+  the exact branch and SHA. Its exact-deployment runtime read showed only the
+  expected `GET /api/identity/webhook → 405`; no runtime error was recorded
+  for that deployment. The project-level `NOTICE_NOT_READY` cluster belongs
+  to an older deployment and is the intentional fail-closed provider response.
+
+### Fresh Sandbox readback
+
+- Didit remains in test mode; no real identity session was submitted.
+- Free KYC workflow `906530b5-e097-481d-aaae-21b7b5e71fbb` is active with
+  Korea selected and National ID card / Driver's license visible in the
+  preview.
+- Returned Data shows **1 of 35** optional points: date of birth. The
+  provider-mandated status, warning, and node ID are the only system fields.
+- Application data retention is **1 month** and biometric templates are
+  **deleted with the session**.
+- The active `PR80 Preview` webhook is v3 with **2 of 11** events
+  (`status.updated`, `data.updated`); the console reports no completed
+  delivery.
+- The organization-level Didit model-improvement control currently reads
+  **Allowed**. This is a new privacy gate: no identity collection may be
+  enabled until the controller decides and the setting is read back as
+  opted out if that is the approved policy. No change was made in this
+  recheck.
+
+### Isolated Neon readback
+
+- Disposable branch `br-snowy-grass-ajz5bj7f` is non-default,
+  non-primary, ready, and still reports `written_data_bytes=0`.
+- Read-only SQL returned 14 migration rows, 5 users, 5 accounts, 5
+  profiles, 0 profile basics, 0 identity verifications, and 0 legal
+  acceptances.
+- The identity table contains only opaque references, state, timestamps,
+  notice/consent versions, and purge evidence; no raw identity, document,
+  media, biometric, or provider-payload columns were present.
+
+The final gate remains `IDENTITY_PROVIDER_NOTICE_READY=false` and
+`CLOSED_ALPHA_READY=NO`. The remaining human/account actions are therefore
+unchanged, with the model-improvement setting added to the account evidence
+checklist.
+
+
 This is the current engineering record for PR #80. It supersedes older
 webhook implementation descriptions, but does not supersede their historical
 account observations. It is not legal advice, DPA acceptance evidence, or
