@@ -1,6 +1,6 @@
 import "server-only";
 import type { IdentityProvider } from "@/lib/identity/contracts";
-import { createDiditIdentityProvider, parseDiditIdentityConfig } from "@/lib/identity/didit";
+import { createDiditIdentityProvider, createDiditIdentityPurgeProvider, parseDiditIdentityConfig } from "@/lib/identity/didit";
 import { IDENTITY_PROVIDER_NOTICE_READY } from "@/lib/identity/notice";
 import { classifyIdentityReadiness, publicIdentityAvailabilityReason, type IdentityReadinessCode } from "@/lib/identity/readiness";
 import { logIdentityEvent } from "@/lib/server/identity/identity-logger";
@@ -46,4 +46,18 @@ export function getIdentityReadiness(env: Record<string, string | undefined> = p
 
 export function getIdentityProvider(): IdentityProvider | null {
   return getIdentityReadiness().provider;
+}
+
+
+/**
+ * Erasure is allowed while identity collection remains legally gated off.
+ * This factory exposes only the remote deletion operation and requires only
+ * the API key needed to remove a previously bound provider session.
+ */
+export function getIdentityPurgeProvider(
+  env: Record<string, string | undefined> = process.env,
+): Pick<IdentityProvider, "id" | "purge"> | null {
+  const apiKey = env.DIDIT_API_KEY?.trim();
+  if (!apiKey || apiKey.length > 4096 || /\s/.test(apiKey)) return null;
+  return createDiditIdentityPurgeProvider(apiKey, fetch, providerDiagnostic);
 }

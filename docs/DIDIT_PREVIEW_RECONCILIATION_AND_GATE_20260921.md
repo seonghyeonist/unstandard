@@ -2,6 +2,12 @@
 
 Status: **BLOCKED_EVIDENCE — fail closed**
 
+## Account deletion and contract-signature readback — 2026-09-23
+
+- The authenticated Terms and Policies screen still exposes “Sign and download” actions for the DPA, SLA, Privacy Policy, and Verification Privacy Notice. Opening the Business Terms/DPA form requires the actual signatory's legal name and title; the contract entity is jurisdiction-dependent. The organization label and login account do not establish those facts. No signature was submitted and no signed document or acceptance timestamp was generated. Account-bound acceptance evidence remains **BLOCKED_EXTERNAL / NOT CONFIRMED**.
+- This is independent of the controller's approval to proceed. Do not infer a legal signature, entity, or title, and keep `IDENTITY_PROVIDER_NOTICE_READY=false` until the accepted document/version and related account evidence are available.
+- Account deletion now has a database-triggered, non-PII purge outbox design on PR #80. It keeps only a request UUID, Didit provider reference, provider id, and queue timestamp; it contains no user id or identity payload. The bounded `identity:reconcile` command can drain the outbox using a deletion-only API client even while identity collection stays gated off. Rows remain until Didit confirms session/template deletion or already-absent status; transient failures remain queued with exponential backoff capped at 64 minutes. This design has not been applied to Production or the default Neon branch; the provider deletion E2E and operational schedule still require verification.
+
 ## Revalidation snapshot — 2026-09-22
 
 This snapshot records a fresh read-only recheck after the final exact-head

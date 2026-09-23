@@ -1,9 +1,9 @@
 import "server-only";
 
 import { randomUUID } from "node:crypto";
-import { and, asc, eq, inArray, isNotNull, isNull, lte, or } from "drizzle-orm";
+import { and, asc, eq, inArray, isNotNull, isNull, lte, or, sql } from "drizzle-orm";
 import { getDb } from "@/lib/db/client";
-import { profileBasics, identityVerifications } from "@/lib/db/schema/profile-basics";
+import { identityProviderPurgeQueue, profileBasics, identityVerifications } from "@/lib/db/schema/profile-basics";
 import { profiles } from "@/lib/db/schema/profiles";
 import { INTRODUCTION_SCOPE_VERSION, PROFILE_CONSENT_VERSION, PROFILE_FRESHNESS_MS } from "@/lib/profile/basics";
 import {
@@ -336,5 +336,54 @@ export const identityRepository: IdentityRepository = {
         .returning({ userId: identityVerifications.userId });
       return updated.length === 1;
     });
+  },
+};
+
+
+export type IdentityProviderPurgeQueueEntry = {
+  requestId: string;
+  provider: string;
+  providerReference: string;
+};
+
+export const identityProviderPurgeQueueRepository = {
+  async listProviderPurges(limit: number): Promise<IdentityProviderPurgeQueueEntry[]> {
+    const boundedLimit = Math.max(1, Math.min(Math.trunc(limit), 50));
+    return getDb()
+      .select({
+        requestId: identityProviderPurgeQueue.requestId,
+        provider: identityProviderPurgeQueue.provider,
+        providerReference: identityProviderPurgeQueue.providerReference,
+      })
+      .from(identityProviderPurgeQueue)
+      .where(lte(identityProviderPurgeQueue.nextAttemptAt, new Date()))
+      .orderBy(asc(identityProviderPurgeQueue.nextAttemptAt), asc(identityProviderPurgeQueue.queuedAt))
+      .limit(boundedLimit);
+  },
+
+  async deleteProviderPurge(entry: IdentityProviderPurgeQueueEntry): Promise<boolean> {
+    const deleted = await getDb()
+      .delete(identityProviderPurgeQueue)
+      .where(and(
+        eq(identityProviderPurgeQueue.requestId, entry.requestId),
+        eq(identityProviderPurgeQueue.provider, entry.provider),
+        eq(identityProviderPurgeQueue.providerReference, entry.providerReference),
+      ))
+      .returning({ requestId: identityProviderPurgeQueue.requestId });
+    return deleted.length === 1;
+  },
+
+  async markProviderPurgeRetry(entry: IdentityProviderPurgeQueueEntry): Promise<void> {
+    await getDb()
+      .update(identityProviderPurgeQueue)
+      .set({
+        attemptCount: sql`${identityProviderPurgeQueue.attemptCount} + 1`,
+        nextAttemptAt: sql`now() + (interval '1 minute' * power(2, LEAST(${identityProviderPurgeQueue.attemptCount}, 6)))`,
+      })
+      .where(and(
+        eq(identityProviderPurgeQueue.requestId, entry.requestId),
+        eq(identityProviderPurgeQueue.provider, entry.provider),
+        eq(identityProviderPurgeQueue.providerReference, entry.providerReference),
+      ));
   },
 };

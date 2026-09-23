@@ -3,9 +3,9 @@ import { config as loadEnv } from "dotenv";
 loadEnv({ path: ".env.local" });
 loadEnv();
 
-import { identityRepository } from "@/lib/db/repositories/identity.repository";
-import { reconcileIdentityCompletions } from "@/lib/identity/reconciliation";
-import { getIdentityReadiness } from "@/lib/server/identity/provider";
+import { identityProviderPurgeQueueRepository, identityRepository } from "@/lib/db/repositories/identity.repository";
+import { reconcileIdentityCompletions, reconcileIdentityProviderPurges } from "@/lib/identity/reconciliation";
+import { getIdentityPurgeProvider, getIdentityReadiness } from "@/lib/server/identity/provider";
 import { createIdentityService } from "@/lib/server/identity/service";
 
 function parseLimit(value: string | undefined): number {
@@ -16,19 +16,34 @@ function parseLimit(value: string | undefined): number {
 }
 
 async function main(): Promise<void> {
-  const readiness = getIdentityReadiness();
-  if (!readiness.available) {
-    console.error(`identity reconciliation unavailable: ${readiness.code}`);
+  const provider = getIdentityPurgeProvider();
+  if (!provider) {
+    console.error("identity reconciliation unavailable: PURGE_PROVIDER_UNAVAILABLE");
     process.exitCode = 2;
     return;
   }
-  const result = await reconcileIdentityCompletions({
-    repository: identityRepository,
-    service: createIdentityService(),
-    limit: parseLimit(process.env.IDENTITY_RECONCILE_LIMIT),
+
+  const limit = parseLimit(process.env.IDENTITY_RECONCILE_LIMIT);
+  const providerPurges = await reconcileIdentityProviderPurges({
+    repository: identityProviderPurgeQueueRepository,
+    provider,
+    limit,
   });
+
+  // Remote erasure can safely continue while new identity collection is
+  // fail-closed. Canonical completion remains behind the full legal gate.
+  const readiness = getIdentityReadiness();
+  let completions = { selected: 0, verified: 0, retryable: 0, cleared: 0 };
+  if (readiness.available) {
+    completions = await reconcileIdentityCompletions({
+      repository: identityRepository,
+      service: createIdentityService(),
+      limit,
+    });
+  }
+
   // Count-only output: no provider identifier, user identifier, decision, or secret.
-  console.log(JSON.stringify({ identityReconciliation: result }));
+  console.log(JSON.stringify({ identityReconciliation: completions, providerPurges }));
 }
 
 main().catch((error) => {

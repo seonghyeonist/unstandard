@@ -21,6 +21,7 @@ export const REQUIRED_APPLICATION_TABLES = [
   "profiles",
   "profile_basics",
   "identity_verifications",
+  "identity_provider_purge_queue",
   "profile_private",
   "questions",
   "answers",

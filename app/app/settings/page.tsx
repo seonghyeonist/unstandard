@@ -180,6 +180,9 @@ export default function SettingsPage() {
             value={deleteConfirmation}
             onChange={(event) => setDeleteConfirmation(event.target.value)}
           />
+          <p className="mt-4 text-sm leading-6 text-foreground/70">
+            계정을 삭제하면 연결된 Didit 인증 세션 정리도 요청됩니다. 외부 제공자의 삭제 확인 전까지 정리 대기열에 최소 참조가 남을 수 있습니다.
+          </p>
           <Button
             className="mt-4 w-full bg-danger hover:bg-danger/90"
             disabled={

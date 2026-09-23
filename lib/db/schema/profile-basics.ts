@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { boolean, check, integer, pgTable, text, timestamp, uniqueIndex, uuid } from "drizzle-orm/pg-core";
+import { boolean, check, index, integer, pgTable, text, timestamp, uniqueIndex, uuid } from "drizzle-orm/pg-core";
 import { users } from "@/lib/db/schema/auth";
 
 // No backfill: an absent row means the user has not supplied these fields.
@@ -48,4 +48,22 @@ export const identityVerifications = pgTable("identity_verifications", {
   )`),
   check("identity_provider_reference_check", sql`${t.status} = 'pending' OR ${t.providerReference} IS NOT NULL`),
   check("identity_expiry_check", sql`${t.expiresAt} > ${t.requestedAt}`),
+]);
+
+
+// Account deletion cascades identity_verifications. This non-PII queue keeps
+// only opaque provider/request references until remote erasure is confirmed.
+export const identityProviderPurgeQueue = pgTable("identity_provider_purge_queue", {
+  requestId: uuid("request_id").primaryKey(),
+  provider: text("provider").notNull(),
+  providerReference: text("provider_reference").notNull(),
+  attemptCount: integer("attempt_count").notNull().default(0),
+  nextAttemptAt: timestamp("next_attempt_at", { withTimezone: true }).defaultNow().notNull(),
+  queuedAt: timestamp("queued_at", { withTimezone: true }).defaultNow().notNull(),
+}, (t) => [
+  index("identity_provider_purge_queue_provider_reference_idx").on(t.providerReference),
+  index("identity_provider_purge_queue_next_attempt_idx").on(t.nextAttemptAt),
+  check("identity_provider_purge_queue_attempt_count_check", sql`${t.attemptCount} >= 0`),
+  check("identity_provider_purge_queue_provider_check", sql`${t.provider} = 'didit-v3'`),
+  check("identity_provider_purge_queue_reference_check", sql`${t.providerReference} ~* '^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$'`),
 ]);

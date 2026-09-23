@@ -128,6 +128,57 @@ function hasExactWorkflowFeatures(features: Array<string | { feature: string }>)
  * Didit is deliberately reduced to a provider-neutral proof here. Raw decision
  * data, including document fields and media URLs, never leaves this adapter.
  */
+export function createDiditIdentityPurgeProvider(
+  apiKey: string,
+  fetcher: typeof fetch = fetch,
+  diagnostic?: DiditDiagnostic,
+): Pick<IdentityProvider, "id" | "purge"> {
+  const headers = { "x-api-key": apiKey, Accept: "application/json" };
+  return {
+    id: "didit-v3",
+    async purge({ requestId, providerReference, deletionInstruction = "operational_session_delete" }) {
+      const url = diditSessionUrl(providerReference, "delete/");
+      if (!url || !identityRequestIdSchema.safeParse(requestId).success) return false;
+      try {
+        const response = await fetcher(url, {
+          method: "DELETE",
+          cache: "no-store",
+          redirect: "error",
+          signal: requestSignal(),
+          headers: { ...headers, "Content-Type": "application/json" },
+          body: JSON.stringify({
+            retain_face_embeddings: false,
+            deletion_instruction: deletionInstruction,
+            instruction_id: requestId,
+          }),
+        });
+        // Didit specifies 404 for both an unknown and an already-deleted
+        // session. The reference comes only from our bound, server-side row,
+        // so an already-absent session is an idempotent successful purge.
+        if (response.status === 404) {
+          diagnostic?.({ operation: "purge", code: "SESSION_PURGE_ALREADY_ABSENT", status: response.status });
+          await response.body?.cancel();
+          return true;
+        }
+        if (response.status !== 200) {
+          diagnostic?.({ operation: "purge", code: "SESSION_PURGE_FAILED", status: response.status });
+          await response.body?.cancel();
+          return false;
+        }
+        const parsed = deleteSessionSchema.safeParse(await readSmallJson(response, 32 * 1024));
+        const accepted = parsed.success && parsed.data.session_id === providerReference &&
+          (parsed.data.face_retention_outcome === "deleted" || parsed.data.face_retention_outcome === "none") &&
+          parsed.data.biometric_template_uuid === null;
+        if (!accepted) diagnostic?.({ operation: "purge", code: "SESSION_PURGE_RESPONSE_INVALID" });
+        return accepted;
+      } catch {
+        diagnostic?.({ operation: "purge", code: "SESSION_PURGE_REQUEST_FAILED" });
+        return false;
+      }
+    },
+  };
+}
+
 export function createDiditIdentityProvider(
   config: DiditIdentityConfig,
   fetcher: typeof fetch = fetch,
@@ -138,6 +189,7 @@ export function createDiditIdentityProvider(
     "x-api-key": config.apiKey,
     Accept: "application/json",
   };
+  const purgeProvider = createDiditIdentityPurgeProvider(config.apiKey, fetcher, diagnostic);
 
   return {
     id: "didit-v3",
@@ -228,46 +280,7 @@ export function createDiditIdentityProvider(
         throw new Error("Didit canonical decision unavailable");
       }
     },
-    async purge({ requestId, providerReference, deletionInstruction = "operational_session_delete" }) {
-      const url = diditSessionUrl(providerReference, "delete/");
-      if (!url || !identityRequestIdSchema.safeParse(requestId).success) return false;
-      try {
-        const response = await fetcher(url, {
-          method: "DELETE",
-          cache: "no-store",
-          redirect: "error",
-          signal: requestSignal(),
-          headers: { ...headers, "Content-Type": "application/json" },
-          body: JSON.stringify({
-            retain_face_embeddings: false,
-            deletion_instruction: deletionInstruction,
-            instruction_id: requestId,
-          }),
-        });
-        // Didit specifies 404 for both an unknown and an already-deleted
-        // session. The reference comes only from our bound, server-side row,
-        // so an already-absent session is an idempotent successful purge.
-        if (response.status === 404) {
-          diagnostic?.({ operation: "purge", code: "SESSION_PURGE_ALREADY_ABSENT", status: response.status });
-          await response.body?.cancel();
-          return true;
-        }
-        if (response.status !== 200) {
-          diagnostic?.({ operation: "purge", code: "SESSION_PURGE_FAILED", status: response.status });
-          await response.body?.cancel();
-          return false;
-        }
-        const parsed = deleteSessionSchema.safeParse(await readSmallJson(response, 32 * 1024));
-        const accepted = parsed.success && parsed.data.session_id === providerReference &&
-          (parsed.data.face_retention_outcome === "deleted" || parsed.data.face_retention_outcome === "none") &&
-          parsed.data.biometric_template_uuid === null;
-        if (!accepted) diagnostic?.({ operation: "purge", code: "SESSION_PURGE_RESPONSE_INVALID" });
-        return accepted;
-      } catch {
-        diagnostic?.({ operation: "purge", code: "SESSION_PURGE_REQUEST_FAILED" });
-        return false;
-      }
-    },
+    purge: purgeProvider.purge,
   };
 }
 
