@@ -1,6 +1,6 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "framework": "nextjs",
-  "buildCommand": "env -u TEST_DATABASE_URL -u AUTH_COOKIE_SECRET -u ALPHA_INVITE_PEPPER -u WAITLIST_TOKEN_PEPPER -u UNSTANDARD_RUNTIME_MODE -u DATABASE_ENV npm run build",
+  "buildCommand": "env -u BETTER_AUTH_SECRET npm run build",
   "installCommand": "npm ci"
 }
