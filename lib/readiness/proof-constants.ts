@@ -30,6 +30,7 @@ export const REQUIRED_INTEGRATION_CASES = [
   "invite_finalization_success",
   "invite_finalization_rollback",
   "migration_second_run_noop",
+  "identity_provider_purge_queue_account_deletion",
   "seed_idempotency",
   "db_unlock_reject_no_row",
   "pass_transaction_commits_attempt_and_unlock",

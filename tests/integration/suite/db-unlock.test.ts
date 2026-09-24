@@ -1,16 +1,23 @@
 import { profileBasicsRepository } from "../../../lib/db/repositories/profile-basics.repository";
-import { identityRepository } from "../../../lib/db/repositories/identity.repository";
+import {
+  identityProviderPurgeQueueRepository,
+  identityRepository,
+} from "../../../lib/db/repositories/identity.repository";
 import { canAccessIntroduction } from "../../../lib/db/repositories/introduction-policy";
 import { getPublicProfileById, listPublicCandidatesForViewer } from "../../../lib/db/repositories/candidates.repository";
 import { createMessage, listConversation } from "../../../lib/db/repositories/messages.repository";
-import { identityVerifications, profileBasics } from "../../../lib/db/schema/profile-basics";
+import {
+  identityProviderPurgeQueue,
+  identityVerifications,
+  profileBasics,
+} from "../../../lib/db/schema/profile-basics";
 import { INTRODUCTION_SCOPE_VERSION, PROFILE_CONSENT_VERSION } from "../../../lib/profile/basics";
 import { IDENTITY_BIOMETRIC_CONSENT_VERSION } from "../../../lib/identity/contracts";
 import { addSyntheticVerifiedBasics } from "../profile-fixture";
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import { describe, it } from "node:test";
-import { and, eq, sql } from "drizzle-orm";
+import { and, eq, inArray, sql } from "drizzle-orm";
 import { createIntegrationDb, getIntegrationDatabaseUrl } from "../helpers";
 import { runDrizzleMigrations } from "../../../lib/db/run-migrations";
 import { seedClosedAlphaData } from "../../../lib/db/seed-data";
@@ -58,6 +65,123 @@ async function insertOnboardedUser(
 }
 
 describe("integration: db-backed unlock vertical slice", () => {
+  it("queues only opaque Didit references after account deletion and bounds retries", async () => {
+    const url = getIntegrationDatabaseUrl();
+    await runDrizzleMigrations(url);
+    await seedClosedAlphaData(url);
+    const db = createIntegrationDb(url);
+    const suffix = `purge-${Date.now()}`;
+    const first = await insertOnboardedUser(db, `${suffix}-a`);
+    const userIds = [first.userId];
+    const queueIds: string[] = [];
+
+    try {
+      const pending = await identityRepository.begin(
+        first.userId,
+        "didit-v3",
+        IDENTITY_BIOMETRIC_CONSENT_VERSION,
+        new Date(),
+      );
+      assert.ok(pending);
+      const providerReference = randomUUID();
+      assert.equal(await identityRepository.bindProviderReference(pending!, providerReference), true);
+      queueIds.push(pending!.requestId);
+
+      await db.delete(users).where(eq(users.id, first.userId));
+      assert.equal(
+        (await db.select().from(identityVerifications).where(eq(identityVerifications.userId, first.userId))).length,
+        0,
+      );
+
+      const [queued] = await db
+        .select()
+        .from(identityProviderPurgeQueue)
+        .where(eq(identityProviderPurgeQueue.requestId, pending!.requestId));
+      assert.ok(queued);
+      assert.deepEqual(Object.keys(queued!).sort(), [
+        "attemptCount",
+        "nextAttemptAt",
+        "provider",
+        "providerReference",
+        "queuedAt",
+        "requestId",
+      ]);
+      assert.equal(queued!.provider, "didit-v3");
+      assert.equal(queued!.providerReference, providerReference);
+      assert.equal(queued!.attemptCount, 0);
+
+      // A repeated cascade with the same opaque request ID must not duplicate
+      // or replace the original deletion instruction.
+      const second = await insertOnboardedUser(db, `${suffix}-b`);
+      userIds.push(second.userId);
+      const duplicate = await identityRepository.begin(
+        second.userId,
+        "didit-v3",
+        IDENTITY_BIOMETRIC_CONSENT_VERSION,
+        new Date(),
+      );
+      assert.ok(duplicate);
+      const duplicateProviderReference = randomUUID();
+      assert.equal(await identityRepository.bindProviderReference(duplicate!, duplicateProviderReference), true);
+      const [rekeyed] = await db
+        .update(identityVerifications)
+        .set({ requestId: pending!.requestId })
+        .where(eq(identityVerifications.requestId, duplicate!.requestId))
+        .returning({ requestId: identityVerifications.requestId });
+      assert.equal(rekeyed?.requestId, pending!.requestId);
+      await db.delete(users).where(eq(users.id, second.userId));
+      const duplicateQueueRows = await db
+        .select()
+        .from(identityProviderPurgeQueue)
+        .where(eq(identityProviderPurgeQueue.requestId, pending!.requestId));
+      assert.equal(duplicateQueueRows.length, 1);
+      assert.equal(duplicateQueueRows[0]?.providerReference, providerReference);
+
+      const retryStartedAt = Date.now();
+      await identityProviderPurgeQueueRepository.markProviderPurgeRetry({
+        requestId: pending!.requestId,
+        provider: "didit-v3",
+        providerReference,
+      });
+      const [retried] = await db
+        .select()
+        .from(identityProviderPurgeQueue)
+        .where(eq(identityProviderPurgeQueue.requestId, pending!.requestId));
+      assert.equal(retried?.attemptCount, 1);
+      const retryDelayMs = (retried?.nextAttemptAt.getTime() ?? 0) - retryStartedAt;
+      assert.ok(retryDelayMs >= 50_000 && retryDelayMs <= 90_000);
+      assert.equal(
+        (await identityProviderPurgeQueueRepository.listProviderPurges(100)).some(
+          (entry) => entry.requestId === pending!.requestId,
+        ),
+        false,
+      );
+
+      const dueFixtures = Array.from({ length: 51 }, () => ({
+        requestId: randomUUID(),
+        provider: "didit-v3",
+        providerReference: randomUUID(),
+      }));
+      queueIds.push(...dueFixtures.map((entry) => entry.requestId));
+      await db.insert(identityProviderPurgeQueue).values(dueFixtures);
+      const boundedDue = await identityProviderPurgeQueueRepository.listProviderPurges(100);
+      assert.equal(boundedDue.length, 50);
+
+      await observeIntegrationCase("identity_provider_purge_queue_account_deletion", async () => {
+        assert.equal(duplicateQueueRows.length, 1);
+        assert.equal(retried?.attemptCount, 1);
+        assert.equal(boundedDue.length, 50);
+      });
+    } finally {
+      await db.delete(users).where(inArray(users.id, userIds));
+      if (queueIds.length > 0) {
+        await db
+          .delete(identityProviderPurgeQueue)
+          .where(inArray(identityProviderPurgeQueue.requestId, queueIds));
+      }
+    }
+  });
+
   it("profile eligibility, direct access, revision binding and deletion fail closed", async () => {
     const url = getIntegrationDatabaseUrl();
     await runDrizzleMigrations(url);

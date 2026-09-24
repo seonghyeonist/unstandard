@@ -1,5 +1,11 @@
 # Didit Preview reconciliation and gate record — 2026-09-21
 
+> Historical snapshot. The account-signature statements below reflect the
+> pre-completion readback. A later founder-side DocuSeal completion was found
+> on 2026-09-23; the current contract/entity reconciliation is in
+> `docs/PR80_PREPROD_GATE_STATE_20260924.md`. Do not read this historical
+> snapshot's “No signature” statement as the current account state.
+
 Status: **BLOCKED_EVIDENCE — fail closed**
 
 ## Account deletion and contract-signature readback — 2026-09-23
