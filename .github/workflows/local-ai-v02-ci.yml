@@ -1,0 +1,66 @@
+name: Local AI v0.2 CI
+
+on:
+  push:
+    branches:
+      - feat/local-ai-v0-2-shadow-calibration-20260924
+  pull_request:
+    branches:
+      - feat/alpha-profile-identity-20260828
+
+jobs:
+  node-gates:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24.x
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Full app check
+        run: npm run check
+
+      - name: Security audit
+        run: npm run audit:security
+
+      - name: Guard no legacy backend
+        run: npm run guard:no-legacy-backend
+
+      - name: Guard import boundaries
+        run: npm run guard:boundaries
+
+  python-policy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+          cache-dependency-path: services/depth-service/requirements.txt
+
+      - name: Install depth-service test dependencies
+        run: python -m pip install -r services/depth-service/requirements.txt
+
+      - name: Test dormant depth service
+        working-directory: services/depth-service
+        run: python -m pytest -q
+
+      - name: Test pure v0.2 policy and calibration summaries
+        working-directory: scripts/local-ai
+        run: python -m unittest -v test_helpers_v02.py test_calibrate_v0_2.py
+
+      - name: Compile v0.2 offline harness
+        run: python -m py_compile scripts/local-ai/helpers_v02.py scripts/local-ai/calibrate_v0_2.py
+
+      - name: Confirm model benchmark stays explicit and local
+        run: |
+          test -f scripts/local-ai/requirements-poc.txt
+          grep -q 'UNSTANDARD_LABELING_WORKBOOK_PATH' scripts/local-ai/poc_bge_m3.py
+          grep -q 'UNTOUCHED_MOCK_ACTIVE' scripts/local-ai/calibrate_v0_2.py
