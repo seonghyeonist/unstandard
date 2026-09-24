@@ -1,6 +1,7 @@
 import "server-only";
 
-import { eq } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
+import { introductionPairSql } from "@/lib/db/repositories/introduction-policy";
 import { getDb } from "@/lib/db/client";
 import { profilePrivate, profiles } from "@/lib/db/schema/profiles";
 import { hasUnlock } from "@/lib/db/repositories/unlocks.repository";
@@ -109,7 +110,8 @@ export async function getDbPrivateProfile(input: {
         smallJoys: profilePrivate.smallJoys,
       })
       .from(profilePrivate)
-      .where(eq(profilePrivate.profileId, profileRow.id))
+      .innerJoin(profiles, eq(profiles.id, profilePrivate.profileId))
+      .where(and(eq(profilePrivate.profileId, profileRow.id), introductionPairSql(input.viewerUserId, sql`${profiles.userId}`)))
       .limit(1);
 
     if (!privateRow) {

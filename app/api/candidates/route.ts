@@ -35,6 +35,7 @@ export async function GET() {
 
   try {
     const rows = await listPublicCandidatesForViewer(user.id);
+    if (rows === "setup_required") return privateJson({ error: "Profile setup required", code: "PROFILE_SETUP_REQUIRED" }, { status: 409 });
     if (rows === "question_missing") {
       logUnlockEvent({
         event: "candidates.question_missing",
@@ -66,6 +67,8 @@ export async function GET() {
       candidates: rows.map((row) => ({
         id: row.id,
         nickname: row.nickname,
+        age: row.age,
+        gender: row.gender,
         city: row.city,
         teaser: row.teaser,
         question: row.question,

@@ -39,7 +39,7 @@ export async function GET(_request: Request, context: { params: Promise<{ id: st
   }
 
   try {
-    const result = await getPublicProfileById(id);
+    const result = await getPublicProfileById(id, user.id);
     if (result === "invalid") {
       return privateJson(
         { error: "Invalid profile id", code: "INVALID_PROFILE_ID", correlationId },
@@ -73,6 +73,8 @@ export async function GET(_request: Request, context: { params: Promise<{ id: st
     return privateJson({
       id: result.id,
       nickname: result.nickname,
+      age: result.age,
+      gender: result.gender,
       city: result.city,
       teaser: result.teaser,
       question: result.question,

@@ -40,6 +40,7 @@ describe("invite-ticket", () => {
       "invite-id",
       "user@example.com",
       capability,
+      "challenge-id",
       secret,
       {
         adultConfirmed: true,

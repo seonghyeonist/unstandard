@@ -7,6 +7,7 @@ import type { DbExecutor } from "@/lib/db/types";
 import { users } from "@/lib/db/schema/auth";
 import { legalAcceptances } from "@/lib/db/schema/legal-acceptances";
 import { consumeReservedInvite } from "@/lib/auth/invite-gate";
+import { consumeEmailVerificationProof } from "@/lib/auth/email-verification";
 import { ensureProfileForUser } from "@/lib/db/repositories/profile-bootstrap";
 import {
   getRegistrationTicketCookieName,
@@ -91,6 +92,7 @@ type FinalizeInviteInput = {
   inviteId: string;
   userId: string;
   reservationCapability: string;
+  emailVerificationId: string;
   email?: string | null;
   legalAcceptance: RegistrationTicket["legalAcceptance"];
 };
@@ -114,6 +116,20 @@ export async function finalizeInviteRegistration(input: FinalizeInviteInput): Pr
     await db.transaction(async (tx) => {
       if (injection === "consume") {
         throw new InviteFinalizationError("INJECTED_CONSUME_FAILURE", "Injected consume failure");
+      }
+
+      const emailProofConsumed = await consumeEmailVerificationProof({
+        challengeId: input.emailVerificationId,
+        inviteId: input.inviteId,
+        email: input.email ?? "",
+        userId: input.userId,
+        db: tx,
+      });
+      if (!emailProofConsumed) {
+        throw new InviteFinalizationError(
+          "EMAIL_VERIFICATION_PROOF_INVALID",
+          "Email verification proof is no longer valid",
+        );
       }
 
       const consumed = await consumeReservedInvite(
@@ -150,7 +166,10 @@ export async function finalizeInviteRegistration(input: FinalizeInviteInput): Pr
     await clearRegistrationTicketCookie();
   } catch (error) {
     await compensateFailedRegistration(input.userId);
-    await clearRegistrationTicketCookie();
+    // Keep the signed registration ticket so a transient post-commit failure
+    // can be retried without issuing or consuming another invite. The ticket
+    // remains bounded by the reservation/proof expiry and is revalidated on
+    // every retry.
     logSanitizedFinalizationFailure(
       error instanceof InviteFinalizationError ? error.code : "FINALIZE_TRANSACTION_FAILED",
     );
