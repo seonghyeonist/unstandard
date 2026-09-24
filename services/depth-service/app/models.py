@@ -4,7 +4,7 @@ from enum import StrEnum
 from typing import Any
 from uuid import UUID
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class Verdict(StrEnum):
@@ -29,6 +29,15 @@ class DepthEvaluateRequest(BaseModel):
     answer_text: str = Field(min_length=1, max_length=4000)
 
 
+class DepthShadowEvaluateRequest(BaseModel):
+    """Scoring-only contract: no identifiers, persistence metadata, or stored text."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    question_text: str = Field(min_length=1, max_length=2000)
+    answer_text: str = Field(min_length=1, max_length=4000)
+
+
 class DepthEvaluateResponse(BaseModel):
     depth_score: float
     verdict: Verdict
@@ -43,4 +52,3 @@ class Decision(BaseModel):
     verdict: Verdict
     path: DecisionPath
     reason_codes: list[str]
-

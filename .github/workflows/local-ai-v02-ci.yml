@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - feat/local-ai-v0-2-shadow-calibration-20260924
+      - feat/local-ai-v0-2-shadow-integration-20260924
   pull_request:
     branches:
       - feat/alpha-profile-identity-20260828

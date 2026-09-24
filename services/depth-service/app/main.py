@@ -12,7 +12,7 @@ from app.db import create_pool, persist_evaluation
 from app.decision import decide
 from app.embedding_client import EmbeddingClient
 from app.features import calculate_depth_raw, clamp, extract_features
-from app.models import DepthEvaluateRequest, DepthEvaluateResponse
+from app.models import DepthEvaluateRequest, DepthEvaluateResponse, DepthShadowEvaluateRequest
 from app.qwen import maybe_request_qwen_review
 
 
@@ -150,3 +150,55 @@ async def evaluate_depth(
 
     return response
 
+
+@app.post("/internal/depth/shadow-evaluate", response_model=DepthEvaluateResponse)
+async def evaluate_depth_shadow(
+    request: DepthShadowEvaluateRequest,
+    x_unstandard_depth_service_token: str | None = Header(default=None),
+) -> DepthEvaluateResponse:
+    """Authenticated shadow-only scorer with no DB writes, embeddings storage, or Qwen call."""
+    if not is_service_request_authorized(x_unstandard_depth_service_token):
+        raise HTTPException(status_code=401, detail=GENERIC_UNAUTHORIZED_DETAIL)
+
+    started = time.perf_counter()
+    config = await app.state.config_provider.get()
+    if not config.local_ai_enabled:
+        raise HTTPException(status_code=503, detail=GENERIC_UNAVAILABLE_DETAIL)
+
+    try:
+        question_embedding, answer_embedding = await app.state.embedding_client.embed(
+            [request.question_text, request.answer_text]
+        )
+    except Exception:
+        logger.error("shadow embedding service call failed")
+        raise HTTPException(status_code=503, detail=GENERIC_UNAVAILABLE_DETAIL) from None
+
+    if (
+        len(question_embedding) != config.embedding_dim
+        or len(answer_embedding) != config.embedding_dim
+    ):
+        logger.error("shadow embedding dimension mismatch: expected=%s", config.embedding_dim)
+        raise HTTPException(status_code=502, detail=GENERIC_UNAVAILABLE_DETAIL)
+
+    feature_result = extract_features(
+        request.question_text,
+        request.answer_text,
+        question_embedding,
+        answer_embedding,
+    )
+    features = feature_result.features
+    depth_raw = calculate_depth_raw(features)
+    depth_score = round(clamp(depth_raw, 0.0, 1.0), 4)
+    features["depth_raw"] = round(depth_raw, 4)
+
+    decision = decide(depth_score, features["answer_length"], features, config)
+    reason_codes = sorted(set(feature_result.reason_codes + decision.reason_codes))
+    return DepthEvaluateResponse(
+        depth_score=depth_score,
+        verdict=decision.verdict,
+        path=decision.path,
+        reason_codes=reason_codes,
+        features=features,
+        model_version=config.full_model_version,
+        latency_ms=int((time.perf_counter() - started) * 1000),
+    )
