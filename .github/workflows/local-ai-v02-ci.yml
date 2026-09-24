@@ -8,10 +8,6 @@ on:
     branches:
       - feat/alpha-profile-identity-20260828
 
-permissions:
-  contents: read
-  statuses: read
-
 jobs:
   node-gates:
     runs-on: ubuntu-latest
@@ -43,6 +39,8 @@ jobs:
     env:
       VERCEL: "1"
       VERCEL_ENV: preview
+      VERCEL_BRANCH_URL: unstandard-git-ci-preview.example.vercel.app
+      VERCEL_URL: unstandard-ci-preview.example.vercel.app
       NEXT_PUBLIC_VERCEL_ENV: preview
     steps:
       - uses: actions/checkout@v4
@@ -57,41 +55,6 @@ jobs:
 
       - name: Preview-like build without injected secrets
         run: npm run build
-
-  vercel-inspect-diagnostic:
-    runs-on: ubuntu-latest
-    env:
-      GH_TOKEN: ${{ github.token }}
-    steps:
-      - name: Wait for Vercel commit status and extract deployment id
-        id: vercel
-        shell: bash
-        run: |
-          set -euo pipefail
-          dep=""
-          for attempt in $(seq 1 18); do
-            payload="$(gh api "repos/${GITHUB_REPOSITORY}/commits/${GITHUB_SHA}/status")"
-            description="$(printf '%s' "$payload" | jq -r '.statuses[]? | select(.context == "Vercel") | .description' | head -n1)"
-            if [ -n "${description:-}" ] && [ "$description" != "null" ]; then
-              dep="$(printf '%s' "$description" | sed -n 's/.*\(dpl_[A-Za-z0-9]*\).*/\1/p')"
-              state="$(printf '%s' "$payload" | jq -r '.statuses[]? | select(.context == "Vercel") | .state' | head -n1)"
-              echo "vercel_state=${state:-unknown}"
-              if [ -n "$dep" ]; then
-                break
-              fi
-            fi
-            sleep 5
-          done
-          if [ -z "$dep" ]; then
-            echo "No Vercel deployment id surfaced in commit status within polling window" >&2
-            exit 2
-          fi
-          echo "deployment_id=$dep" >> "$GITHUB_OUTPUT"
-          echo "deployment_id=$dep"
-
-      - name: Inspect failed Vercel build logs via CLI if public/authorized
-        continue-on-error: true
-        run: npx --yes vercel@latest inspect "${{ steps.vercel.outputs.deployment_id }}" --logs --scope unstandard
 
   python-policy:
     runs-on: ubuntu-latest
