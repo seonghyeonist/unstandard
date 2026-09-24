@@ -37,6 +37,7 @@ Migration 0014 adds a purge queue with only request UUID, provider ID, opaque pr
 - The repository command `npm run db:migrate` completed successfully against that branch. Its newest Drizzle ledger record is migration 0014; the recorded hash matches `drizzle/migrations/0014_identity_provider_purge_queue.sql` exactly. The queue table, six expected columns, checks, and `AFTER DELETE` trigger were read back.
 - The default branch was read-only checked; it remained unchanged (nine migration-ledger rows, max ID 9). No default/primary branch write was issued.
 - An actual `npm run test:integration` against the disposable branch was attempted. Shell DB access was stopped when the network approval was cancelled before a decision returned. Therefore deletion-cascade, queue insertion, retry/backoff, and bounded-reconciliation integration results are **not claimed as passed**.
+- To bypass the shell-network bottleneck without exposing a connection string, an assertion-based SQL probe ran through the Neon connector against the same disposable branch. It passed account-deletion cascade, six-column opaque queue shape, duplicate-request idempotency, one-minute retry/backoff, and 50-row due-query checks; a cleanup readback confirmed zero synthetic users and zero queue rows. This is DB-level evidence, **not** a passing result for the Node `npm run test:integration` suite.
 - A regression case covering opaque queue data, duplicate-request idempotency, retry schedule, and 50-row bound is included in this PR change. It still requires execution on a runner with authorized access to the disposable branch.
 
 ## Didit Sandbox and webhook
@@ -47,13 +48,15 @@ References: Didit Help Center, [Sandbox testing](https://help.didit.me/getting-s
 
 ## Human label review
 
+**PR #80 procedure: `WAIVED_BY_FOUNDER / NOT_PERFORMED`.** The founder has waived the human-labeling step for this closure as an unavoidable procedural decision. Reviewer assignment is not a remaining action or a blocker for PR #80.
+
 - The source workbook hash matches the previously audited source. It contains 1,000 physical rows, 260 unique question–answer pairs, and no completed Reviewer 1, Reviewer 2, or final labels.
 - A deterministic 225-unique-pair sample, two identical blind reviewer workbooks, a separate controller crosswalk, and a blank merged-results template were prepared in an operator-local directory. The reviewer views contain only pair ID, question text, answer text, label, and notes; categories, source row IDs, recommendations, paths, and expected scores are absent.
 - The source dataset gate prohibits uploading row-level data or derivatives to third-party services. No row-level workbook or crosswalk was uploaded to Drive, Git, email, or chat. Drive search found no earlier reviewer packet or crosswalk.
-- `scripts/local-ai/analyze_human_review_results.py` reads only pair IDs and labels from reviewer workbooks and category from the local crosswalk. It writes row-level merged labels only locally, emits aggregate agreement/confusion/kappa metrics, and leaves disagreements without a final label until human tie-break. Synthetic tests pass; blank packets fail closed. No human labels or human-review statistics exist yet.
-- No two eligible independent human reviewer identities were found in authorized project context. Human review remains `BLOCKED_HUMAN_ONLY`; assignment is the sole reviewer-side action needed before review can begin.
+- The ingestion tool and synthetic tests remain available for a separately authorized future review. No human labels, human-review statistics, or independent human ground truth were produced.
+- This procedural waiver is **not** evidence of human ground truth and does not support calibration, accuracy, or model-quality claims. It does not authorize separate Local AI execution or calibration; those remain governed by their own authorization and readiness gates.
 
-After both local reviewer workbooks are complete, install the pinned `openpyxl` dependency from `scripts/local-ai/requirements-human-review.txt` and run `python3 scripts/local-ai/analyze_human_review_results.py --directory <operator-local-packet-directory>`. The CLI refuses incomplete or mismatched packets and writes only local outputs; never put reviewer workbooks or row-level merged labels in Git, Drive, email, or chat.
+If human labeling is separately reauthorized later, install the pinned `openpyxl` dependency from `scripts/local-ai/requirements-human-review.txt` and run `python3 scripts/local-ai/analyze_human_review_results.py --directory <operator-local-packet-directory>`. The CLI refuses incomplete or mismatched packets and writes only local outputs; never put reviewer workbooks or row-level merged labels in Git, Drive, email, or chat.
 
 ## Local validation and rollback boundary
 
