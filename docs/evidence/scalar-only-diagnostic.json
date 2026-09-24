@@ -1,0 +1,1845 @@
+{
+  "agreement_with_synthetic_prior": {
+    "agreements": 117,
+    "disagreements": 143,
+    "metric": "agreement_with_synthetic_prior",
+    "n": 260,
+    "note": "synthetic design prior only; offline label-disagreement proxy",
+    "rate": 0.45
+  },
+  "all_scored_threshold_band_counts": {
+    "above_threshold_below_fast_track": 72,
+    "below_gray": 88,
+    "fast_track_or_above": 14,
+    "in_gray_band": 86
+  },
+  "by_category": {
+    "AI_STYLED": {
+      "feature_distributions": {
+        "abstract_style_hits": {
+          "max": 5.0,
+          "mean": 2.8,
+          "min": 2.0,
+          "n": 30,
+          "p50": 2.5,
+          "p95": 5.0
+        },
+        "emoji_symbol_penalty": {
+          "max": 0.0,
+          "mean": 0.0,
+          "min": 0.0,
+          "n": 30,
+          "p50": 0.0,
+          "p95": 0.0
+        },
+        "emotional_concreteness": {
+          "max": 0.34,
+          "mean": 0.164,
+          "min": 0.0,
+          "n": 30,
+          "p50": 0.17,
+          "p95": 0.34
+        },
+        "lexical_diversity": {
+          "max": 1.0,
+          "mean": 1.0,
+          "min": 1.0,
+          "n": 30,
+          "p50": 1.0,
+          "p95": 1.0
+        },
+        "personal_grounding_score": {
+          "max": 0.34,
+          "mean": 0.147077,
+          "min": 0.0,
+          "n": 30,
+          "p50": 0.11,
+          "p95": 0.337435
+        },
+        "relevance_score": {
+          "max": 0.6775,
+          "mean": 0.599467,
+          "min": 0.5348,
+          "n": 30,
+          "p50": 0.59325,
+          "p95": 0.661855
+        },
+        "repeat_pattern_penalty": {
+          "max": 0.0,
+          "mean": 0.0,
+          "min": 0.0,
+          "n": 30,
+          "p50": 0.0,
+          "p95": 0.0
+        },
+        "semantic_density": {
+          "max": 0.6554,
+          "mean": 0.37022,
+          "min": 0.0967,
+          "n": 30,
+          "p50": 0.31945,
+          "p95": 0.6554
+        },
+        "spam_signature_penalty": {
+          "max": 0.0,
+          "mean": 0.0,
+          "min": 0.0,
+          "n": 30,
+          "p50": 0.0,
+          "p95": 0.0
+        },
+        "specificity_score": {
+          "max": 0.4881,
+          "mean": 0.35236,
+          "min": 0.2456,
+          "n": 30,
+          "p50": 0.3528,
+          "p95": 0.4881
+        },
+        "structure_score": {
+          "max": 1.0,
+          "mean": 0.9688,
+          "min": 0.9145,
+          "n": 30,
+          "p50": 0.9668,
+          "p95": 1.0
+        },
+        "ungrounded_abstract_penalty": {
+          "max": 1.0,
+          "mean": 0.564747,
+          "min": 0.292,
+          "n": 30,
+          "p50": 0.501,
+          "p95": 1.0
+        }
+      },
+      "n": 30,
+      "path_counts": {
+        "BASIC": 9,
+        "FAST_TRACK": 3,
+        "GRAY_BAND": 8,
+        "LOW_SCORE": 10
+      },
+      "reason_code_counts": {
+        "BASIC_SCORE": 9,
+        "FAST_TRACK_SCORE": 3,
+        "GRAY_BAND": 2,
+        "LOW_SCORE": 10,
+        "UNGROUNDED_ABSTRACT_REVIEW": 6
+      },
+      "score_distribution": {
+        "max": 0.5668,
+        "mean": 0.423787,
+        "min": 0.2866,
+        "n": 30,
+        "p50": 0.42525,
+        "p95": 0.56448
+      },
+      "threshold_band_counts": {
+        "above_threshold_below_fast_track": 13,
+        "below_gray": 10,
+        "fast_track_or_above": 3,
+        "in_gray_band": 4
+      },
+      "verdict_counts": {
+        "PASS": 12,
+        "REJECT": 10,
+        "REVIEW": 8
+      }
+    },
+    "GRAY_BAND": {
+      "feature_distributions": {
+        "abstract_style_hits": {
+          "max": 0.0,
+          "mean": 0.0,
+          "min": 0.0,
+          "n": 60,
+          "p50": 0.0,
+          "p95": 0.0
+        },
+        "emoji_symbol_penalty": {
+          "max": 0.1,
+          "mean": 0.005,
+          "min": 0.0,
+          "n": 60,
+          "p50": 0.0,
+          "p95": 0.005
+        },
+        "emotional_concreteness": {
+          "max": 0.22,
+          "mean": 0.044,
+          "min": 0.0,
+          "n": 60,
+          "p50": 0.0,
+          "p95": 0.22
+        },
+        "lexical_diversity": {
+          "max": 1.0,
+          "mean": 1.0,
+          "min": 1.0,
+          "n": 60,
+          "p50": 1.0,
+          "p95": 1.0
+        },
+        "personal_grounding_score": {
+          "max": 0.0,
+          "mean": 0.0,
+          "min": 0.0,
+          "n": 60,
+          "p50": 0.0,
+          "p95": 0.0
+        },
+        "relevance_score": {
+          "max": 0.7113,
+          "mean": 0.599717,
+          "min": 0.545,
+          "n": 60,
+          "p50": 0.605,
+          "p95": 0.628575
+        },
+        "repeat_pattern_penalty": {
+          "max": 1.0,
+          "mean": 0.340005,
+          "min": 0.0,
+          "n": 60,
+          "p50": 0.35,
+          "p95": 1.0
+        },
+        "semantic_density": {
+          "max": 0.36,
+          "mean": 0.084,
+          "min": 0.0067,
+          "n": 60,
+          "p50": 0.01915,
+          "p95": 0.36
+        },
+        "spam_signature_penalty": {
+          "max": 0.25,
+          "mean": 0.0125,
+          "min": 0.0,
+          "n": 60,
+          "p50": 0.0,
+          "p95": 0.0125
+        },
+        "specificity_score": {
+          "max": 0.0869,
+          "mean": 0.053995,
+          "min": 0.0125,
+          "n": 60,
+          "p50": 0.06185,
+          "p95": 0.0869
+        },
+        "structure_score": {
+          "max": 0.9173,
+          "mean": 0.672645,
+          "min": 0.3818,
+          "n": 60,
+          "p50": 0.735,
+          "p95": 0.785155
+        },
+        "ungrounded_abstract_penalty": {
+          "max": 0.15,
+          "mean": 0.15,
+          "min": 0.15,
+          "n": 60,
+          "p50": 0.15,
+          "p95": 0.15
+        }
+      },
+      "n": 60,
+      "path_counts": {
+        "BASIC": 1,
+        "GRAY_BAND": 11,
+        "LOW_SCORE": 36,
+        "SPAM_REJECT": 12
+      },
+      "reason_code_counts": {
+        "BASIC_SCORE": 1,
+        "GRAY_BAND": 11,
+        "LOW_SCORE": 36,
+        "REPEAT_DOMINANT": 12,
+        "TOO_SHORT": 4
+      },
+      "score_distribution": {
+        "max": 0.4133,
+        "mean": 0.274927,
+        "min": 0.1047,
+        "n": 60,
+        "p50": 0.27815,
+        "p95": 0.389705
+      },
+      "threshold_band_counts": {
+        "above_threshold_below_fast_track": 1,
+        "below_gray": 48,
+        "in_gray_band": 11
+      },
+      "verdict_counts": {
+        "PASS": 1,
+        "REJECT": 48,
+        "REVIEW": 11
+      }
+    },
+    "L1_PASS": {
+      "feature_distributions": {
+        "abstract_style_hits": {
+          "max": 0.0,
+          "mean": 0.0,
+          "min": 0.0,
+          "n": 20,
+          "p50": 0.0,
+          "p95": 0.0
+        },
+        "emoji_symbol_penalty": {
+          "max": 0.0364,
+          "mean": 0.00182,
+          "min": 0.0,
+          "n": 20,
+          "p50": 0.0,
+          "p95": 0.00182
+        },
+        "emotional_concreteness": {
+          "max": 0.42,
+          "mean": 0.099,
+          "min": 0.0,
+          "n": 20,
+          "p50": 0.0,
+          "p95": 0.363
+        },
+        "lexical_diversity": {
+          "max": 1.0,
+          "mean": 1.0,
+          "min": 1.0,
+          "n": 20,
+          "p50": 1.0,
+          "p95": 1.0
+        },
+        "personal_grounding_score": {
+          "max": 0.54,
+          "mean": 0.146,
+          "min": 0.0,
+          "n": 20,
+          "p50": 0.18,
+          "p95": 0.369
+        },
+        "relevance_score": {
+          "max": 0.6974,
+          "mean": 0.634725,
+          "min": 0.5579,
+          "n": 20,
+          "p50": 0.63305,
+          "p95": 0.68733
+        },
+        "repeat_pattern_penalty": {
+          "max": 0.1167,
+          "mean": 0.005835,
+          "min": 0.0,
+          "n": 20,
+          "p50": 0.0,
+          "p95": 0.005835
+        },
+        "semantic_density": {
+          "max": 0.7783,
+          "mean": 0.289085,
+          "min": 0.0233,
+          "n": 20,
+          "p50": 0.37445,
+          "p95": 0.722915
+        },
+        "spam_signature_penalty": {
+          "max": 0.0,
+          "mean": 0.0,
+          "min": 0.0,
+          "n": 20,
+          "p50": 0.0,
+          "p95": 0.0
+        },
+        "specificity_score": {
+          "max": 0.6819,
+          "mean": 0.25784,
+          "min": 0.0963,
+          "n": 20,
+          "p50": 0.25655,
+          "p95": 0.48886
+        },
+        "structure_score": {
+          "max": 1.0,
+          "mean": 0.913085,
+          "min": 0.8145,
+          "n": 20,
+          "p50": 0.92045,
+          "p95": 1.0
+        },
+        "ungrounded_abstract_penalty": {
+          "max": 0.15,
+          "mean": 0.0852,
+          "min": 0.0,
+          "n": 20,
+          "p50": 0.11,
+          "p95": 0.15
+        }
+      },
+      "n": 20,
+      "path_counts": {
+        "BASIC": 11,
+        "FAST_TRACK": 3,
+        "GRAY_BAND": 6
+      },
+      "reason_code_counts": {
+        "BASIC_SCORE": 11,
+        "EMOTIONAL_CONCRETE": 2,
+        "FAST_TRACK_SCORE": 3,
+        "GRAY_BAND": 6,
+        "PERSONALLY_GROUNDED": 1,
+        "SPECIFIC": 1
+      },
+      "score_distribution": {
+        "max": 0.7025,
+        "mean": 0.48088,
+        "min": 0.3593,
+        "n": 20,
+        "p50": 0.51075,
+        "p95": 0.600565
+      },
+      "threshold_band_counts": {
+        "above_threshold_below_fast_track": 11,
+        "fast_track_or_above": 3,
+        "in_gray_band": 6
+      },
+      "verdict_counts": {
+        "PASS": 14,
+        "REVIEW": 6
+      }
+    },
+    "L2_PASS": {
+      "feature_distributions": {
+        "abstract_style_hits": {
+          "max": 0.0,
+          "mean": 0.0,
+          "min": 0.0,
+          "n": 30,
+          "p50": 0.0,
+          "p95": 0.0
+        },
+        "emoji_symbol_penalty": {
+          "max": 0.0,
+          "mean": 0.0,
+          "min": 0.0,
+          "n": 30,
+          "p50": 0.0,
+          "p95": 0.0
+        },
+        "emotional_concreteness": {
+          "max": 0.36,
+          "mean": 0.126667,
+          "min": 0.0,
+          "n": 30,
+          "p50": 0.14,
+          "p95": 0.324
+        },
+        "lexical_diversity": {
+          "max": 1.0,
+          "mean": 1.0,
+          "min": 1.0,
+          "n": 30,
+          "p50": 1.0,
+          "p95": 1.0
+        },
+        "personal_grounding_score": {
+          "max": 0.3343,
+          "mean": 0.09543,
+          "min": 0.0,
+          "n": 30,
+          "p50": 0.0743,
+          "p95": 0.246
+        },
+        "relevance_score": {
+          "max": 0.7282,
+          "mean": 0.610877,
+          "min": 0.5439,
+          "n": 30,
+          "p50": 0.6023,
+          "p95": 0.68026
+        },
+        "repeat_pattern_penalty": {
+          "max": 0.0,
+          "mean": 0.0,
+          "min": 0.0,
+          "n": 30,
+          "p50": 0.0,
+          "p95": 0.0
+        },
+        "semantic_density": {
+          "max": 0.725,
+          "mean": 0.294947,
+          "min": 0.0517,
+          "n": 30,
+          "p50": 0.3165,
+          "p95": 0.685805
+        },
+        "spam_signature_penalty": {
+          "max": 0.0,
+          "mean": 0.0,
+          "min": 0.0,
+          "n": 30,
+          "p50": 0.0,
+          "p95": 0.0
+        },
+        "specificity_score": {
+          "max": 0.465,
+          "mean": 0.257127,
+          "min": 0.0969,
+          "n": 30,
+          "p50": 0.2175,
+          "p95": 0.41577
+        },
+        "structure_score": {
+          "max": 1.0,
+          "mean": 0.98194,
+          "min": 0.8555,
+          "n": 30,
+          "p50": 1.0,
+          "p95": 1.0
+        },
+        "ungrounded_abstract_penalty": {
+          "max": 0.35,
+          "mean": 0.256533,
+          "min": 0.024,
+          "n": 30,
+          "p50": 0.266,
+          "p95": 0.35
+        }
+      },
+      "n": 30,
+      "path_counts": {
+        "BASIC": 13,
+        "FAST_TRACK": 4,
+        "GRAY_BAND": 13
+      },
+      "reason_code_counts": {
+        "BASIC_SCORE": 13,
+        "EMOTIONAL_CONCRETE": 2,
+        "FAST_TRACK_SCORE": 4,
+        "GRAY_BAND": 13
+      },
+      "score_distribution": {
+        "max": 0.6099,
+        "mean": 0.451343,
+        "min": 0.3544,
+        "n": 30,
+        "p50": 0.42345,
+        "p95": 0.60386
+      },
+      "threshold_band_counts": {
+        "above_threshold_below_fast_track": 13,
+        "fast_track_or_above": 4,
+        "in_gray_band": 13
+      },
+      "verdict_counts": {
+        "PASS": 17,
+        "REVIEW": 13
+      }
+    },
+    "L3_PASS": {
+      "feature_distributions": {
+        "abstract_style_hits": {
+          "max": 0.0,
+          "mean": 0.0,
+          "min": 0.0,
+          "n": 30,
+          "p50": 0.0,
+          "p95": 0.0
+        },
+        "emoji_symbol_penalty": {
+          "max": 0.0571,
+          "mean": 0.003807,
+          "min": 0.0,
+          "n": 30,
+          "p50": 0.0,
+          "p95": 0.031405
+        },
+        "emotional_concreteness": {
+          "max": 0.28,
+          "mean": 0.06,
+          "min": 0.0,
+          "n": 30,
+          "p50": 0.0,
+          "p95": 0.253
+        },
+        "lexical_diversity": {
+          "max": 1.0,
+          "mean": 1.0,
+          "min": 1.0,
+          "n": 30,
+          "p50": 1.0,
+          "p95": 1.0
+        },
+        "personal_grounding_score": {
+          "max": 0.5143,
+          "mean": 0.090553,
+          "min": 0.0,
+          "n": 30,
+          "p50": 0.0,
+          "p95": 0.4206
+        },
+        "relevance_score": {
+          "max": 0.7386,
+          "mean": 0.618703,
+          "min": 0.5612,
+          "n": 30,
+          "p50": 0.61095,
+          "p95": 0.68557
+        },
+        "repeat_pattern_penalty": {
+          "max": 0.0,
+          "mean": 0.0,
+          "min": 0.0,
+          "n": 30,
+          "p50": 0.0,
+          "p95": 0.0
+        },
+        "semantic_density": {
+          "max": 0.6412,
+          "mean": 0.1983,
+          "min": 0.045,
+          "n": 30,
+          "p50": 0.0667,
+          "p95": 0.6412
+        },
+        "spam_signature_penalty": {
+          "max": 0.0,
+          "mean": 0.0,
+          "min": 0.0,
+          "n": 30,
+          "p50": 0.0,
+          "p95": 0.0
+        },
+        "specificity_score": {
+          "max": 0.5325,
+          "mean": 0.234913,
+          "min": 0.0844,
+          "n": 30,
+          "p50": 0.1894,
+          "p95": 0.4785
+        },
+        "structure_score": {
+          "max": 1.0,
+          "mean": 0.954547,
+          "min": 0.8327,
+          "n": 30,
+          "p50": 1.0,
+          "p95": 1.0
+        },
+        "ungrounded_abstract_penalty": {
+          "max": 0.35,
+          "mean": 0.26028,
+          "min": 0.0,
+          "n": 30,
+          "p50": 0.35,
+          "p95": 0.35
+        }
+      },
+      "n": 30,
+      "path_counts": {
+        "BASIC": 8,
+        "FAST_TRACK": 4,
+        "GRAY_BAND": 18
+      },
+      "reason_code_counts": {
+        "BASIC_SCORE": 8,
+        "FAST_TRACK_SCORE": 4,
+        "GRAY_BAND": 18,
+        "PERSONALLY_GROUNDED": 2
+      },
+      "score_distribution": {
+        "max": 0.6255,
+        "mean": 0.422717,
+        "min": 0.3525,
+        "n": 30,
+        "p50": 0.3836,
+        "p95": 0.597305
+      },
+      "threshold_band_counts": {
+        "above_threshold_below_fast_track": 8,
+        "fast_track_or_above": 4,
+        "in_gray_band": 18
+      },
+      "verdict_counts": {
+        "PASS": 12,
+        "REVIEW": 18
+      }
+    },
+    "L4_PASS": {
+      "feature_distributions": {
+        "abstract_style_hits": {
+          "max": 0.0,
+          "mean": 0.0,
+          "min": 0.0,
+          "n": 30,
+          "p50": 0.0,
+          "p95": 0.0
+        },
+        "emoji_symbol_penalty": {
+          "max": 0.0,
+          "mean": 0.0,
+          "min": 0.0,
+          "n": 30,
+          "p50": 0.0,
+          "p95": 0.0
+        },
+        "emotional_concreteness": {
+          "max": 0.22,
+          "mean": 0.037333,
+          "min": 0.0,
+          "n": 30,
+          "p50": 0.0,
+          "p95": 0.22
+        },
+        "lexical_diversity": {
+          "max": 1.0,
+          "mean": 0.97924,
+          "min": 0.9091,
+          "n": 30,
+          "p50": 1.0,
+          "p95": 1.0
+        },
+        "personal_grounding_score": {
+          "max": 0.34,
+          "mean": 0.085,
+          "min": 0.0,
+          "n": 30,
+          "p50": 0.0,
+          "p95": 0.3
+        },
+        "relevance_score": {
+          "max": 0.7333,
+          "mean": 0.645127,
+          "min": 0.5717,
+          "n": 30,
+          "p50": 0.64005,
+          "p95": 0.705225
+        },
+        "repeat_pattern_penalty": {
+          "max": 0.0,
+          "mean": 0.0,
+          "min": 0.0,
+          "n": 30,
+          "p50": 0.0,
+          "p95": 0.0
+        },
+        "semantic_density": {
+          "max": 0.3917,
+          "mean": 0.181667,
+          "min": 0.05,
+          "n": 30,
+          "p50": 0.08,
+          "p95": 0.38657
+        },
+        "spam_signature_penalty": {
+          "max": 0.35,
+          "mean": 0.046667,
+          "min": 0.0,
+          "n": 30,
+          "p50": 0.0,
+          "p95": 0.35
+        },
+        "specificity_score": {
+          "max": 0.4225,
+          "mean": 0.23454,
+          "min": 0.1338,
+          "n": 30,
+          "p50": 0.1956,
+          "p95": 0.394375
+        },
+        "structure_score": {
+          "max": 1.0,
+          "mean": 0.956127,
+          "min": 0.7209,
+          "n": 30,
+          "p50": 1.0,
+          "p95": 1.0
+        },
+        "ungrounded_abstract_penalty": {
+          "max": 0.35,
+          "mean": 0.263833,
+          "min": 0.112,
+          "n": 30,
+          "p50": 0.35,
+          "p95": 0.35
+        }
+      },
+      "n": 30,
+      "path_counts": {
+        "BASIC": 12,
+        "GRAY_BAND": 16,
+        "LOW_SCORE": 2
+      },
+      "reason_code_counts": {
+        "BASIC_SCORE": 12,
+        "GRAY_BAND": 16,
+        "LOW_SCORE": 2
+      },
+      "score_distribution": {
+        "max": 0.5169,
+        "mean": 0.409917,
+        "min": 0.2478,
+        "n": 30,
+        "p50": 0.3908,
+        "p95": 0.509095
+      },
+      "threshold_band_counts": {
+        "above_threshold_below_fast_track": 12,
+        "below_gray": 2,
+        "in_gray_band": 16
+      },
+      "verdict_counts": {
+        "PASS": 12,
+        "REJECT": 2,
+        "REVIEW": 16
+      }
+    },
+    "L5_PASS": {
+      "feature_distributions": {
+        "abstract_style_hits": {
+          "max": 1.0,
+          "mean": 0.066667,
+          "min": 0.0,
+          "n": 30,
+          "p50": 0.0,
+          "p95": 0.55
+        },
+        "emoji_symbol_penalty": {
+          "max": 0.0,
+          "mean": 0.0,
+          "min": 0.0,
+          "n": 30,
+          "p50": 0.0,
+          "p95": 0.0
+        },
+        "emotional_concreteness": {
+          "max": 0.12,
+          "mean": 0.008,
+          "min": 0.0,
+          "n": 30,
+          "p50": 0.0,
+          "p95": 0.066
+        },
+        "lexical_diversity": {
+          "max": 1.0,
+          "mean": 0.994447,
+          "min": 0.9167,
+          "n": 30,
+          "p50": 1.0,
+          "p95": 1.0
+        },
+        "personal_grounding_score": {
+          "max": 0.348,
+          "mean": 0.107887,
+          "min": 0.0,
+          "n": 30,
+          "p50": 0.0,
+          "p95": 0.322
+        },
+        "relevance_score": {
+          "max": 0.7789,
+          "mean": 0.64703,
+          "min": 0.5899,
+          "n": 30,
+          "p50": 0.6413,
+          "p95": 0.719455
+        },
+        "repeat_pattern_penalty": {
+          "max": 0.0,
+          "mean": 0.0,
+          "min": 0.0,
+          "n": 30,
+          "p50": 0.0,
+          "p95": 0.0
+        },
+        "semantic_density": {
+          "max": 0.3869,
+          "mean": 0.167407,
+          "min": 0.04,
+          "n": 30,
+          "p50": 0.065,
+          "p95": 0.3698
+        },
+        "spam_signature_penalty": {
+          "max": 0.0,
+          "mean": 0.0,
+          "min": 0.0,
+          "n": 30,
+          "p50": 0.0,
+          "p95": 0.0
+        },
+        "specificity_score": {
+          "max": 0.4037,
+          "mean": 0.23358,
+          "min": 0.115,
+          "n": 30,
+          "p50": 0.1894,
+          "p95": 0.399515
+        },
+        "structure_score": {
+          "max": 1.0,
+          "mean": 0.952127,
+          "min": 0.8191,
+          "n": 30,
+          "p50": 1.0,
+          "p95": 1.0
+        },
+        "ungrounded_abstract_penalty": {
+          "max": 0.35,
+          "mean": 0.22608,
+          "min": 0.0,
+          "n": 30,
+          "p50": 0.15,
+          "p95": 0.35
+        }
+      },
+      "n": 30,
+      "path_counts": {
+        "BASIC": 14,
+        "GRAY_BAND": 16
+      },
+      "reason_code_counts": {
+        "BASIC_SCORE": 14,
+        "GRAY_BAND": 16
+      },
+      "score_distribution": {
+        "max": 0.5358,
+        "mean": 0.427853,
+        "min": 0.3544,
+        "n": 30,
+        "p50": 0.40465,
+        "p95": 0.516335
+      },
+      "threshold_band_counts": {
+        "above_threshold_below_fast_track": 14,
+        "in_gray_band": 16
+      },
+      "verdict_counts": {
+        "PASS": 14,
+        "REVIEW": 16
+      }
+    },
+    "ONBOARDING": {
+      "feature_distributions": {
+        "abstract_style_hits": {
+          "max": 0.0,
+          "mean": 0.0,
+          "min": 0.0,
+          "n": 10,
+          "p50": 0.0,
+          "p95": 0.0
+        },
+        "emoji_symbol_penalty": {
+          "max": 0.0,
+          "mean": 0.0,
+          "min": 0.0,
+          "n": 10,
+          "p50": 0.0,
+          "p95": 0.0
+        },
+        "emotional_concreteness": {
+          "max": 0.0,
+          "mean": 0.0,
+          "min": 0.0,
+          "n": 10,
+          "p50": 0.0,
+          "p95": 0.0
+        },
+        "lexical_diversity": {
+          "max": 1.0,
+          "mean": 0.9,
+          "min": 0.0,
+          "n": 10,
+          "p50": 1.0,
+          "p95": 1.0
+        },
+        "personal_grounding_score": {
+          "max": 0.0,
+          "mean": 0.0,
+          "min": 0.0,
+          "n": 10,
+          "p50": 0.0,
+          "p95": 0.0
+        },
+        "relevance_score": {
+          "max": 0.6246,
+          "mean": 0.59797,
+          "min": 0.5553,
+          "n": 10,
+          "p50": 0.60085,
+          "p95": 0.621855
+        },
+        "repeat_pattern_penalty": {
+          "max": 1.0,
+          "mean": 0.835,
+          "min": 0.0,
+          "n": 10,
+          "p50": 1.0,
+          "p95": 1.0
+        },
+        "semantic_density": {
+          "max": 0.0117,
+          "mean": 0.00682,
+          "min": 0.0033,
+          "n": 10,
+          "p50": 0.00665,
+          "p95": 0.010935
+        },
+        "spam_signature_penalty": {
+          "max": 0.0,
+          "mean": 0.0,
+          "min": 0.0,
+          "n": 10,
+          "p50": 0.0,
+          "p95": 0.0
+        },
+        "specificity_score": {
+          "max": 0.0619,
+          "mean": 0.02882,
+          "min": 0.0063,
+          "n": 10,
+          "p50": 0.01405,
+          "p95": 0.06046
+        },
+        "structure_score": {
+          "max": 0.5618,
+          "mean": 0.51263,
+          "min": 0.3591,
+          "n": 10,
+          "p50": 0.5436,
+          "p95": 0.559775
+        },
+        "ungrounded_abstract_penalty": {
+          "max": 0.15,
+          "mean": 0.135,
+          "min": 0.0,
+          "n": 10,
+          "p50": 0.15,
+          "p95": 0.15
+        }
+      },
+      "n": 10,
+      "path_counts": {
+        "ONBOARDING_PASS": 10
+      },
+      "reason_code_counts": {
+        "ONBOARDING_BYPASS": 10
+      },
+      "score_distribution": {
+        "max": 0.2608,
+        "mean": 0.13489,
+        "min": 0.0971,
+        "n": 10,
+        "p50": 0.11075,
+        "p95": 0.24082
+      },
+      "threshold_band_counts": {
+        "below_gray": 10
+      },
+      "verdict_counts": {
+        "PASS": 10
+      }
+    },
+    "SPAM_ABUSE": {
+      "feature_distributions": {
+        "abstract_style_hits": {
+          "max": 0.0,
+          "mean": 0.0,
+          "min": 0.0,
+          "n": 20,
+          "p50": 0.0,
+          "p95": 0.0
+        },
+        "emoji_symbol_penalty": {
+          "max": 1.0,
+          "mean": 0.068,
+          "min": 0.0,
+          "n": 20,
+          "p50": 0.0,
+          "p95": 0.24
+        },
+        "emotional_concreteness": {
+          "max": 0.28,
+          "mean": 0.067,
+          "min": 0.0,
+          "n": 20,
+          "p50": 0.0,
+          "p95": 0.223
+        },
+        "lexical_diversity": {
+          "max": 1.0,
+          "mean": 0.626665,
+          "min": 0.0,
+          "n": 20,
+          "p50": 1.0,
+          "p95": 1.0
+        },
+        "personal_grounding_score": {
+          "max": 0.42,
+          "mean": 0.084,
+          "min": 0.0,
+          "n": 20,
+          "p50": 0.0,
+          "p95": 0.306
+        },
+        "relevance_score": {
+          "max": 0.6575,
+          "mean": 0.603115,
+          "min": 0.5591,
+          "n": 20,
+          "p50": 0.59905,
+          "p95": 0.646005
+        },
+        "repeat_pattern_penalty": {
+          "max": 1.0,
+          "mean": 0.500775,
+          "min": 0.0,
+          "n": 20,
+          "p50": 0.69105,
+          "p95": 1.0
+        },
+        "semantic_density": {
+          "max": 0.7233,
+          "mean": 0.22581,
+          "min": 0.0033,
+          "n": 20,
+          "p50": 0.0392,
+          "p95": 0.71703
+        },
+        "spam_signature_penalty": {
+          "max": 1.0,
+          "mean": 0.285,
+          "min": 0.0,
+          "n": 20,
+          "p50": 0.0,
+          "p95": 0.9525
+        },
+        "specificity_score": {
+          "max": 0.4413,
+          "mean": 0.13816,
+          "min": 0.0063,
+          "n": 20,
+          "p50": 0.0806,
+          "p95": 0.37005
+        },
+        "structure_score": {
+          "max": 1.0,
+          "mean": 0.679775,
+          "min": 0.3727,
+          "n": 20,
+          "p50": 0.59815,
+          "p95": 1.0
+        },
+        "ungrounded_abstract_penalty": {
+          "max": 0.2,
+          "mean": 0.0578,
+          "min": 0.0,
+          "n": 20,
+          "p50": 0.0,
+          "p95": 0.1525
+        }
+      },
+      "n": 20,
+      "path_counts": {
+        "GRAY_BAND": 1,
+        "LOW_SCORE": 4,
+        "SPAM_REJECT": 15
+      },
+      "reason_code_counts": {
+        "GRAY_BAND": 1,
+        "LOW_SCORE": 4,
+        "REPEAT_DOMINANT": 9,
+        "SPAM_SIGNATURE": 6,
+        "TOO_SHORT": 2
+      },
+      "score_distribution": {
+        "max": 0.3952,
+        "mean": 0.18333,
+        "min": 0.0,
+        "n": 20,
+        "p50": 0.1766,
+        "p95": 0.381045
+      },
+      "threshold_band_counts": {
+        "below_gray": 18,
+        "in_gray_band": 2
+      },
+      "verdict_counts": {
+        "REJECT": 19,
+        "REVIEW": 1
+      }
+    }
+  },
+  "candidate_category_rates": {
+    "ai_styled_review_rate": 0.26666666666666666,
+    "onboarding_pass_rate": 1.0,
+    "spam_abuse_reject_rate": 0.95
+  },
+  "dataset": {
+    "physical_rows": 1000,
+    "synthetic_prior_category_counts": {
+      "AI_STYLED": 50,
+      "GRAY_BAND": 100,
+      "L1_PASS": 100,
+      "L2_PASS": 100,
+      "L3_PASS": 150,
+      "L4_PASS": 150,
+      "L5_PASS": 150,
+      "ONBOARDING": 100,
+      "SPAM_ABUSE": 100
+    },
+    "synthetic_prior_verdict_counts_physical": {
+      "PASS": 750,
+      "REJECT": 100,
+      "REVIEW": 150
+    },
+    "unique_pair_failures": 0,
+    "unique_pairs": 260,
+    "unique_pairs_scored": 260
+  },
+  "determinism_probe": {
+    "max_abs_diff": 0.0,
+    "passed": true,
+    "repeat_count": 2
+  },
+  "embedding_health": {
+    "dimension": 1024,
+    "dimension_check_passed": true,
+    "inf_count": 0,
+    "nan_count": 0,
+    "vector_count": 520
+  },
+  "label_review_gate": "WAIVED_BY_FOUNDER_NOT_PERFORMED",
+  "latency_ms": {
+    "n": 260,
+    "p50": 180.51529399997435,
+    "p95": 348.7861424500236
+  },
+  "model": {
+    "model_config_sha256": "26159e7ad065073448460117eb24b7a4572f6f4e78eadff65dc0a11c052449fa",
+    "model_id": "BAAI/bge-m3",
+    "model_revision": "5617a9f61b028005a4858fdac845db406aefb181"
+  },
+  "non_onboarding_agreement_with_synthetic_prior": {
+    "agreements": 107,
+    "disagreements": 143,
+    "metric": "agreement_with_synthetic_prior",
+    "n": 250,
+    "note": "synthetic design prior only; offline label-disagreement proxy",
+    "rate": 0.428
+  },
+  "operating_boundaries": {
+    "live_unlock_scorer": "NOT_WIRED",
+    "production_scoring": "UNTOUCHED_MOCK_ACTIVE",
+    "qwen_status": "INACTIVE_NOT_INSTALLED"
+  },
+  "path_distribution": {
+    "BASIC": 68,
+    "FAST_TRACK": 14,
+    "GRAY_BAND": 89,
+    "LOW_SCORE": 52,
+    "ONBOARDING_PASS": 10,
+    "SPAM_REJECT": 27
+  },
+  "redaction_checks": {
+    "embeddings": "omitted",
+    "pair_keys": "omitted",
+    "raw_qa_text": "omitted",
+    "row_ids": "omitted",
+    "secrets": "omitted"
+  },
+  "run_role": "scalar-only-diagnostic",
+  "scalar_only_ungrounded_penalty_sweep": {
+    "0.35": {
+      "all_scored_threshold_band_counts": {
+        "above_threshold_below_fast_track": 72,
+        "below_gray": 88,
+        "fast_track_or_above": 14,
+        "in_gray_band": 86
+      },
+      "candidate_target_checks": {
+        "ai_styled_review_rate_gte_0_80": false,
+        "onboarding_pass_rate_eq_1_00": true,
+        "spam_abuse_reject_rate_gte_0_90": true
+      },
+      "critical_category_rates": {
+        "ai_styled_review_rate": 0.36666666666666664,
+        "onboarding_pass_rate": 1.0,
+        "spam_abuse_reject_rate": 0.95
+      },
+      "non_onboarding": {
+        "agreements": 101,
+        "disagreements": 149,
+        "metric": "agreement_with_synthetic_prior",
+        "n": 250,
+        "note": "synthetic design prior only; offline label-disagreement proxy",
+        "rate": 0.404
+      },
+      "overall": {
+        "agreements": 111,
+        "disagreements": 149,
+        "metric": "agreement_with_synthetic_prior",
+        "n": 260,
+        "note": "synthetic design prior only; offline label-disagreement proxy",
+        "rate": 0.426923
+      },
+      "path_counts": {
+        "BASIC": 56,
+        "FAST_TRACK": 14,
+        "GRAY_BAND": 101,
+        "LOW_SCORE": 52,
+        "ONBOARDING_PASS": 10,
+        "SPAM_REJECT": 27
+      },
+      "policy_candidate": false,
+      "score_distribution": {
+        "max": 0.7025,
+        "mean": 0.366143,
+        "min": 0.0,
+        "n": 260,
+        "p50": 0.3717,
+        "p95": 0.559895
+      },
+      "threshold_band_counts": {
+        "above_threshold_below_fast_track": 72,
+        "below_gray": 78,
+        "fast_track_or_above": 14,
+        "in_gray_band": 86
+      },
+      "verdict_counts": {
+        "PASS": 80,
+        "REJECT": 79,
+        "REVIEW": 101
+      }
+    },
+    "0.40": {
+      "all_scored_threshold_band_counts": {
+        "above_threshold_below_fast_track": 72,
+        "below_gray": 88,
+        "fast_track_or_above": 14,
+        "in_gray_band": 86
+      },
+      "candidate_target_checks": {
+        "ai_styled_review_rate_gte_0_80": false,
+        "onboarding_pass_rate_eq_1_00": true,
+        "spam_abuse_reject_rate_gte_0_90": true
+      },
+      "critical_category_rates": {
+        "ai_styled_review_rate": 0.3,
+        "onboarding_pass_rate": 1.0,
+        "spam_abuse_reject_rate": 0.95
+      },
+      "non_onboarding": {
+        "agreements": 108,
+        "disagreements": 142,
+        "metric": "agreement_with_synthetic_prior",
+        "n": 250,
+        "note": "synthetic design prior only; offline label-disagreement proxy",
+        "rate": 0.432
+      },
+      "overall": {
+        "agreements": 118,
+        "disagreements": 142,
+        "metric": "agreement_with_synthetic_prior",
+        "n": 260,
+        "note": "synthetic design prior only; offline label-disagreement proxy",
+        "rate": 0.453846
+      },
+      "path_counts": {
+        "BASIC": 67,
+        "FAST_TRACK": 14,
+        "GRAY_BAND": 90,
+        "LOW_SCORE": 52,
+        "ONBOARDING_PASS": 10,
+        "SPAM_REJECT": 27
+      },
+      "policy_candidate": false,
+      "score_distribution": {
+        "max": 0.7025,
+        "mean": 0.366143,
+        "min": 0.0,
+        "n": 260,
+        "p50": 0.3717,
+        "p95": 0.559895
+      },
+      "threshold_band_counts": {
+        "above_threshold_below_fast_track": 72,
+        "below_gray": 78,
+        "fast_track_or_above": 14,
+        "in_gray_band": 86
+      },
+      "verdict_counts": {
+        "PASS": 91,
+        "REJECT": 79,
+        "REVIEW": 90
+      }
+    },
+    "0.45": {
+      "all_scored_threshold_band_counts": {
+        "above_threshold_below_fast_track": 72,
+        "below_gray": 88,
+        "fast_track_or_above": 14,
+        "in_gray_band": 86
+      },
+      "candidate_target_checks": {
+        "ai_styled_review_rate_gte_0_80": false,
+        "onboarding_pass_rate_eq_1_00": true,
+        "spam_abuse_reject_rate_gte_0_90": true
+      },
+      "critical_category_rates": {
+        "ai_styled_review_rate": 0.26666666666666666,
+        "onboarding_pass_rate": 1.0,
+        "spam_abuse_reject_rate": 0.95
+      },
+      "non_onboarding": {
+        "agreements": 107,
+        "disagreements": 143,
+        "metric": "agreement_with_synthetic_prior",
+        "n": 250,
+        "note": "synthetic design prior only; offline label-disagreement proxy",
+        "rate": 0.428
+      },
+      "overall": {
+        "agreements": 117,
+        "disagreements": 143,
+        "metric": "agreement_with_synthetic_prior",
+        "n": 260,
+        "note": "synthetic design prior only; offline label-disagreement proxy",
+        "rate": 0.45
+      },
+      "path_counts": {
+        "BASIC": 68,
+        "FAST_TRACK": 14,
+        "GRAY_BAND": 89,
+        "LOW_SCORE": 52,
+        "ONBOARDING_PASS": 10,
+        "SPAM_REJECT": 27
+      },
+      "policy_candidate": false,
+      "score_distribution": {
+        "max": 0.7025,
+        "mean": 0.366143,
+        "min": 0.0,
+        "n": 260,
+        "p50": 0.3717,
+        "p95": 0.559895
+      },
+      "threshold_band_counts": {
+        "above_threshold_below_fast_track": 72,
+        "below_gray": 78,
+        "fast_track_or_above": 14,
+        "in_gray_band": 86
+      },
+      "verdict_counts": {
+        "PASS": 92,
+        "REJECT": 79,
+        "REVIEW": 89
+      }
+    },
+    "0.50": {
+      "all_scored_threshold_band_counts": {
+        "above_threshold_below_fast_track": 72,
+        "below_gray": 88,
+        "fast_track_or_above": 14,
+        "in_gray_band": 86
+      },
+      "candidate_target_checks": {
+        "ai_styled_review_rate_gte_0_80": false,
+        "onboarding_pass_rate_eq_1_00": true,
+        "spam_abuse_reject_rate_gte_0_90": true
+      },
+      "critical_category_rates": {
+        "ai_styled_review_rate": 0.26666666666666666,
+        "onboarding_pass_rate": 1.0,
+        "spam_abuse_reject_rate": 0.95
+      },
+      "non_onboarding": {
+        "agreements": 107,
+        "disagreements": 143,
+        "metric": "agreement_with_synthetic_prior",
+        "n": 250,
+        "note": "synthetic design prior only; offline label-disagreement proxy",
+        "rate": 0.428
+      },
+      "overall": {
+        "agreements": 117,
+        "disagreements": 143,
+        "metric": "agreement_with_synthetic_prior",
+        "n": 260,
+        "note": "synthetic design prior only; offline label-disagreement proxy",
+        "rate": 0.45
+      },
+      "path_counts": {
+        "BASIC": 68,
+        "FAST_TRACK": 14,
+        "GRAY_BAND": 89,
+        "LOW_SCORE": 52,
+        "ONBOARDING_PASS": 10,
+        "SPAM_REJECT": 27
+      },
+      "policy_candidate": false,
+      "score_distribution": {
+        "max": 0.7025,
+        "mean": 0.366143,
+        "min": 0.0,
+        "n": 260,
+        "p50": 0.3717,
+        "p95": 0.559895
+      },
+      "threshold_band_counts": {
+        "above_threshold_below_fast_track": 72,
+        "below_gray": 78,
+        "fast_track_or_above": 14,
+        "in_gray_band": 86
+      },
+      "verdict_counts": {
+        "PASS": 92,
+        "REJECT": 79,
+        "REVIEW": 89
+      }
+    },
+    "0.55": {
+      "all_scored_threshold_band_counts": {
+        "above_threshold_below_fast_track": 72,
+        "below_gray": 88,
+        "fast_track_or_above": 14,
+        "in_gray_band": 86
+      },
+      "candidate_target_checks": {
+        "ai_styled_review_rate_gte_0_80": false,
+        "onboarding_pass_rate_eq_1_00": true,
+        "spam_abuse_reject_rate_gte_0_90": true
+      },
+      "critical_category_rates": {
+        "ai_styled_review_rate": 0.13333333333333333,
+        "onboarding_pass_rate": 1.0,
+        "spam_abuse_reject_rate": 0.95
+      },
+      "non_onboarding": {
+        "agreements": 103,
+        "disagreements": 147,
+        "metric": "agreement_with_synthetic_prior",
+        "n": 250,
+        "note": "synthetic design prior only; offline label-disagreement proxy",
+        "rate": 0.412
+      },
+      "overall": {
+        "agreements": 113,
+        "disagreements": 147,
+        "metric": "agreement_with_synthetic_prior",
+        "n": 260,
+        "note": "synthetic design prior only; offline label-disagreement proxy",
+        "rate": 0.434615
+      },
+      "path_counts": {
+        "BASIC": 72,
+        "FAST_TRACK": 14,
+        "GRAY_BAND": 85,
+        "LOW_SCORE": 52,
+        "ONBOARDING_PASS": 10,
+        "SPAM_REJECT": 27
+      },
+      "policy_candidate": false,
+      "score_distribution": {
+        "max": 0.7025,
+        "mean": 0.366143,
+        "min": 0.0,
+        "n": 260,
+        "p50": 0.3717,
+        "p95": 0.559895
+      },
+      "threshold_band_counts": {
+        "above_threshold_below_fast_track": 72,
+        "below_gray": 78,
+        "fast_track_or_above": 14,
+        "in_gray_band": 86
+      },
+      "verdict_counts": {
+        "PASS": 96,
+        "REJECT": 79,
+        "REVIEW": 85
+      }
+    }
+  },
+  "schema_version": "local-ai-v0.2-sanitized-aggregate-v1",
+  "score_distribution": {
+    "max": 0.7025,
+    "mean": 0.366143,
+    "min": 0.0,
+    "n": 260,
+    "p50": 0.3717,
+    "p95": 0.559895
+  },
+  "snapshot": {
+    "approved_snapshot_id": "ULDS-v0.1-b63f77dc-20260804",
+    "hash_matched": true,
+    "workbook_sha256": "b63f77dc7fa10694e4af6d3fc5ee86c4fcb4b01bda0889a1e96bcba4b1a55e51"
+  },
+  "synthetic_prior_language": "synthetic design prior only; offline label-disagreement proxy",
+  "technical_issue_count": 0,
+  "threshold_band_counts": {
+    "above_threshold_below_fast_track": 72,
+    "below_gray": 78,
+    "fast_track_or_above": 14,
+    "in_gray_band": 86
+  },
+  "threshold_sweep": {
+    "0.35": {
+      "all_scored_threshold_band_counts": {
+        "above_threshold_below_fast_track": 102,
+        "below_gray": 72,
+        "fast_track_or_above": 14,
+        "in_gray_band": 72
+      },
+      "candidate_target_checks": {
+        "ai_styled_review_rate_gte_0_80": false,
+        "onboarding_pass_rate_eq_1_00": true,
+        "spam_abuse_reject_rate_gte_0_90": true
+      },
+      "critical_category_rates": {
+        "ai_styled_review_rate": 0.36666666666666664,
+        "onboarding_pass_rate": 1.0,
+        "spam_abuse_reject_rate": 0.95
+      },
+      "non_onboarding": {
+        "agreements": 143,
+        "disagreements": 107,
+        "metric": "agreement_with_synthetic_prior",
+        "n": 250,
+        "note": "synthetic design prior only; offline label-disagreement proxy",
+        "rate": 0.572
+      },
+      "overall": {
+        "agreements": 153,
+        "disagreements": 107,
+        "metric": "agreement_with_synthetic_prior",
+        "n": 260,
+        "note": "synthetic design prior only; offline label-disagreement proxy",
+        "rate": 0.588462
+      },
+      "path_counts": {
+        "BASIC": 96,
+        "FAST_TRACK": 14,
+        "GRAY_BAND": 76,
+        "LOW_SCORE": 37,
+        "ONBOARDING_PASS": 10,
+        "SPAM_REJECT": 27
+      },
+      "policy_candidate": false,
+      "score_distribution": {
+        "max": 0.7025,
+        "mean": 0.366143,
+        "min": 0.0,
+        "n": 260,
+        "p50": 0.3717,
+        "p95": 0.559895
+      },
+      "threshold_band_counts": {
+        "above_threshold_below_fast_track": 102,
+        "below_gray": 62,
+        "fast_track_or_above": 14,
+        "in_gray_band": 72
+      },
+      "verdict_counts": {
+        "PASS": 120,
+        "REJECT": 64,
+        "REVIEW": 76
+      }
+    },
+    "0.38": {
+      "all_scored_threshold_band_counts": {
+        "above_threshold_below_fast_track": 72,
+        "below_gray": 88,
+        "fast_track_or_above": 14,
+        "in_gray_band": 86
+      },
+      "candidate_target_checks": {
+        "ai_styled_review_rate_gte_0_80": false,
+        "onboarding_pass_rate_eq_1_00": true,
+        "spam_abuse_reject_rate_gte_0_90": true
+      },
+      "critical_category_rates": {
+        "ai_styled_review_rate": 0.26666666666666666,
+        "onboarding_pass_rate": 1.0,
+        "spam_abuse_reject_rate": 0.95
+      },
+      "non_onboarding": {
+        "agreements": 107,
+        "disagreements": 143,
+        "metric": "agreement_with_synthetic_prior",
+        "n": 250,
+        "note": "synthetic design prior only; offline label-disagreement proxy",
+        "rate": 0.428
+      },
+      "overall": {
+        "agreements": 117,
+        "disagreements": 143,
+        "metric": "agreement_with_synthetic_prior",
+        "n": 260,
+        "note": "synthetic design prior only; offline label-disagreement proxy",
+        "rate": 0.45
+      },
+      "path_counts": {
+        "BASIC": 68,
+        "FAST_TRACK": 14,
+        "GRAY_BAND": 89,
+        "LOW_SCORE": 52,
+        "ONBOARDING_PASS": 10,
+        "SPAM_REJECT": 27
+      },
+      "policy_candidate": false,
+      "score_distribution": {
+        "max": 0.7025,
+        "mean": 0.366143,
+        "min": 0.0,
+        "n": 260,
+        "p50": 0.3717,
+        "p95": 0.559895
+      },
+      "threshold_band_counts": {
+        "above_threshold_below_fast_track": 72,
+        "below_gray": 78,
+        "fast_track_or_above": 14,
+        "in_gray_band": 86
+      },
+      "verdict_counts": {
+        "PASS": 92,
+        "REJECT": 79,
+        "REVIEW": 89
+      }
+    },
+    "0.40": {
+      "all_scored_threshold_band_counts": {
+        "above_threshold_below_fast_track": 60,
+        "below_gray": 127,
+        "fast_track_or_above": 14,
+        "in_gray_band": 59
+      },
+      "candidate_target_checks": {
+        "ai_styled_review_rate_gte_0_80": false,
+        "onboarding_pass_rate_eq_1_00": true,
+        "spam_abuse_reject_rate_gte_0_90": true
+      },
+      "critical_category_rates": {
+        "ai_styled_review_rate": 0.2,
+        "onboarding_pass_rate": 1.0,
+        "spam_abuse_reject_rate": 0.95
+      },
+      "non_onboarding": {
+        "agreements": 90,
+        "disagreements": 160,
+        "metric": "agreement_with_synthetic_prior",
+        "n": 250,
+        "note": "synthetic design prior only; offline label-disagreement proxy",
+        "rate": 0.36
+      },
+      "overall": {
+        "agreements": 100,
+        "disagreements": 160,
+        "metric": "agreement_with_synthetic_prior",
+        "n": 260,
+        "note": "synthetic design prior only; offline label-disagreement proxy",
+        "rate": 0.384615
+      },
+      "path_counts": {
+        "BASIC": 57,
+        "FAST_TRACK": 14,
+        "GRAY_BAND": 61,
+        "LOW_SCORE": 91,
+        "ONBOARDING_PASS": 10,
+        "SPAM_REJECT": 27
+      },
+      "policy_candidate": false,
+      "score_distribution": {
+        "max": 0.7025,
+        "mean": 0.366143,
+        "min": 0.0,
+        "n": 260,
+        "p50": 0.3717,
+        "p95": 0.559895
+      },
+      "threshold_band_counts": {
+        "above_threshold_below_fast_track": 60,
+        "below_gray": 117,
+        "fast_track_or_above": 14,
+        "in_gray_band": 59
+      },
+      "verdict_counts": {
+        "PASS": 81,
+        "REJECT": 118,
+        "REVIEW": 61
+      }
+    },
+    "0.45": {
+      "all_scored_threshold_band_counts": {
+        "above_threshold_below_fast_track": 42,
+        "below_gray": 181,
+        "fast_track_or_above": 14,
+        "in_gray_band": 23
+      },
+      "candidate_target_checks": {
+        "ai_styled_review_rate_gte_0_80": false,
+        "onboarding_pass_rate_eq_1_00": true,
+        "spam_abuse_reject_rate_gte_0_90": true
+      },
+      "critical_category_rates": {
+        "ai_styled_review_rate": 0.2,
+        "onboarding_pass_rate": 1.0,
+        "spam_abuse_reject_rate": 1.0
+      },
+      "non_onboarding": {
+        "agreements": 70,
+        "disagreements": 180,
+        "metric": "agreement_with_synthetic_prior",
+        "n": 250,
+        "note": "synthetic design prior only; offline label-disagreement proxy",
+        "rate": 0.28
+      },
+      "overall": {
+        "agreements": 80,
+        "disagreements": 180,
+        "metric": "agreement_with_synthetic_prior",
+        "n": 260,
+        "note": "synthetic design prior only; offline label-disagreement proxy",
+        "rate": 0.307692
+      },
+      "path_counts": {
+        "BASIC": 39,
+        "FAST_TRACK": 14,
+        "GRAY_BAND": 26,
+        "LOW_SCORE": 144,
+        "ONBOARDING_PASS": 10,
+        "SPAM_REJECT": 27
+      },
+      "policy_candidate": false,
+      "score_distribution": {
+        "max": 0.7025,
+        "mean": 0.366143,
+        "min": 0.0,
+        "n": 260,
+        "p50": 0.3717,
+        "p95": 0.559895
+      },
+      "threshold_band_counts": {
+        "above_threshold_below_fast_track": 42,
+        "below_gray": 171,
+        "fast_track_or_above": 14,
+        "in_gray_band": 23
+      },
+      "verdict_counts": {
+        "PASS": 63,
+        "REJECT": 171,
+        "REVIEW": 26
+      }
+    }
+  },
+  "verdict": "V0_2_NEEDS_TUNING",
+  "verdict_distribution": {
+    "PASS": 92,
+    "REJECT": 79,
+    "REVIEW": 89
+  }
+}

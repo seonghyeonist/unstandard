@@ -2,8 +2,8 @@
 """Run the Local AI v0.2 synthetic-prior calibration benchmark.
 
 This is an operator-local, aggregate-only benchmark. It does not create human
-labels, does not claim accuracy/ground truth, does not touch Preview/Production,
-and does not activate the live app's Local AI path.
+labels or claim human-reviewed validity, does not touch Preview/Production, and
+does not activate the live app's Local AI path.
 """
 
 from __future__ import annotations
@@ -30,10 +30,14 @@ from helpers_v02 import (
     METRIC_AGREEMENT,
     POLICY_VERSION,
     QWEN_STATUS,
+    ABSTRACT_STYLE_REVIEW_MIN_HITS,
+    MAX_PERSONAL_GROUNDING_FOR_ABSTRACT_REVIEW,
+    UNGROUNDED_ABSTRACT_REVIEW_THRESHOLD,
     agreement_with_synthetic_prior,
     count_distribution,
     decide,
     embedding_health,
+    max_abs_diff,
     percentile,
     score_pair,
     threshold_band,
@@ -52,6 +56,21 @@ from poc_bge_m3 import (
 )
 
 THRESHOLD_SWEEP = (0.35, 0.38, 0.40, 0.45)
+UNGROUNDED_REVIEW_THRESHOLD_SWEEP = (0.35, 0.40, 0.45, 0.50, 0.55)
+FEATURE_SUMMARY_KEYS = (
+    "relevance_score",
+    "specificity_score",
+    "semantic_density",
+    "structure_score",
+    "lexical_diversity",
+    "emotional_concreteness",
+    "personal_grounding_score",
+    "ungrounded_abstract_penalty",
+    "abstract_style_hits",
+    "repeat_pattern_penalty",
+    "emoji_symbol_penalty",
+    "spam_signature_penalty",
+)
 
 
 def _utc_now() -> str:
@@ -65,7 +84,23 @@ def _rate(records: list[dict[str, Any]], category: str, verdict: str) -> float |
     return sum(row["verdict"] == verdict for row in selected) / len(selected)
 
 
-def summarize_policy(records: list[dict[str, Any]]) -> dict[str, Any]:
+def summarize_scores(scores: list[float]) -> dict[str, Any]:
+    ordered = sorted(float(score) for score in scores)
+    if not ordered:
+        return {"n": 0, "mean": None, "min": None, "p50": None, "p95": None, "max": None}
+    return {
+        "n": len(ordered),
+        "mean": round(sum(ordered) / len(ordered), 6),
+        "min": round(ordered[0], 6),
+        "p50": round(percentile(ordered, 50) or 0.0, 6),
+        "p95": round(percentile(ordered, 95) or 0.0, 6),
+        "max": round(ordered[-1], 6),
+    }
+
+
+def summarize_policy(
+    records: list[dict[str, Any]], *, threshold: float = DEPTH_SCORE_THRESHOLD
+) -> dict[str, Any]:
     verdicts = [str(row["verdict"]) for row in records]
     labels = [str(row["synthetic_label"]) for row in records]
     non_onboarding = [row for row in records if row["category"] != "ONBOARDING"]
@@ -85,7 +120,7 @@ def summarize_policy(records: list[dict[str, Any]]) -> dict[str, Any]:
         ),
         "onboarding_pass_rate_eq_1_00": critical["onboarding_pass_rate"] == 1.0,
     }
-    return {
+    summary = {
         "overall": agreement_with_synthetic_prior(verdicts, labels),
         "non_onboarding": agreement_with_synthetic_prior(
             [str(row["verdict"]) for row in non_onboarding],
@@ -97,6 +132,21 @@ def summarize_policy(records: list[dict[str, Any]]) -> dict[str, Any]:
         "verdict_counts": count_distribution(verdicts),
         "path_counts": count_distribution(str(row["path"]) for row in records),
     }
+    scores = [float(row["score"]) for row in records if row.get("score") is not None]
+    if scores:
+        summary["score_distribution"] = summarize_scores(scores)
+        depth_gate_scores = [
+            float(row["score"])
+            for row in records
+            if row.get("score") is not None and row["category"] != "ONBOARDING"
+        ]
+        summary["threshold_band_counts"] = count_distribution(
+            threshold_band(score, threshold) for score in depth_gate_scores
+        )
+        summary["all_scored_threshold_band_counts"] = count_distribution(
+            threshold_band(score, threshold) for score in scores
+        )
+    return summary
 
 
 def build_threshold_sweep(base_records: list[dict[str, Any]]) -> dict[str, Any]:
@@ -118,11 +168,44 @@ def build_threshold_sweep(base_records: list[dict[str, Any]]) -> dict[str, Any]:
                 {
                     "category": row["category"],
                     "synthetic_label": row["synthetic_label"],
+                    "score": row["score"],
                     "verdict": verdict,
                     "path": path,
                 }
             )
-        sweep[f"{threshold:.2f}"] = summarize_policy(evaluated)
+        sweep[f"{threshold:.2f}"] = summarize_policy(evaluated, threshold=threshold)
+    return sweep
+
+
+def build_ungrounded_review_threshold_sweep(
+    base_records: list[dict[str, Any]],
+) -> dict[str, Any]:
+    sweep: dict[str, Any] = {}
+    for penalty_threshold in UNGROUNDED_REVIEW_THRESHOLD_SWEEP:
+        evaluated: list[dict[str, Any]] = []
+        for row in base_records:
+            if row["category"] == "ONBOARDING":
+                verdict, path = "PASS", "ONBOARDING_PASS"
+            else:
+                decision = decide(
+                    float(row["score"]),
+                    int(row["features"]["answer_length"]),
+                    row["features"],
+                    threshold=DEPTH_SCORE_THRESHOLD,
+                    ungrounded_abstract_review_threshold=penalty_threshold,
+                    abstract_style_hit_threshold=None,
+                )
+                verdict, path = decision.verdict, decision.path
+            evaluated.append(
+                {
+                    "category": row["category"],
+                    "synthetic_label": row["synthetic_label"],
+                    "score": row["score"],
+                    "verdict": verdict,
+                    "path": path,
+                }
+            )
+        sweep[f"{penalty_threshold:.2f}"] = summarize_policy(evaluated)
     return sweep
 
 
@@ -142,6 +225,17 @@ def run_calibration(workbook_path: str, out_dir: Path) -> dict[str, Any]:
     rows, workbook_meta = load_workbook_rows(workbook_path)
     unique_rows = dedupe_unique_pairs(rows)
     model, model_meta = load_embedder(paths["cache"], paths["models"])
+
+    # Determinism probe uses a fixed synthetic phrase, never workbook content.
+    probe = ["unstandard local ai v0.2 determinism probe"]
+    probe_a = embed_texts(model, probe, batch_size=1)[0]
+    probe_b = embed_texts(model, probe, batch_size=1)[0]
+    determinism_max_abs_diff = max_abs_diff(probe_a, probe_b)
+    determinism_probe = {
+        "repeat_count": 2,
+        "max_abs_diff": round(determinism_max_abs_diff, 12),
+        "passed": determinism_max_abs_diff <= 1e-6,
+    }
 
     records: list[dict[str, Any]] = []
     embeddings: list[list[float]] = []
@@ -170,10 +264,11 @@ def run_calibration(workbook_path: str, out_dir: Path) -> dict[str, Any]:
                     "score": result["depth_score"],
                     "verdict": result["verdict"],
                     "path": result["path"],
+                    "reason_codes": result["reason_codes"],
                     "features": result["features"],
                 }
             )
-            embeddings.append(answer_embedding)
+            embeddings.extend([question_embedding, answer_embedding])
         except Exception:
             failures += 1
 
@@ -183,6 +278,7 @@ def run_calibration(workbook_path: str, out_dir: Path) -> dict[str, Any]:
     p95 = percentile(latencies_sorted, 95)
     policy_summary = summarize_policy(records)
     threshold_sweep = build_threshold_sweep(records)
+    ungrounded_review_threshold_sweep = build_ungrounded_review_threshold_sweep(records)
 
     technical_issues: list[str] = []
     if not records:
@@ -193,6 +289,8 @@ def run_calibration(workbook_path: str, out_dir: Path) -> dict[str, Any]:
         technical_issues.append("embedding_dim_mismatch")
     if health["nan_count"] or health["inf_count"]:
         technical_issues.append("nan_or_inf_in_embeddings")
+    if not determinism_probe["passed"]:
+        technical_issues.append("determinism_probe_failed")
     if p95 is not None and p95 > 1200:
         technical_issues.append("p95_latency_gt_1200ms")
     if workbook_meta["physical_rows"] != EXPECTED_PHYSICAL_ROWS:
@@ -213,11 +311,21 @@ def run_calibration(workbook_path: str, out_dir: Path) -> dict[str, Any]:
         scores = sorted(float(row["score"]) for row in group)
         by_category[category] = {
             "n": len(group),
-            "score_mean": round(sum(scores) / len(scores), 6) if scores else None,
-            "score_p50": percentile(scores, 50),
-            "score_p95": percentile(scores, 95),
+            "score_distribution": summarize_scores(scores),
+            "threshold_band_counts": count_distribution(
+                threshold_band(score, DEPTH_SCORE_THRESHOLD) for score in scores
+            ),
             "verdict_counts": count_distribution(str(row["verdict"]) for row in group),
             "path_counts": count_distribution(str(row["path"]) for row in group),
+            "reason_code_counts": count_distribution(
+                str(code) for row in group for code in row.get("reason_codes", [])
+            ),
+            "feature_distributions": {
+                key: summarize_scores(
+                    [float(row["features"][key]) for row in group if key in row["features"]]
+                )
+                for key in FEATURE_SUMMARY_KEYS
+            },
         }
 
     report = {
@@ -242,6 +350,7 @@ def run_calibration(workbook_path: str, out_dir: Path) -> dict[str, Any]:
         },
         "model": model_meta,
         "embedding_health": health,
+        "determinism_probe": determinism_probe,
         "latency_ms": {
             "n": len(latencies_sorted),
             "p50": percentile(latencies_sorted, 50),
@@ -256,9 +365,26 @@ def run_calibration(workbook_path: str, out_dir: Path) -> dict[str, Any]:
             "rss_delta_bytes": rss_after - rss_before,
         },
         "canonical_threshold": DEPTH_SCORE_THRESHOLD,
+        "ungrounded_abstract_review_threshold": UNGROUNDED_ABSTRACT_REVIEW_THRESHOLD,
+        "abstract_style_review_rule": {
+            "minimum_abstract_style_hits": ABSTRACT_STYLE_REVIEW_MIN_HITS,
+            "maximum_personal_grounding_score_exclusive": MAX_PERSONAL_GROUNDING_FOR_ABSTRACT_REVIEW,
+            "applies_below_depth_threshold": True,
+        },
         "fast_track_threshold": FAST_TRACK_THRESHOLD,
+        "verdict_distribution": policy_summary["verdict_counts"],
+        "path_distribution": policy_summary["path_counts"],
+        "score_distribution": summarize_scores([float(row["score"]) for row in records]),
+        "threshold_band_counts": policy_summary.get("threshold_band_counts", {}),
+        "all_scored_threshold_band_counts": policy_summary.get(
+            "all_scored_threshold_band_counts", {}
+        ),
+        "agreement_with_synthetic_prior": policy_summary["overall"],
+        "non_onboarding_agreement_with_synthetic_prior": policy_summary["non_onboarding"],
+        "candidate_category_rates": policy_summary["critical_category_rates"],
         "policy_summary": policy_summary,
         "threshold_sweep": threshold_sweep,
+        "ungrounded_abstract_review_threshold_sweep": ungrounded_review_threshold_sweep,
         "by_category": by_category,
         "technical_issues": technical_issues,
         "redaction": {
@@ -269,9 +395,9 @@ def run_calibration(workbook_path: str, out_dir: Path) -> dict[str, Any]:
             "secrets": "omitted",
         },
         "notes": [
-            "Synthetic design prior only; never report these metrics as human accuracy or ground truth.",
-            "Founder waived human review procedurally; the waiver does not validate model quality.",
-            "ONBOARDING is a product bypass and is not treated as a depth-model success.",
+            "Synthetic design prior only; agreement is an offline label-disagreement proxy.",
+            "Founder waived human review procedurally; no human labels were collected.",
+            "Threshold bands exclude ONBOARDING, which is a product bypass rather than a depth-model path.",
             "Qwen remains inactive. The live app remains on mock-local-heuristic-v0.0.",
         ],
     }

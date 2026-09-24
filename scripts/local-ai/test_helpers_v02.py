@@ -52,11 +52,45 @@ class HelpersV02Tests(unittest.TestCase):
             [0.95, 0.05],
         )
         self.assertGreaterEqual(features["ungrounded_abstract_penalty"], 0.55)
+        self.assertGreaterEqual(features["abstract_style_hits"], 2)
         decision = decide(0.75, int(features["answer_length"]), features)
         self.assertEqual(decision.verdict, "REVIEW")
         self.assertEqual(decision.reason_codes, ["UNGROUNDED_ABSTRACT_REVIEW"])
 
-    def test_onboarding_is_product_bypass_not_model_accuracy(self) -> None:
+    def test_repeated_abstract_cues_with_weak_grounding_review_even_below_score_threshold(self) -> None:
+        decision = decide(
+            0.20,
+            60,
+            {
+                "spam_signature_penalty": 0.0,
+                "repeat_pattern_penalty": 0.0,
+                "emoji_symbol_penalty": 0.0,
+                "ungrounded_abstract_penalty": 0.30,
+                "abstract_style_hits": 2,
+                "personal_grounding_score": 0.20,
+            },
+        )
+        self.assertEqual(decision.verdict, "REVIEW")
+        self.assertEqual(decision.reason_codes, ["UNGROUNDED_ABSTRACT_REVIEW"])
+
+    def test_abstract_cues_with_concrete_personal_grounding_do_not_force_review(self) -> None:
+        decision = decide(
+            0.60,
+            60,
+            {
+                "spam_signature_penalty": 0.0,
+                "repeat_pattern_penalty": 0.0,
+                "emoji_symbol_penalty": 0.0,
+                "ungrounded_abstract_penalty": 0.20,
+                "abstract_style_hits": 2,
+                "personal_grounding_score": 0.60,
+                "specificity_score": 0.60,
+                "emotional_concreteness": 0.45,
+            },
+        )
+        self.assertEqual(decision.verdict, "PASS")
+
+    def test_onboarding_is_product_bypass_not_a_depth_score_claim(self) -> None:
         result = score_pair(
             "하나만 고른다면?",
             "치킨",

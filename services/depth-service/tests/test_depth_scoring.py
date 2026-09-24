@@ -122,6 +122,40 @@ def test_polished_but_ungrounded_high_score_is_reviewed() -> None:
     assert decision.reason_codes == ["UNGROUNDED_ABSTRACT_REVIEW"]
 
 
+def test_v02_abstract_review_uses_lower_calibrated_cutoff() -> None:
+    decision = decide(
+        depth_score=0.72,
+        answer_length=48,
+        features={
+            "spam_signature_penalty": 0.0,
+            "repeat_pattern_penalty": 0.0,
+            "emoji_symbol_penalty": 0.0,
+            "ungrounded_abstract_penalty": 0.50,
+        },
+        config=RuntimeConfig(),
+    )
+    assert decision.verdict == Verdict.REVIEW
+    assert decision.reason_codes == ["UNGROUNDED_ABSTRACT_REVIEW"]
+
+
+def test_repeated_abstract_cues_need_personal_grounding_before_pass() -> None:
+    decision = decide(
+        depth_score=0.20,
+        answer_length=60,
+        features={
+            "spam_signature_penalty": 0.0,
+            "repeat_pattern_penalty": 0.0,
+            "emoji_symbol_penalty": 0.0,
+            "ungrounded_abstract_penalty": 0.30,
+            "abstract_style_hits": 2,
+            "personal_grounding_score": 0.20,
+        },
+        config=RuntimeConfig(),
+    )
+    assert decision.verdict == Verdict.REVIEW
+    assert decision.reason_codes == ["UNGROUNDED_ABSTRACT_REVIEW"]
+
+
 def test_feature_extractor_keeps_raw_text_out_of_snapshot() -> None:
     result = extract_features(
         "요즘 당신을 웃게 만드는 것은?",
@@ -153,7 +187,7 @@ def test_feature_extractor_flags_ungrounded_abstract_style_without_raw_text_rule
         [1.0, 0.0, 0.0],
         [0.95, 0.05, 0.0],
     )
-    assert result.features["ungrounded_abstract_penalty"] >= 0.55
+    assert result.features["ungrounded_abstract_penalty"] >= 0.45
     assert result.features["personal_grounding_score"] < 0.45
     assert "UNGROUNDED_ABSTRACT" in result.reason_codes
 

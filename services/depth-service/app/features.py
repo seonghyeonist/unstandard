@@ -6,6 +6,12 @@ from collections import Counter
 from dataclasses import dataclass
 from typing import Any
 
+from app.config import (
+    ABSTRACT_STYLE_REVIEW_MIN_HITS,
+    MAX_PERSONAL_GROUNDING_FOR_ABSTRACT_REVIEW,
+    UNGROUNDED_ABSTRACT_REVIEW_THRESHOLD,
+)
+
 
 TOKEN_RE = re.compile(r"[A-Za-z0-9가-힣]+")
 URL_RE = re.compile(r"https?://|www\.", re.IGNORECASE)
@@ -178,6 +184,7 @@ def extract_features(
         "emotional_concreteness": round(emotional_concreteness, 4),
         "personal_grounding_score": round(personal_grounding_score, 4),
         "ungrounded_abstract_penalty": round(ungrounded_abstract_penalty, 4),
+        "abstract_style_hits": abstract_hits,
         "repeat_pattern_penalty": round(repeat_pattern_penalty, 4),
         "emoji_symbol_penalty": round(emoji_symbol_penalty, 4),
         "spam_signature_penalty": round(spam_signature_penalty, 4),
@@ -274,7 +281,14 @@ def _reason_codes(features: dict[str, Any]) -> list[str]:
         reasons.append("EMOTIONAL_CONCRETE")
     if features["personal_grounding_score"] >= 0.45:
         reasons.append("PERSONALLY_GROUNDED")
-    if features["ungrounded_abstract_penalty"] >= 0.55:
+    if (
+        features["ungrounded_abstract_penalty"] >= UNGROUNDED_ABSTRACT_REVIEW_THRESHOLD
+        or (
+            features["abstract_style_hits"] >= ABSTRACT_STYLE_REVIEW_MIN_HITS
+            and features["personal_grounding_score"]
+            < MAX_PERSONAL_GROUNDING_FOR_ABSTRACT_REVIEW
+        )
+    ):
         reasons.append("UNGROUNDED_ABSTRACT")
     if features["relevance_score"] < 0.35:
         reasons.append("LOW_RELEVANCE")

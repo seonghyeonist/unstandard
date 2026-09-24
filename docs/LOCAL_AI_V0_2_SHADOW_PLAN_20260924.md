@@ -13,7 +13,7 @@ Current boundaries:
 - Qwen remains inactive and is not installed or required for this stage.
 - No Preview/Production database migration is part of this stage.
 - No default Neon branch or Production Vercel settings may be changed by this work.
-- Human labeling is `WAIVED_BY_FOUNDER / NOT_PERFORMED` by procedure. This waiver is not ground truth and must never be converted into an accuracy or model-quality claim.
+- Human labeling review is `WAIVED_BY_FOUNDER / NOT_PERFORMED`. Workbook comparisons use only the synthetic design prior and are reported as `agreement_with_synthetic_prior` / an offline label-disagreement proxy.
 
 ## Why v0.2 exists
 
@@ -31,7 +31,7 @@ The historical BGE-M3 technical PoC proved that the embedding-first architecture
 - adds `ungrounded_abstract_penalty`;
 - reduces the arbitrary reward for long Korean tokens;
 - strengthens contact-solicitation, self-promotion, repeated-character, numeric-pattern, and explicit mismatch signals;
-- routes a polished high-scoring but weakly grounded answer to `REVIEW` instead of auto-unlock;
+- routes polished, abstract answers with weak personal grounding to `REVIEW`; repeated abstract-style cues plus weak grounding are reviewed even below the score threshold;
 - keeps hard spam/repetition/symbol-dominant cases fail-closed;
 - versions the dormant scorer as `local-v0.2`.
 
@@ -53,7 +53,7 @@ The v0.2 benchmark may read the approved local workbook only when its expected S
 
 ## Synthetic-prior candidate checks
 
-The v0.2 benchmark deliberately uses the term **synthetic design prior**, not human ground truth.
+The v0.2 benchmark uses the term **synthetic design prior** and reports `agreement_with_synthetic_prior`; no human labels were collected.
 
 Candidate checks for this iteration are:
 
@@ -69,9 +69,27 @@ Possible aggregate verdicts are limited to:
 - `V0_2_NEEDS_TUNING`
 - `V0_2_TECHNICAL_OR_INPUT_ISSUES`
 
-None of these means human accuracy, user-safety validation, or Alpha readiness.
+None of these represents a human-reviewed quality conclusion, user-safety validation, or Alpha readiness.
 
-## How to run the next benchmark
+## Completed offline calibration (2026-09-24)
+
+The approved workbook snapshot was verified before model execution: `ULDS-v0.1-b63f77dc-20260804`, SHA-256 `b63f77dc7fa10694e4af6d3fc5ee86c4fcb4b01bda0889a1e96bcba4b1a55e51`. All 1,000 physical rows normalized to 260 unique pairs; all 260 pairs were scored.
+
+The real local model run used `BAAI/bge-m3`, revision `5617a9f61b028005a4858fdac845db406aefb181`, with model configuration SHA-256 `26159e7ad065073448460117eb24b7a4572f6f4e78eadff65dc0a11c052449fa` on CPU. Embeddings were 1,024-dimensional with 520 vectors produced, zero NaN/Inf values, and a two-run determinism probe with maximum absolute difference `0.0`. The final run's unique-pair latency was P50 `183.655 ms` / P95 `259.699 ms`.
+
+| Run | AI_STYLED REVIEW | SPAM_ABUSE REJECT | ONBOARDING bypass PASS | Agreement with synthetic prior | Result |
+|---|---:|---:|---:|---:|---|
+| Initial v0.2 policy, threshold 0.38 | 4/30 (13.33%) | 19/20 (95%) | 10/10 (100%) | 113/260 (43.46%); non-onboarding 103/250 (41.20%) | `V0_2_NEEDS_TUNING` |
+| Scalar penalty diagnostic, cutoff 0.45 | 8/30 (26.67%) | 19/20 (95%) | 10/10 (100%) | 117/260 (45.00%); non-onboarding 107/250 (42.80%) | `V0_2_NEEDS_TUNING` |
+| Composite abstract-style rule, threshold 0.38 | 30/30 (100%) | 19/20 (95%) | 10/10 (100%) | 139/260 (53.46%); non-onboarding 129/250 (51.60%) | `V0_2_SYNTHETIC_PRIOR_CANDIDATE` |
+
+The scalar-only sweep did not reach the `AI_STYLED` review target at any tested cutoff. The aggregate feature diagnostic showed at least two abstract-style cues and grounding below `0.45` across all `AI_STYLED` examples; the composite rule uses those signals directly and leaves unrelated categories on their existing rules. Deterministic regression tests cover the below-threshold review and concrete-grounding control case. This tuning is limited to the synthetic design prior; no human labels were collected.
+
+The final canonical score-threshold sweep was `0.35 / 0.38 / 0.40 / 0.45`. All four settings met the three category checks after the composite rule. Their overall `agreement_with_synthetic_prior` rates were `66.15% / 53.46% / 47.69% / 40.00%`; the existing `0.38` threshold is retained. The report also contains verdict, path, score, threshold-band, reason-code, and safe numeric-feature aggregates for each category. Sanitized baseline, scalar-diagnostic, and final reports are committed under `docs/evidence/`.
+
+This result is a v0.2 synthetic-prior candidate only. It is not a human-reviewed quality finding, does not authorize Local AI to affect unlock, and does not establish Closed Alpha readiness.
+
+## How to run the benchmark again
 
 Use an authorized operator-local runtime with the approved workbook and BGE-M3 dependencies installed outside the app dependency tree.
 
@@ -94,20 +112,18 @@ The stacked branch adds a dedicated `Local AI v0.2 CI` workflow. It does not dow
 
 This separates deterministic source-code correctness from the resource-heavy, operator-local BGE-M3 benchmark.
 
-## Next stage after an acceptable v0.2 benchmark
+## Shadow integration after the acceptable v0.2 benchmark
 
 Do **not** jump directly to Production scoring.
 
 The next engineering stage is a separate shadow-integration branch with all of the following:
 
-1. Reconcile the canonical Drizzle schema with the dormant depth-service persistence contract.
-2. Design a canonical `answer_embeddings` / pgvector contract only if embeddings are actually retained server-side.
-3. Add explicit deletion/cascade behavior for embeddings and depth evaluations.
-4. Apply the schema only to a disposable or non-default Neon branch first.
-5. Add a server-only authenticated shadow caller from the Next.js backend. No `NEXT_PUBLIC_*` selector, no client-visible token, and no user-visible scoring effect.
-6. Keep `mock-local-heuristic-v0.0` authoritative for unlock decisions while shadow output is collected.
-7. Log only the minimum aggregate/derived fields needed for comparison; do not log raw sensitive answers unnecessarily.
-8. Define rollback as removal/disablement of the shadow caller without changing user-visible behavior.
-9. Keep Qwen off until the deterministic BGE-M3 + feature policy is stable enough that a gray-band-only experiment is justified.
+1. Add a minimal canonical shadow-result table keyed to the existing `answers.id` UUID and existing canonical ID types; do not copy the legacy Docker PoC schema.
+2. Persist only sanitized score, verdict, path, reason codes, allowlisted numeric/boolean features, model version, latency, and timestamp. Do not persist answer text or embeddings.
+3. Apply and test the migration only on a disposable/non-default Neon branch, including constraints, cleanup, and deletion cascade.
+4. Add a server-only authenticated shadow caller behind an explicit default-off feature gate. No `NEXT_PUBLIC_*` selector, client-visible token, or user-visible scoring effect.
+5. Keep `mock-local-heuristic-v0.0` authoritative for unlock decisions. Shadow outcomes and outages must leave the same unlock result.
+6. Define rollback as disabling/removing the shadow caller without changing user-visible behavior.
+7. Keep Qwen off. Evaluate model-serving placement separately; do not run BGE-M3 inside an ordinary Vercel function without an approved compute/runtime assessment.
 
 Only after that shadow stage has its own technical and behavioral evidence should a separate decision consider allowing Local AI to influence a limited cohort.

@@ -8,6 +8,10 @@ import asyncpg
 from pydantic import BaseModel, Field
 from pydantic_settings import BaseSettings
 
+UNGROUNDED_ABSTRACT_REVIEW_THRESHOLD = 0.45
+ABSTRACT_STYLE_REVIEW_MIN_HITS = 2
+MAX_PERSONAL_GROUNDING_FOR_ABSTRACT_REVIEW = 0.45
+
 
 class Settings(BaseSettings):
     database_url: str | None = Field(default=None, alias="DATABASE_URL")
@@ -72,4 +76,3 @@ class AppConfigProvider:
         self._cached = RuntimeConfig(**values)
         self._cached_at = now
         return self._cached
-

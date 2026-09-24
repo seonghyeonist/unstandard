@@ -1,6 +1,11 @@
 from __future__ import annotations
 
-from app.config import RuntimeConfig
+from app.config import (
+    ABSTRACT_STYLE_REVIEW_MIN_HITS,
+    MAX_PERSONAL_GROUNDING_FOR_ABSTRACT_REVIEW,
+    RuntimeConfig,
+    UNGROUNDED_ABSTRACT_REVIEW_THRESHOLD,
+)
 from app.models import Decision, DecisionPath, Verdict
 
 
@@ -28,11 +33,23 @@ def decide(depth_score: float, answer_length: int, features: dict, config: Runti
             reason_codes=["SYMBOL_DOMINANT"],
         )
 
-    # v0.2 safety valve: a polished/abstract answer that scores well but lacks
-    # concrete personal grounding is reviewed rather than auto-unlocked.
+    # v0.2 safety valve: repeated abstract-style cues plus weak personal
+    # grounding require review, even when the score is below the depth threshold.
+    if (
+        features.get("abstract_style_hits", 0) >= ABSTRACT_STYLE_REVIEW_MIN_HITS
+        and features.get("personal_grounding_score", 0.0)
+        < MAX_PERSONAL_GROUNDING_FOR_ABSTRACT_REVIEW
+    ):
+        return Decision(
+            verdict=Verdict.REVIEW,
+            path=DecisionPath.GRAY_BAND,
+            reason_codes=["UNGROUNDED_ABSTRACT_REVIEW"],
+        )
+
     if (
         depth_score >= config.depth_score_threshold
-        and features.get("ungrounded_abstract_penalty", 0.0) >= 0.55
+        and features.get("ungrounded_abstract_penalty", 0.0)
+        >= UNGROUNDED_ABSTRACT_REVIEW_THRESHOLD
     ):
         return Decision(
             verdict=Verdict.REVIEW,

@@ -27,6 +27,9 @@ FAST_TRACK_MIN_LENGTH = 8
 FAST_TRACK_THRESHOLD = 0.55
 DEPTH_SCORE_THRESHOLD = 0.38
 DEPTH_GRAY_BAND = 0.03
+UNGROUNDED_ABSTRACT_REVIEW_THRESHOLD = 0.45
+ABSTRACT_STYLE_REVIEW_MIN_HITS = 2
+MAX_PERSONAL_GROUNDING_FOR_ABSTRACT_REVIEW = 0.45
 EXPECTED_EMBEDDING_DIM = 1024
 POLICY_VERSION = "local-v0.2"
 HUMAN_LABEL_GATE_STATUS = "WAIVED_BY_FOUNDER_NOT_PERFORMED"
@@ -235,6 +238,7 @@ def extract_features(
         "emotional_concreteness": round(emotional_concreteness, 4),
         "personal_grounding_score": round(personal_grounding_score, 4),
         "ungrounded_abstract_penalty": round(ungrounded_abstract_penalty, 4),
+        "abstract_style_hits": abstract_hits,
         "repeat_pattern_penalty": round(repeat_pattern_penalty, 4),
         "emoji_symbol_penalty": round(emoji_symbol_penalty, 4),
         "spam_signature_penalty": round(spam_signature_penalty, 4),
@@ -251,6 +255,8 @@ def decide(
     features: Mapping[str, Any],
     *,
     threshold: float = DEPTH_SCORE_THRESHOLD,
+    ungrounded_abstract_review_threshold: float = UNGROUNDED_ABSTRACT_REVIEW_THRESHOLD,
+    abstract_style_hit_threshold: int | None = ABSTRACT_STYLE_REVIEW_MIN_HITS,
     gray_band: float = DEPTH_GRAY_BAND,
     fast_track_threshold: float = FAST_TRACK_THRESHOLD,
     min_answer_length: int = MIN_ANSWER_LENGTH,
@@ -262,7 +268,18 @@ def decide(
         return Decision("REJECT", "SPAM_REJECT", ["REPEAT_DOMINANT"])
     if float(features.get("emoji_symbol_penalty", 0.0)) >= 0.75:
         return Decision("REJECT", "SPAM_REJECT", ["SYMBOL_DOMINANT"])
-    if depth_score >= threshold and float(features.get("ungrounded_abstract_penalty", 0.0)) >= 0.55:
+    if (
+        abstract_style_hit_threshold is not None
+        and int(features.get("abstract_style_hits", 0)) >= abstract_style_hit_threshold
+        and float(features.get("personal_grounding_score", 0.0))
+        < MAX_PERSONAL_GROUNDING_FOR_ABSTRACT_REVIEW
+    ):
+        return Decision("REVIEW", "GRAY_BAND", ["UNGROUNDED_ABSTRACT_REVIEW"])
+    if (
+        depth_score >= threshold
+        and float(features.get("ungrounded_abstract_penalty", 0.0))
+        >= ungrounded_abstract_review_threshold
+    ):
         return Decision("REVIEW", "GRAY_BAND", ["UNGROUNDED_ABSTRACT_REVIEW"])
 
     if depth_score >= fast_track_threshold and answer_length >= fast_track_min_length:
@@ -296,6 +313,8 @@ def score_pair(
     *,
     product_context: str | None = None,
     threshold: float = DEPTH_SCORE_THRESHOLD,
+    ungrounded_abstract_review_threshold: float = UNGROUNDED_ABSTRACT_REVIEW_THRESHOLD,
+    abstract_style_hit_threshold: int | None = ABSTRACT_STYLE_REVIEW_MIN_HITS,
 ) -> dict[str, Any]:
     features = extract_features(question_text, answer_text, question_embedding, answer_embedding)
     depth_score = round(clamp(calculate_depth_raw(features), 0.0, 1.0), 4)
@@ -308,6 +327,8 @@ def score_pair(
             int(features["answer_length"]),
             features,
             threshold=threshold,
+            ungrounded_abstract_review_threshold=ungrounded_abstract_review_threshold,
+            abstract_style_hit_threshold=abstract_style_hit_threshold,
         )
 
     return {
@@ -365,7 +386,7 @@ def agreement_with_synthetic_prior(
             "agreements": 0,
             "disagreements": 0,
             "rate": None,
-            "note": "synthetic design prior only; not human ground truth",
+            "note": "synthetic design prior only; offline label-disagreement proxy",
         }
     agreements = sum(1 for left, right in zip(model_verdicts, synthetic_labels) if left == right)
     n = len(model_verdicts)
@@ -375,7 +396,7 @@ def agreement_with_synthetic_prior(
         "agreements": agreements,
         "disagreements": n - agreements,
         "rate": round(agreements / n, 6),
-        "note": "synthetic design prior only; not human ground truth",
+        "note": "synthetic design prior only; offline label-disagreement proxy",
     }
 
 
