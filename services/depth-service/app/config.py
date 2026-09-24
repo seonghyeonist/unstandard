@@ -31,7 +31,7 @@ class RuntimeConfig(BaseModel):
     local_ai_enabled: bool = False
     embedding_model: str = "BAAI/bge-m3"
     embedding_dim: int = 1024
-    depth_model_version: str = "local-v0.1"
+    depth_model_version: str = "local-v0.2"
     depth_score_threshold: float = 0.38
     fast_track_threshold: float = 0.55
     min_answer_length: int = 12
