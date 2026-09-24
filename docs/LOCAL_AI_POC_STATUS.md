@@ -18,6 +18,35 @@ mock-local-heuristic-v0.0
 There is no code path, environment variable, or configuration value that can make
 the live Next.js app call a remote Depth service instead.
 
+## v0.2 offline calibration update (2026-09-24)
+
+The authorized full local BGE-M3 benchmark completed on the pinned workbook
+snapshot. Human labeling review is `WAIVED_BY_FOUNDER / NOT_PERFORMED`; the
+workbook labels are used only as a synthetic design prior, reported as
+`agreement_with_synthetic_prior` and an offline label-disagreement proxy.
+
+The initial policy failed the `AI_STYLED` REVIEW target (4/30, 13.33%). A
+scalar-only ungrounded-penalty sweep reached 8/30 (26.67%) at its best tested
+cutoff. An aggregate feature diagnostic motivated the v0.2 composite rule:
+two or more abstract-style cues plus personal grounding below `0.45` routes to
+`REVIEW`, including below the score threshold. The final candidate met the
+three stated checks: `AI_STYLED` REVIEW 30/30 (100%), `SPAM_ABUSE` REJECT 19/20
+(95%), and `ONBOARDING` bypass PASS 10/10 (100%). Its overall
+`agreement_with_synthetic_prior` was 139/260 (53.46%); non-onboarding was
+129/250 (51.60%).
+
+The pinned `BAAI/bge-m3` revision produced 1,024-dimensional vectors with zero
+NaN/Inf values and a deterministic probe max absolute difference of `0.0`.
+Final unique-pair latency was P50 `183.655 ms` / P95 `259.699 ms`. The allowed
+offline result is `V0_2_SYNTHETIC_PRIOR_CANDIDATE`; this is not a human-reviewed
+quality conclusion or Closed Alpha readiness finding. Sanitized aggregate
+reports are in `docs/evidence/` and the run details are in
+`docs/LOCAL_AI_V0_2_SHADOW_PLAN_20260924.md`.
+
+The benchmark did not alter the live scorer, Production, or any Neon branch.
+Shadow integration is tracked separately and must keep
+`mock-local-heuristic-v0.0` authoritative.
+
 ## What P0.4A found and contained
 
 | # | Finding | Where | Containment |

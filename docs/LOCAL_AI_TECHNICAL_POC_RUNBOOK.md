@@ -2,14 +2,47 @@
 
 ## Status boundary
 
-This runbook describes an **isolated technical PoC harness**. It does **not**:
+The original sections below preserve the **isolated v0.1 technical PoC** path.
+The separately authorized v0.2 offline calibration is now complete and is
+recorded below; it did not change app scoring or connect to Preview/Production.
+
+The v0.1 path does **not**:
 
 - activate app production scoring (live unlock remains `mock-local-heuristic-v0.0`);
-- authorize calibration, HUMAN_LABEL_GATE transition, or Alpha readiness;
+- authorize a user-facing scoring change or Alpha readiness;
 - install or run Qwen (`QWEN_STATUS = INACTIVE_NOT_INSTALLED`);
 - connect to Preview/Production databases or Vercel.
 
-`HUMAN_LABEL_GATE` is always recorded as `NOT_RUN_FOUNDER_DEFERRED`.
+The historical v0.1 reports retain their original human-label gate status. The
+v0.2 run records `WAIVED_BY_FOUNDER / NOT_PERFORMED`.
+
+## v0.2 offline calibration result
+
+The full benchmark was run with the approved local workbook and real
+`BAAI/bge-m3` model, pinned at revision
+`5617a9f61b028005a4858fdac845db406aefb181`. It scored all 260 normalized pairs
+from 1,000 physical rows after the pinned workbook SHA-256 matched. The model
+returned 1,024 dimensions, zero NaN/Inf values, and max absolute determinism
+difference `0.0`; final P50/P95 unique-pair latency was `183.655 / 259.699 ms`.
+
+The accepted offline candidate is `V0_2_SYNTHETIC_PRIOR_CANDIDATE` with
+`AI_STYLED` REVIEW 30/30, `SPAM_ABUSE` REJECT 19/20, and `ONBOARDING` bypass
+PASS 10/10. Its overall and non-onboarding values are
+`agreement_with_synthetic_prior` 139/260 and 129/250. These are comparisons
+against the synthetic design prior and an offline label-disagreement proxy.
+See `docs/LOCAL_AI_V0_2_SHADOW_PLAN_20260924.md` and the sanitized aggregates
+under `docs/evidence/` for the complete threshold/category distributions.
+
+Reproduce the v0.2 run using the existing isolated Python environment and full
+workbook (do not supply `--max-pairs`):
+
+```bash
+export UNSTANDARD_LABELING_WORKBOOK_PATH=/absolute/private/path/Unstandard_LabelingDataset_v0.1.xlsx
+npm run poc:local-ai:v0.2-calibrate
+```
+
+The app remains on `mock-local-heuristic-v0.0`; Qwen remains inactive. This
+offline candidate alone does not establish Closed Alpha readiness.
 
 ## Approved input snapshot
 
@@ -20,7 +53,7 @@ This runbook describes an **isolated technical PoC harness**. It does **not**:
 | Expected SHA-256 | `b63f77dc7fa10694e4af6d3fc5ee86c4fcb4b01bda0889a1e96bcba4b1a55e51` |
 | Env path | `UNSTANDARD_LABELING_WORKBOOK_PATH` (absolute, operator-local) |
 | Physical rows | 1,000 |
-| Unique Q/A pairs | ~260 (score distribution must use unique pairs) |
+| Unique Q/A pairs | 260 (score distribution must use unique pairs) |
 
 If the file is missing → harness exits `BLOCKED_INPUT_FILE_NOT_FOUND`.  
 If the hash mismatches → harness exits `BLOCKED_INPUT_HASH_MISMATCH`.
@@ -96,7 +129,7 @@ Aggregate-only:
 - determinism on a fixed synthetic probe (cold/warm latency);
 - unique-pair latency P50/P95, peak RSS, throughput;
 - category score distribution + threshold-band counts;
-- `agreement_with_synthetic_prior` only (never “human accuracy” / “ground truth”).
+- `agreement_with_synthetic_prior` only; compare solely with the synthetic design prior.
 
 ## Redacted reporting rules
 
@@ -108,7 +141,8 @@ Aggregate-only:
 - embeddings or vector dumps;
 - model weight files;
 - secrets / tokens / connection strings;
-- phrases like “accuracy”, “ground truth”, or “alpha ready” for this PoC.
+- descriptions that present workbook comparisons as human-reviewed findings;
+- a Closed Alpha readiness claim based on this PoC.
 
 Use `docs/evidence/LOCAL_AI_TECHNICAL_POC_HANDOFF_TEMPLATE.md` when filing aggregate results.
 
@@ -136,5 +170,5 @@ python3 -m unittest test_helpers.py -v
 
 - Passing this PoC ≠ Alpha readiness.
 - Passing this PoC ≠ calibration complete.
-- `agreement_with_synthetic_prior` ≠ human label accuracy.
+- `agreement_with_synthetic_prior` is an offline label-disagreement proxy only.
 - App unlock scoring remains the deterministic mock until a separate, authorized wiring decision.

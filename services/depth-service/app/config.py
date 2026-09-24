@@ -8,6 +8,10 @@ import asyncpg
 from pydantic import BaseModel, Field
 from pydantic_settings import BaseSettings
 
+UNGROUNDED_ABSTRACT_REVIEW_THRESHOLD = 0.45
+ABSTRACT_STYLE_REVIEW_MIN_HITS = 2
+MAX_PERSONAL_GROUNDING_FOR_ABSTRACT_REVIEW = 0.45
+
 
 class Settings(BaseSettings):
     database_url: str | None = Field(default=None, alias="DATABASE_URL")
@@ -31,7 +35,7 @@ class RuntimeConfig(BaseModel):
     local_ai_enabled: bool = False
     embedding_model: str = "BAAI/bge-m3"
     embedding_dim: int = 1024
-    depth_model_version: str = "local-v0.1"
+    depth_model_version: str = "local-v0.2"
     depth_score_threshold: float = 0.38
     fast_track_threshold: float = 0.55
     min_answer_length: int = 12
@@ -72,4 +76,3 @@ class AppConfigProvider:
         self._cached = RuntimeConfig(**values)
         self._cached_at = now
         return self._cached
-
