@@ -83,6 +83,17 @@ clean up only this run's synthetic rows, and record branch teardown/expiry.
 - Python v0.2 policy and calibration tests: 11 passed without a model or database.
 - Neon schema inserts, constraints, cascade, and cleanup were tested against the disposable branch above.
 
-The 2026-09-25 follow-up adds the streamed response cap, a dependency-injected scheduled-flow boundary test, shadow-only safe-default config, a separate default-off gate for legacy `/internal/depth/evaluate`, and documentation corrections. Current exact-head CI and Preview evidence will be appended after this commit completes.
+The 2026-09-25 follow-up adds the streamed response cap, a dependency-injected scheduled-flow boundary test, shadow-only safe-default config, a separate default-off gate for legacy `/internal/depth/evaluate`, and documentation corrections.
+
+### Implementation-head verification — 2026-09-25
+
+- Implementation SHA: `b552fffb9b4bbd922952efda7df1411aacc4cc73`; PR #89 remained OPEN / DRAFT / unmerged on branch `feat/local-ai-v0-2-shadow-integration-20260924`, based on #88 SHA `4a8ee19b6d2c66b1d64b2fb40b1cf0b55389508a`.
+- GitHub Actions run `36085613659` / run #31: **SUCCESS** on the exact implementation SHA. `node-gates`, `python-policy`, and `vercel-preview-parity` all passed.
+- Vercel deployment `dpl_DK1tLQSFWfUm21AyZRLRzCrautYP`: Git source, exact implementation SHA, **READY**, alias error none.
+- Immutable deployment smoke: `GET /` → 200; `GET /api/auth/get-session` → 200 with `null`; `GET /api/waitlist` → 200 with `{"joined":false}`.
+- Vercel runtime-error query since the new deployment began returned no runtime errors.
+- `LIVE_SHADOW_INVOCATION=NOT_RUN`; `PREVIEW_SHADOW_PERSISTENCE=NOT_RUN`. Ordinary route health is not shadow execution evidence.
+- The connected Vercel project inventory contains only the Unstandard app project; the available Vercel connector has no environment-variable listing or mutation operation, and the local Vercel CLI is unavailable. No Preview secret or deployment configuration was changed.
+- Neon revalidation remains blocked: the exposed Neon tools omit `project_id`, while the backend rejects calls without it. The old disposable-branch SQL validation remains historical evidence; current Preview database binding and migration 0015 application are **not re-proven** in this session.
 
 The caller defaults off, and this change does not configure a Preview model endpoint or service token. Preview verification covers the ordinary application routes and the code-level disabled path; it does not claim a live model call. Production, the default Neon branch, Qwen, and Closed Alpha readiness remain outside this change.
