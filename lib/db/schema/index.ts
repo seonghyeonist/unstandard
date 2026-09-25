@@ -8,6 +8,7 @@ export * from "@/lib/db/schema/reports";
 export * from "@/lib/db/schema/blocks";
 export * from "@/lib/db/schema/unlocks";
 export * from "@/lib/db/schema/unlock-attempts";
+export * from "@/lib/db/schema/local-ai-shadow-evaluations";
 export * from "@/lib/db/schema/invites";
 export * from "@/lib/db/schema/app-config";
 export * from "@/lib/db/schema/support";
@@ -26,6 +27,7 @@ import * as reportsSchema from "@/lib/db/schema/reports";
 import * as blocksSchema from "@/lib/db/schema/blocks";
 import * as unlocksSchema from "@/lib/db/schema/unlocks";
 import * as unlockAttemptsSchema from "@/lib/db/schema/unlock-attempts";
+import * as localAiShadowEvaluationsSchema from "@/lib/db/schema/local-ai-shadow-evaluations";
 import * as invitesSchema from "@/lib/db/schema/invites";
 import * as appConfigSchema from "@/lib/db/schema/app-config";
 import * as supportSchema from "@/lib/db/schema/support";
@@ -46,6 +48,7 @@ export const schema = {
   ...blocksSchema,
   ...unlocksSchema,
   ...unlockAttemptsSchema,
+  ...localAiShadowEvaluationsSchema,
   ...invitesSchema,
   ...appConfigSchema,
   ...supportSchema,

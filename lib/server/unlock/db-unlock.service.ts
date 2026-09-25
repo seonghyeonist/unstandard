@@ -14,6 +14,7 @@ import {
   type DepthVerdict,
 } from "@/lib/depth/evaluate-depth-answer";
 import { getConfiguredUnlockQuestion } from "@/lib/server/unlock/question-config";
+import { scheduleLocalAiShadowEvaluation } from "@/lib/server/local-ai/shadow-caller";
 import type { UnlockErrorCode } from "@/lib/unlock/unlock-codes";
 import {
   createCorrelationId,
@@ -215,7 +216,7 @@ export async function submitDbUnlockAnswer(
     const transactionResult = await db.transaction(async (tx) => {
       await lockIntroductionProfiles(tx, input.viewerUserId, profileId);
       if (!await canAccessIntroduction(input.viewerUserId, profileId, tx)) throw new Error("Introduction no longer permitted");
-      await tx.insert(unlockAttempts).values({
+      const [attempt] = await tx.insert(unlockAttempts).values({
         viewerUserId: input.viewerUserId,
         targetProfileId: target.profileId,
         questionId: question.id,
@@ -225,10 +226,11 @@ export async function submitDbUnlockAnswer(
         path: evaluation.path,
         reasonCodes: evaluation.reasonCodes,
         modelVersion: evaluation.modelVersion || DEPTH_MOCK_MODEL_VERSION,
-      });
+      }).returning({ id: unlockAttempts.id });
+      if (!attempt) throw new Error("unlock attempt persistence failed");
 
       if (evaluation.verdict !== "PASS") {
-        return { unlocked: false, idempotent: false };
+        return { unlocked: false, idempotent: false, attemptId: attempt.id };
       }
 
       const created = await createUnlock(
@@ -241,10 +243,20 @@ export async function submitDbUnlockAnswer(
       if (!created.ok) {
         throw new Error("unlock transaction persistence failed");
       }
-      return { unlocked: true, idempotent: !created.inserted };
+      return { unlocked: true, idempotent: !created.inserted, attemptId: attempt.id };
     });
     unlocked = transactionResult.unlocked;
     idempotent = transactionResult.idempotent;
+    scheduleLocalAiShadowEvaluation({
+      unlockAttemptId: transactionResult.attemptId,
+      questionText: question.prompt,
+      answerText: answer,
+      authoritative: {
+        verdict: evaluation.verdict,
+        unlocked,
+        idempotent,
+      },
+    });
   } catch (error) {
     logDatabaseFailure({
       correlationId,

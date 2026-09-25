@@ -30,6 +30,7 @@ export const REQUIRED_APPLICATION_TABLES = [
   "blocks",
   "unlocks",
   "unlock_attempts",
+  "local_ai_shadow_evaluations",
   "alpha_invites",
   "app_config",
   "rate_limits",

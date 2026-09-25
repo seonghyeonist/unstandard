@@ -19,13 +19,21 @@ class Settings(BaseSettings):
     qwen_review_url: str | None = Field(default=None, alias="QWEN_REVIEW_URL")
     app_config_cache_ttl_seconds: float = Field(default=5.0, alias="APP_CONFIG_CACHE_TTL_SECONDS")
 
-    # Server-only containment gate for the still-dormant PoC. Both of these
-    # must be explicitly set (env, never app_config/DB) before
-    # /internal/depth/evaluate will do anything beyond reject the request.
-    # Absence of either — the default — must never activate scoring.
+    # Server-only opt-in + token are required for authenticated scoring routes.
+    # Both are env-only and default off/absent.
     local_ai_poc_enabled: bool = Field(default=False, alias="UNSTANDARD_LOCAL_AI_POC_ENABLED")
     local_ai_service_token: str | None = Field(
         default=None, alias="UNSTANDARD_DEPTH_SERVICE_TOKEN"
+    )
+    # Optional shadow-only config path: uses RuntimeConfig's safe defaults for
+    # /shadow-evaluate without reading or changing shared app_config.
+    local_ai_shadow_config_enabled: bool = Field(
+        default=False, alias="UNSTANDARD_LOCAL_AI_SHADOW_CONFIG_ENABLED"
+    )
+    # The legacy scorer and persistence route stays inaccessible by default,
+    # even when service-to-service auth is enabled for shadow scoring.
+    local_ai_legacy_evaluate_enabled: bool = Field(
+        default=False, alias="UNSTANDARD_LOCAL_AI_LEGACY_EVALUATE_ENABLED"
     )
 
 

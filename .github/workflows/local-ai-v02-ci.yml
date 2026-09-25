@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - feat/local-ai-v0-2-shadow-calibration-20260924
+      - feat/local-ai-v0-2-shadow-integration-20260924
   pull_request:
     branches:
       - feat/alpha-profile-identity-20260828
@@ -70,7 +71,7 @@ jobs:
       - name: Install depth-service test dependencies
         run: python -m pip install -r services/depth-service/requirements.txt
 
-      - name: Test dormant depth service
+      - name: Test depth-service containment and shadow policy
         working-directory: services/depth-service
         run: python -m pytest -q
 

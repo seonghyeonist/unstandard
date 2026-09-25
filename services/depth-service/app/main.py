@@ -7,12 +7,12 @@ from contextlib import asynccontextmanager
 
 from fastapi import BackgroundTasks, FastAPI, Header, HTTPException
 
-from app.config import AppConfigProvider, Settings
+from app.config import AppConfigProvider, RuntimeConfig, Settings
 from app.db import create_pool, persist_evaluation
 from app.decision import decide
 from app.embedding_client import EmbeddingClient
 from app.features import calculate_depth_raw, clamp, extract_features
-from app.models import DepthEvaluateRequest, DepthEvaluateResponse
+from app.models import DepthEvaluateRequest, DepthEvaluateResponse, DepthShadowEvaluateRequest
 from app.qwen import maybe_request_qwen_review
 
 
@@ -23,6 +23,7 @@ logger = logging.getLogger("unstandard.depth_service")
 # server-side only (see logger.* calls below), never returned to callers.
 GENERIC_UNAVAILABLE_DETAIL = "Local AI depth scoring is temporarily unavailable"
 GENERIC_UNAUTHORIZED_DETAIL = "Unauthorized"
+GENERIC_NOT_FOUND_DETAIL = "Not Found"
 
 settings = Settings()
 
@@ -70,6 +71,11 @@ async def evaluate_depth(
     background_tasks: BackgroundTasks,
     x_unstandard_depth_service_token: str | None = Header(default=None),
 ) -> DepthEvaluateResponse:
+    # Keep the legacy scorer/persistence endpoint off for shadow deployments.
+    # Its separate opt-in defaults false and is not shared with shadow config.
+    if not settings.local_ai_legacy_evaluate_enabled:
+        raise HTTPException(status_code=404, detail=GENERIC_NOT_FOUND_DETAIL)
+
     # Authentication is checked before any config/DB/embedding work — an
     # unauthenticated or missing-token caller triggers zero side effects.
     if not is_service_request_authorized(x_unstandard_depth_service_token):
@@ -150,3 +156,60 @@ async def evaluate_depth(
 
     return response
 
+
+@app.post("/internal/depth/shadow-evaluate", response_model=DepthEvaluateResponse)
+async def evaluate_depth_shadow(
+    request: DepthShadowEvaluateRequest,
+    x_unstandard_depth_service_token: str | None = Header(default=None),
+) -> DepthEvaluateResponse:
+    """Authenticated shadow-only scorer with no DB writes, embeddings storage, or Qwen call."""
+    if not is_service_request_authorized(x_unstandard_depth_service_token):
+        raise HTTPException(status_code=401, detail=GENERIC_UNAUTHORIZED_DETAIL)
+
+    started = time.perf_counter()
+    # This opt-in affects only the shadow scorer and uses safe RuntimeConfig
+    # defaults. It does not enable the legacy /evaluate route or shared app_config.
+    if settings.local_ai_shadow_config_enabled:
+        config = RuntimeConfig(local_ai_enabled=True)
+    else:
+        config = await app.state.config_provider.get()
+    if not config.local_ai_enabled:
+        raise HTTPException(status_code=503, detail=GENERIC_UNAVAILABLE_DETAIL)
+
+    try:
+        question_embedding, answer_embedding = await app.state.embedding_client.embed(
+            [request.question_text, request.answer_text]
+        )
+    except Exception:
+        logger.error("shadow embedding service call failed")
+        raise HTTPException(status_code=503, detail=GENERIC_UNAVAILABLE_DETAIL) from None
+
+    if (
+        len(question_embedding) != config.embedding_dim
+        or len(answer_embedding) != config.embedding_dim
+    ):
+        logger.error("shadow embedding dimension mismatch: expected=%s", config.embedding_dim)
+        raise HTTPException(status_code=502, detail=GENERIC_UNAVAILABLE_DETAIL)
+
+    feature_result = extract_features(
+        request.question_text,
+        request.answer_text,
+        question_embedding,
+        answer_embedding,
+    )
+    features = feature_result.features
+    depth_raw = calculate_depth_raw(features)
+    depth_score = round(clamp(depth_raw, 0.0, 1.0), 4)
+    features["depth_raw"] = round(depth_raw, 4)
+
+    decision = decide(depth_score, features["answer_length"], features, config)
+    reason_codes = sorted(set(feature_result.reason_codes + decision.reason_codes))
+    return DepthEvaluateResponse(
+        depth_score=depth_score,
+        verdict=decision.verdict,
+        path=decision.path,
+        reason_codes=reason_codes,
+        features=features,
+        model_version=config.full_model_version,
+        latency_ms=int((time.perf_counter() - started) * 1000),
+    )

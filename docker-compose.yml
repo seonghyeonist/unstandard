@@ -17,15 +17,24 @@ services:
       timeout: 3s
       retries: 20
 
-  # tei and depth-service are dormant Local AI PoC scaffolding, not the live
-  # scorer (the app always uses the deterministic mock-local-heuristic-v0.0).
-  # They only start with `docker compose --profile local-ai-poc up`; a plain
-  # `docker compose up` never starts them. See docs/LOCAL_AI_POC_STATUS.md.
+  # TEI and depth-service are isolated PoC services, not the authoritative
+  # unlock scorer. The app's optional shadow observer is a separate,
+  # server-only, default-off caller. These services start only with
+  # `docker compose --profile local-ai-poc up`; plain `docker compose up`
+  # never starts them. See docs/LOCAL_AI_POC_STATUS.md.
   tei:
     image: ghcr.io/huggingface/text-embeddings-inference:latest
     container_name: unstandard-tei-bge-m3
     profiles: ["local-ai-poc"]
-    command: ["--model-id", "BAAI/bge-m3", "--port", "8080"]
+    command:
+      [
+        "--model-id",
+        "BAAI/bge-m3",
+        "--revision",
+        "5617a9f61b028005a4858fdac845db406aefb181",
+        "--port",
+        "8080",
+      ]
     ports:
       - "8080:8080"
     volumes:
@@ -45,10 +54,13 @@ services:
       # QWEN_REVIEW_URL and app_config qwen_review_enabled are explicitly set.
       QWEN_REVIEW_URL: ${QWEN_REVIEW_URL:-}
       APP_CONFIG_CACHE_TTL_SECONDS: ${APP_CONFIG_CACHE_TTL_SECONDS:-5}
-      # Server-only opt-in + service auth. Absence keeps /internal/depth/evaluate
-      # fail-closed even if this container were started.
-      UNSTANDARD_LOCAL_AI_POC_ENABLED: ${UNSTANDARD_LOCAL_AI_POC_ENABLED:-}
+      # Service-only auth remains fail-closed unless explicitly enabled.
+      UNSTANDARD_LOCAL_AI_POC_ENABLED: ${UNSTANDARD_LOCAL_AI_POC_ENABLED:-false}
       UNSTANDARD_DEPTH_SERVICE_TOKEN: ${UNSTANDARD_DEPTH_SERVICE_TOKEN:-}
+      # This path enables safe RuntimeConfig defaults for /shadow-evaluate only.
+      UNSTANDARD_LOCAL_AI_SHADOW_CONFIG_ENABLED: ${UNSTANDARD_LOCAL_AI_SHADOW_CONFIG_ENABLED:-false}
+      # Keep legacy /internal/depth/evaluate plus legacy persistence disabled.
+      UNSTANDARD_LOCAL_AI_LEGACY_EVALUATE_ENABLED: ${UNSTANDARD_LOCAL_AI_LEGACY_EVALUATE_ENABLED:-false}
     ports:
       - "8000:8000"
     depends_on:

@@ -1,9 +1,7 @@
-"""P0.4A containment proofs.
+"""Fail-closed containment proofs for the Local AI shadow and legacy routes.
 
-These tests prove the dormant Local AI PoC cannot activate by accident.
-No real network, model, Docker, or database is used: embedding/HTTP calls
-are monkeypatched to raise if they are ever reached, so any regression that
-would allow an outbound call fails the test rather than silently passing.
+No real network, model, Docker, or database is used. External embedding calls
+and legacy persistence are stubbed, so accidental activation fails the tests.
 """
 
 from __future__ import annotations
@@ -38,6 +36,8 @@ def _evaluate_payload() -> dict[str, str]:
 def test_settings_default_to_local_ai_disabled(monkeypatch: pytest.MonkeyPatch) -> None:
     for key in (
         "UNSTANDARD_LOCAL_AI_POC_ENABLED",
+        "UNSTANDARD_LOCAL_AI_SHADOW_CONFIG_ENABLED",
+        "UNSTANDARD_LOCAL_AI_LEGACY_EVALUATE_ENABLED",
         "UNSTANDARD_DEPTH_SERVICE_TOKEN",
         "QWEN_REVIEW_URL",
         "DATABASE_URL",
@@ -46,6 +46,8 @@ def test_settings_default_to_local_ai_disabled(monkeypatch: pytest.MonkeyPatch) 
 
     settings = Settings()
     assert settings.local_ai_poc_enabled is False
+    assert settings.local_ai_shadow_config_enabled is False
+    assert settings.local_ai_legacy_evaluate_enabled is False
     assert settings.local_ai_service_token is None
     assert settings.qwen_review_url is None
 
@@ -80,7 +82,8 @@ def test_authorization_requires_every_gate(monkeypatch: pytest.MonkeyPatch) -> N
 def test_evaluate_endpoint_rejects_missing_auth_without_touching_embeddings(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    monkeypatch.setattr(main_module.settings, "local_ai_poc_enabled", False)
+    monkeypatch.setattr(main_module.settings, "local_ai_poc_enabled", True)
+    monkeypatch.setattr(main_module.settings, "local_ai_legacy_evaluate_enabled", True)
     monkeypatch.setattr(main_module.settings, "local_ai_service_token", None)
 
     async def _forbidden_embed(self, inputs):  # noqa: ANN001
@@ -99,6 +102,7 @@ def test_evaluate_endpoint_rejects_wrong_token_even_when_poc_enabled(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     monkeypatch.setattr(main_module.settings, "local_ai_poc_enabled", True)
+    monkeypatch.setattr(main_module.settings, "local_ai_legacy_evaluate_enabled", True)
     monkeypatch.setattr(main_module.settings, "local_ai_service_token", "correct-token")
 
     async def _forbidden_embed(self, inputs):  # noqa: ANN001
@@ -123,6 +127,7 @@ def test_evaluate_endpoint_rejects_when_app_config_disabled_despite_valid_token(
     """A valid token + server-only opt-in is not enough on its own —
     app_config local_ai_enabled must also be true (default False)."""
     monkeypatch.setattr(main_module.settings, "local_ai_poc_enabled", True)
+    monkeypatch.setattr(main_module.settings, "local_ai_legacy_evaluate_enabled", True)
     monkeypatch.setattr(main_module.settings, "local_ai_service_token", "correct-token")
 
     async def _forbidden_embed(self, inputs):  # noqa: ANN001
@@ -145,6 +150,7 @@ def test_evaluate_endpoint_redacts_embedding_exception_detail(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     monkeypatch.setattr(main_module.settings, "local_ai_poc_enabled", True)
+    monkeypatch.setattr(main_module.settings, "local_ai_legacy_evaluate_enabled", True)
     monkeypatch.setattr(main_module.settings, "local_ai_service_token", "correct-token")
 
     async def _fake_get(self):  # noqa: ANN001
@@ -169,6 +175,146 @@ def test_evaluate_endpoint_redacts_embedding_exception_detail(
     assert response.status_code == 503
     assert secret_marker not in response.text
     assert response.json()["detail"] == GENERIC_UNAVAILABLE_DETAIL
+
+
+def test_shadow_endpoint_scores_without_persisting_text_or_calling_qwen(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(main_module.settings, "local_ai_poc_enabled", True)
+    monkeypatch.setattr(main_module.settings, "local_ai_shadow_config_enabled", True)
+    monkeypatch.setattr(main_module.settings, "local_ai_service_token", "correct-token")
+
+    async def _no_pool(_settings):  # noqa: ANN001
+        return None
+
+    async def _forbidden_config(_self):  # noqa: ANN001
+        raise AssertionError("shadow-only defaults must not read shared app_config")
+
+    async def _embeddings(_self, inputs):  # noqa: ANN001
+        assert len(inputs) == 2
+        return [[0.0] * 1024, [0.0] * 1024]
+
+    persistence_calls = 0
+    qwen_calls = 0
+
+    async def _forbidden_persist(*_args, **_kwargs):  # noqa: ANN002, ANN003
+        nonlocal persistence_calls
+        persistence_calls += 1
+        raise AssertionError("shadow scoring must not use legacy persistence")
+
+    async def _forbidden_qwen(*_args, **_kwargs):  # noqa: ANN002, ANN003
+        nonlocal qwen_calls
+        qwen_calls += 1
+        raise AssertionError("shadow scoring must not schedule Qwen")
+
+    monkeypatch.setattr(main_module, "create_pool", _no_pool)
+    monkeypatch.setattr(main_module.AppConfigProvider, "get", _forbidden_config)
+    monkeypatch.setattr("app.embedding_client.EmbeddingClient.embed", _embeddings)
+    monkeypatch.setattr(main_module, "persist_evaluation", _forbidden_persist)
+    monkeypatch.setattr(main_module, "maybe_request_qwen_review", _forbidden_qwen)
+
+    payload = {
+        "question_text": "Synthetic shadow question",
+        "answer_text": "Synthetic shadow answer used only by the isolated test.",
+    }
+    with TestClient(app) as client:
+        response = client.post(
+            "/internal/depth/shadow-evaluate",
+            headers={"x-unstandard-depth-service-token": "correct-token"},
+            json=payload,
+        )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["model_version"] == "local-v0.2+bge-m3"
+    assert body["verdict"] in {"PASS", "REVIEW", "REJECT"}
+    assert "question_text" not in body
+    assert "answer_text" not in body
+    assert "embedding" not in body
+    assert "embedding" not in body["features"]
+    assert persistence_calls == 0
+    assert qwen_calls == 0
+
+
+def test_shadow_endpoint_rejects_missing_service_auth_before_embeddings(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(main_module.settings, "local_ai_poc_enabled", False)
+    monkeypatch.setattr(main_module.settings, "local_ai_service_token", None)
+
+    async def _no_pool(_settings):  # noqa: ANN001
+        return None
+
+    async def _forbidden_embed(self, _inputs):  # noqa: ANN001
+        raise AssertionError("shadow embeddings must not run before service auth")
+
+    monkeypatch.setattr(main_module, "create_pool", _no_pool)
+    monkeypatch.setattr("app.embedding_client.EmbeddingClient.embed", _forbidden_embed)
+
+    with TestClient(app) as client:
+        response = client.post(
+            "/internal/depth/shadow-evaluate",
+            json={
+                "question_text": "Synthetic shadow question",
+                "answer_text": "Synthetic shadow answer",
+            },
+        )
+
+    assert response.status_code == 401
+    assert response.json()["detail"] == GENERIC_UNAUTHORIZED_DETAIL
+
+
+def test_shadow_embedding_failure_logs_no_exception_or_request_text(
+    monkeypatch: pytest.MonkeyPatch,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    monkeypatch.setattr(main_module.settings, "local_ai_poc_enabled", True)
+    monkeypatch.setattr(main_module.settings, "local_ai_service_token", "correct-token")
+
+    async def _enabled(_self):  # noqa: ANN001
+        return RuntimeConfig(local_ai_enabled=True)
+
+    request_marker = "synthetic-private-answer-marker"
+
+    async def _boom(self, _inputs):  # noqa: ANN001
+        raise RuntimeError(request_marker)
+
+    monkeypatch.setattr(main_module.AppConfigProvider, "get", _enabled)
+    monkeypatch.setattr("app.embedding_client.EmbeddingClient.embed", _boom)
+
+    with caplog.at_level("ERROR", logger="app.main"), TestClient(app) as client:
+        response = client.post(
+            "/internal/depth/shadow-evaluate",
+            headers={"x-unstandard-depth-service-token": "correct-token"},
+            json={
+                "question_text": "Synthetic shadow question",
+                "answer_text": request_marker,
+            },
+        )
+
+    assert response.status_code == 503
+    assert request_marker not in caplog.text
+    assert "shadow embedding service call failed" in caplog.text
+
+
+def test_shadow_endpoint_contract_rejects_identity_fields(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    async def _no_pool(_settings):  # noqa: ANN001
+        return None
+
+    monkeypatch.setattr(main_module, "create_pool", _no_pool)
+    with TestClient(app) as client:
+        response = client.post(
+            "/internal/depth/shadow-evaluate",
+            json={
+                "question_text": "Synthetic shadow question",
+                "answer_text": "Synthetic shadow answer",
+                "user_id": "legacy-uuid-assumption",
+            },
+        )
+
+    assert response.status_code == 422
 
 
 @pytest.mark.asyncio
@@ -200,3 +346,65 @@ async def test_qwen_review_makes_no_outbound_request_when_disabled_by_default() 
         )
     finally:
         httpx.AsyncClient = original_async_client  # type: ignore[misc]
+
+
+def test_legacy_evaluate_route_stays_hidden_when_shadow_auth_is_enabled(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(main_module.settings, "local_ai_poc_enabled", True)
+    monkeypatch.setattr(main_module.settings, "local_ai_shadow_config_enabled", True)
+    monkeypatch.setattr(main_module.settings, "local_ai_legacy_evaluate_enabled", False)
+    monkeypatch.setattr(main_module.settings, "local_ai_service_token", "correct-token")
+
+    async def _no_pool(_settings):  # noqa: ANN001
+        return None
+
+    async def _forbidden_embed(self, _inputs):  # noqa: ANN001
+        raise AssertionError("legacy embeddings must stay unreachable")
+
+    async def _forbidden_persist(*_args, **_kwargs):  # noqa: ANN002, ANN003
+        raise AssertionError("legacy persistence must stay unreachable")
+
+    monkeypatch.setattr(main_module, "create_pool", _no_pool)
+    monkeypatch.setattr("app.embedding_client.EmbeddingClient.embed", _forbidden_embed)
+    monkeypatch.setattr(main_module, "persist_evaluation", _forbidden_persist)
+
+    with TestClient(app) as client:
+        response = client.post(
+            "/internal/depth/evaluate",
+            headers={"x-unstandard-depth-service-token": "correct-token"},
+            json=_evaluate_payload(),
+        )
+
+    assert response.status_code == 404
+    assert response.json()["detail"] == "Not Found"
+
+
+def test_shadow_only_config_fails_closed_without_its_explicit_flag(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(main_module.settings, "local_ai_poc_enabled", True)
+    monkeypatch.setattr(main_module.settings, "local_ai_shadow_config_enabled", False)
+    monkeypatch.setattr(main_module.settings, "local_ai_service_token", "correct-token")
+
+    async def _no_pool(_settings):  # noqa: ANN001
+        return None
+
+    async def _forbidden_embed(self, _inputs):  # noqa: ANN001
+        raise AssertionError("embedding must not run while shadow config is disabled")
+
+    monkeypatch.setattr(main_module, "create_pool", _no_pool)
+    monkeypatch.setattr("app.embedding_client.EmbeddingClient.embed", _forbidden_embed)
+
+    with TestClient(app) as client:
+        response = client.post(
+            "/internal/depth/shadow-evaluate",
+            headers={"x-unstandard-depth-service-token": "correct-token"},
+            json={
+                "question_text": "Synthetic shadow question",
+                "answer_text": "Synthetic shadow answer",
+            },
+        )
+
+    assert response.status_code == 503
+    assert response.json()["detail"] == GENERIC_UNAVAILABLE_DETAIL
