@@ -7,7 +7,7 @@ from contextlib import asynccontextmanager
 
 from fastapi import BackgroundTasks, FastAPI, Header, HTTPException
 
-from app.config import AppConfigProvider, Settings
+from app.config import AppConfigProvider, RuntimeConfig, Settings
 from app.db import create_pool, persist_evaluation
 from app.decision import decide
 from app.embedding_client import EmbeddingClient
@@ -23,6 +23,7 @@ logger = logging.getLogger("unstandard.depth_service")
 # server-side only (see logger.* calls below), never returned to callers.
 GENERIC_UNAVAILABLE_DETAIL = "Local AI depth scoring is temporarily unavailable"
 GENERIC_UNAUTHORIZED_DETAIL = "Unauthorized"
+GENERIC_NOT_FOUND_DETAIL = "Not Found"
 
 settings = Settings()
 
@@ -70,6 +71,11 @@ async def evaluate_depth(
     background_tasks: BackgroundTasks,
     x_unstandard_depth_service_token: str | None = Header(default=None),
 ) -> DepthEvaluateResponse:
+    # Keep the legacy scorer/persistence endpoint off for shadow deployments.
+    # Its separate opt-in defaults false and is not shared with shadow config.
+    if not settings.local_ai_legacy_evaluate_enabled:
+        raise HTTPException(status_code=404, detail=GENERIC_NOT_FOUND_DETAIL)
+
     # Authentication is checked before any config/DB/embedding work — an
     # unauthenticated or missing-token caller triggers zero side effects.
     if not is_service_request_authorized(x_unstandard_depth_service_token):
@@ -161,7 +167,12 @@ async def evaluate_depth_shadow(
         raise HTTPException(status_code=401, detail=GENERIC_UNAUTHORIZED_DETAIL)
 
     started = time.perf_counter()
-    config = await app.state.config_provider.get()
+    # This opt-in affects only the shadow scorer and uses safe RuntimeConfig
+    # defaults. It does not enable the legacy /evaluate route or shared app_config.
+    if settings.local_ai_shadow_config_enabled:
+        config = RuntimeConfig(local_ai_enabled=True)
+    else:
+        config = await app.state.config_provider.get()
     if not config.local_ai_enabled:
         raise HTTPException(status_code=503, detail=GENERIC_UNAVAILABLE_DETAIL)
 

@@ -1,22 +1,28 @@
 # Local AI Depth Score PoC — Status
 
-## Current status: `INACTIVE / NOT DEPLOYABLE`
+## Current status (2026-09-25): `SHADOW_IMPLEMENTED / DEFAULT_OFF; LIVE_SHADOW_INVOCATION=NOT_RUN`
 
-`services/depth-service` (and `docker-compose.yml`'s `tei`/`postgres` sidecars) are
-**dormant scaffolding**, not an implemented or deployable feature. Nothing in this
-repository wires them into the live app, Preview, or Production. This document
-records what was audited and contained in P0.4A so nobody mistakes the scaffold
-for a shipped PoC.
-
-The live app's answer-unlock scoring is, and remains, exactly:
+PR #89 adds a server-only, best-effort observer from the canonical database
+unlock flow to `/internal/depth/shadow-evaluate`. The observer remains
+default-off and does not change the authoritative unlock scorer or result.
+Current authoritative scoring remains:
 
 ```text
 mock-local-heuristic-v0.0
 ```
 
-— a deterministic, explainable, non-AI heuristic (`lib/depth/evaluate-depth-answer.ts`).
-There is no code path, environment variable, or configuration value that can make
-the live Next.js app call a remote Depth service instead.
+No deployed BGE-M3/TEI scoring endpoint, matching service credential, or
+Preview shadow-persistence proof is established by this status update:
+`LIVE_SHADOW_INVOCATION=NOT_RUN` and
+`PREVIEW_SHADOW_PERSISTENCE=NOT_RUN`. The exact integration record is
+[`docs/LOCAL_AI_V0_2_SHADOW_INTEGRATION_20260924.md`](LOCAL_AI_V0_2_SHADOW_INTEGRATION_20260924.md)
+and the implementation remains in Draft PR #89.
+
+The P0.4A containment findings below are historical. They describe the then
+current system and the legacy `/internal/depth/evaluate` persistence path;
+they are not a current inventory of PR #89's shadow caller or its canonical
+`local_ai_shadow_evaluations` table. In PR #89, the legacy route is separately
+default-disabled and shadow scoring does not call legacy persistence or Qwen.
 
 ## v0.2 offline calibration update (2026-09-24)
 
@@ -44,10 +50,10 @@ reports are in `docs/evidence/` and the run details are in
 `docs/LOCAL_AI_V0_2_SHADOW_PLAN_20260924.md`.
 
 The benchmark did not alter the live scorer, Production, or any Neon branch.
-Shadow integration is tracked separately and must keep
-`mock-local-heuristic-v0.0` authoritative.
+The shadow observer is tracked in `docs/LOCAL_AI_V0_2_SHADOW_INTEGRATION_20260924.md`
+and Draft PR #89; it must keep `mock-local-heuristic-v0.0` authoritative.
 
-## What P0.4A found and contained
+## Historical P0.4A findings and containment
 
 | # | Finding | Where | Containment |
 |---|---|---|---|
@@ -88,7 +94,13 @@ and would fail against a canonical Neon database today — this is expected, sin
 the service was never wired to canonical persistence, and is not treated as a bug
 to silently patch (no FK weakening, no invented columns).
 
-## What a later dedicated PoC branch must implement (out of scope here)
+## Historical P0.4A recommendations (superseded for the PR #89 shadow slice)
+
+PR #89 has since added a separate canonical Drizzle migration for sanitized
+shadow outputs and an app-side repository. The remaining recommendations below
+are still historical for the legacy evaluator or future permanent vector
+infrastructure; they are not missing prerequisites for the current shadow
+observer.
 
 1. **Canonical migration design** — a real Drizzle migration (reviewed on its
    own branch) that either extends `depth_evaluations` with the columns the

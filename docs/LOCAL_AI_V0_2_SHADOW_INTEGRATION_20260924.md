@@ -1,6 +1,6 @@
 # Local AI v0.2 shadow integration
 
-Date: 2026-09-24
+Last updated: 2026-09-25 (baseline integration evidence: 2026-09-24)
 
 ## Provenance and release boundary
 
@@ -32,7 +32,7 @@ Live branch validation confirmed:
 
 - all 17 expected columns, primary key, cascading foreign key, indexes, and checks are present;
 - an isolated synthetic row inserts successfully;
-- duplicate `(unlock_attempt_id, model_version)` insertion is ignored by the unique constraint;
+- duplicate `(unlock_attempt_id, model_version)` insertion is rejected by the unique constraint; the application repository uses plain INSERT and does not make replay idempotent;
 - an out-of-range score and a missing attempt foreign key are rejected;
 - deleting the synthetic canonical attempt cascades its shadow row;
 - cleanup readback returned zero shadow rows, attempts, synthetic users, and synthetic questions.
@@ -41,26 +41,48 @@ The default Neon branch was inspected to confirm its identity and was not writte
 
 ## Server-only caller and scorer boundary
 
-The caller is imported only from the server-side database unlock service. It schedules a best-effort callback with Next.js `after()`, after the authoritative transaction commits. It requires all of:
+The caller is imported only from the server-side database unlock service. It schedules a best-effort callback with Next.js `after()`, after the authoritative transaction commits. Its Preview-side config requires all of:
 
 - `UNSTANDARD_LOCAL_AI_SHADOW_ENABLED=true`;
 - an HTTPS `UNSTANDARD_LOCAL_AI_SHADOW_URL` ending at `/internal/depth/shadow-evaluate`;
 - `UNSTANDARD_LOCAL_AI_SHADOW_TOKEN` from server secret storage.
 
-Without all three, it schedules no request. Requests use the service-only `X-Unstandard-Depth-Service-Token` header, a 1.5-second timeout, no retry, no redirects, and a bounded response size. Logs contain only stable failure codes.
+Without all three, it schedules no request. Requests use the service-only `X-Unstandard-Depth-Service-Token` header, a 1.5-second caller timeout, no retry, no redirects, and a streaming 32 KiB response-byte cap. The TEI client retains its separate 1.0-second timeout. `Content-Length` is an early rejection hint; the stream byte count enforces the cap when that header is missing or false. Warm and cold model latency must be recorded separately. Logs contain only stable failure codes.
 
 The dedicated Python route rejects caller identity fields and performs no database persistence, embedding persistence, or Qwen request. It returns only a scoring result and feature data. The Next.js caller validates the version and response shape, then writes only the allowlisted derived fields to the canonical shadow table. No client configuration or user-facing Local AI result is added.
 
-The service result version is `local-v0.2+bge-m3`. The shadow schema does not store embeddings or any text. The Local AI result and any service failure are ignored for unlock behavior.
+The service result version is `local-v0.2+bge-m3`. The expected embedding model is `BAAI/bge-m3`, pinned to revision `5617a9f61b028005a4858fdac845db406aefb181`, with 1,024-dimensional output. The isolated local Compose profile pins this model revision; this does not attest a deployed endpoint until its actual runtime configuration is captured. The shadow schema does not store embeddings or any text. The Local AI result and any service failure are ignored for unlock behavior.
+
+## Shadow-only runtime config and legacy-route boundary
+
+The depth service still requires `UNSTANDARD_LOCAL_AI_POC_ENABLED=true` and a
+matching `UNSTANDARD_DEPTH_SERVICE_TOKEN` for authenticated scoring. When
+`UNSTANDARD_LOCAL_AI_SHADOW_CONFIG_ENABLED=true`, only
+`/internal/depth/shadow-evaluate` uses the safe defaults in
+`RuntimeConfig`; it does not query or modify shared `app_config`. This
+flag defaults to false and does not change the global
+`AppConfigProvider` fail-closed behavior.
+
+The legacy `/internal/depth/evaluate` route additionally requires
+`UNSTANDARD_LOCAL_AI_LEGACY_EVALUATE_ENABLED=true`, which must remain unset or
+false for this shadow deployment. The route returns 404 without that separate
+opt-in, even if the shadow auth token is valid. The shadow route does not call
+legacy persistence or Qwen.
+
+The intended bounded proof uses only synthetic Preview input and an isolated
+disposable Neon branch with migration 0015. After proof, disable
+`UNSTANDARD_LOCAL_AI_SHADOW_ENABLED`, remove the Preview-only token and URL,
+clean up only this run's synthetic rows, and record branch teardown/expiry.
 
 ## Verification
 
-- Local `npm run check`: lint, typecheck, all 373 Node tests, and production build passed.
-- Local shadow invariant test: authoritative PASS/REVIEW/REJECT results stay identical when shadow returns PASS/REVIEW/REJECT or fails by timeout, HTTP 500, malformed response, or network error.
-- Python depth-service tests: 26 passed, including missing service auth before embeddings, no exception/request-text log on shadow failure, identity-field rejection, and no legacy persistence or Qwen call.
+- 2026-09-24 baseline `npm run check`: lint, typecheck, 373 Node tests, and production build passed before the 2026-09-25 follow-up changes.
+- Node tests exercise the scheduled-flow boundary: scheduler registration, outbound fetch request, bounded streaming response parsing, and the persistence adapter with synthetic values. Fault cases cover a wrong-token service response, timeout, HTTP 500, malformed/oversized output, and repository failure. These tests use stubs; they do not establish a live app-to-Neon E2E proof.
+- The separate invariant test keeps authoritative PASS/REVIEW/REJECT values unchanged across successful or failed shadow operations.
+- 2026-09-24 baseline Python depth-service tests: 26 passed, including missing service auth before embeddings, no exception/request-text log on shadow failure, identity-field rejection, and no legacy persistence or Qwen call.
 - Python v0.2 policy and calibration tests: 11 passed without a model or database.
 - Neon schema inserts, constraints, cascade, and cleanup were tested against the disposable branch above.
 
-Exact-head GitHub CI and Preview deployment evidence are recorded in the stacked integration PR description after publication.
+The 2026-09-25 follow-up adds the streamed response cap, a dependency-injected scheduled-flow boundary test, shadow-only safe-default config, a separate default-off gate for legacy `/internal/depth/evaluate`, and documentation corrections. Current exact-head CI and Preview evidence will be appended after this commit completes.
 
 The caller defaults off, and this change does not configure a Preview model endpoint or service token. Preview verification covers the ordinary application routes and the code-level disabled path; it does not claim a live model call. Production, the default Neon branch, Qwen, and Closed Alpha readiness remain outside this change.
