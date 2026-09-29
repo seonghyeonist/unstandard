@@ -626,6 +626,67 @@ async function testProfileOnboardingAndPrivacy(fixture: Fixture, jar: CookieJar)
   expectStatus(direct, 404, "UNVERIFIED_PROFILE_WAS_DIRECTLY_EXPOSED");
   writeCase("profile_setup_first_answer_and_unverified_visibility_denied");
 
+  const targetUserId = randomUUID();
+  const targetProfileId = randomUUID();
+  const targetEmail = `${activePrefix}block-target-${randomUUID()}@example.test`;
+  await query(
+    `INSERT INTO users (id, name, email, email_verified, invite_finalized_at)
+     VALUES ($1, $2, $3, true, now())`,
+    [targetUserId, "Synthetic Block Target", targetEmail],
+  );
+  await query(
+    `INSERT INTO profiles (id, user_id, nickname, onboarded_at)
+     VALUES ($1, $2, $3, now())`,
+    [targetProfileId, targetUserId, "Synthetic Block Target"],
+  );
+
+  const unauthenticatedBlock = await api(server!, new Map(), "/api/blocks", {
+    body: { profileId: targetProfileId },
+  });
+  expectStatus(unauthenticatedBlock, 401, "BLOCK_ACTION_ALLOWED_WITHOUT_SESSION");
+  const invalidBlock = await api(server!, jar, "/api/blocks", {
+    body: { profileId: "invalid-profile-id" },
+  });
+  expectStatus(invalidBlock, 400, "BLOCK_ACTION_ACCEPTED_INVALID_PROFILE_ID");
+
+  const blocked = await api(server!, jar, "/api/blocks", {
+    body: { profileId: targetProfileId },
+  });
+  expectStatus(blocked, 201, "BLOCK_ACTION_FAILED");
+  assert.equal(blocked.body.blocked, true, "BLOCK_ACTION_RESPONSE_MISSING_BLOCK_STATE");
+  assert.equal(blocked.body.inserted, true, "BLOCK_ACTION_DID_NOT_INSERT_BLOCK");
+  assert.match(blocked.headers.get("cache-control") ?? "", /private.*no-store/iu, "BLOCK_RESPONSE_NOT_PRIVATE_NO_STORE");
+
+  const repeatedBlock = await api(server!, jar, "/api/blocks", {
+    body: { profileId: targetProfileId },
+  });
+  expectStatus(repeatedBlock, 200, "REPEATED_BLOCK_NOT_IDEMPOTENT");
+  assert.equal(repeatedBlock.body.blocked, true);
+  assert.equal(repeatedBlock.body.inserted, false);
+
+  const [viewer] = await query<{ id: string }>("SELECT id FROM users WHERE email=$1", [fixture.email]);
+  assert.ok(viewer?.id, "BLOCK_VIEWER_MISSING");
+  const [persistedBlock] = await query<{ count: number }>(
+    "SELECT count(*)::int AS count FROM blocks WHERE blocker_user_id=$1 AND blocked_user_id=$2",
+    [viewer.id, targetUserId],
+  );
+  assert.equal(Number(persistedBlock?.count), 1, "BLOCK_ROW_NOT_PERSISTED_ONCE");
+
+  const blockedConversation = await api(server!, jar, `/api/messages/${targetProfileId}`);
+  expectStatus(blockedConversation, 403, "BLOCKED_CONVERSATION_REMAINED_READABLE");
+  assert.equal(blockedConversation.body.code, "BLOCKED", "BLOCKED_CONVERSATION_WRONG_DENIAL");
+  const blockedMessage = await api(server!, jar, `/api/messages/${targetProfileId}`, {
+    body: { body: "Synthetic post-block message" },
+  });
+  expectStatus(blockedMessage, 403, "BLOCKED_MESSAGE_WAS_SENT");
+  assert.equal(blockedMessage.body.code, "BLOCKED", "BLOCKED_MESSAGE_WRONG_DENIAL");
+  const [messageCount] = await query<{ count: number }>(
+    "SELECT count(*)::int AS count FROM messages WHERE sender_user_id=$1 AND recipient_user_id=$2",
+    [viewer.id, targetUserId],
+  );
+  assert.equal(Number(messageCount?.count), 0, "POST_BLOCK_MESSAGE_ROW_CREATED");
+  writeCase("block_action_persists_and_denies_post_block_messaging");
+
   expectStatus(await api(server!, jar, "/api/profile/basics", { method: "DELETE" }), 200, "PROFILE_WITHDRAWAL_FAILED");
   const afterWithdrawal = await api(server!, jar, "/api/profile/basics");
   expectStatus(afterWithdrawal, 200, "WITHDRAWN_PROFILE_READ_FAILED");
