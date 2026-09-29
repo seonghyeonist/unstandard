@@ -70,8 +70,8 @@ the current Closed Alpha implementation path:
   [OAUTH_EXTERNAL_SETUP_GUIDE_20260904.md](./OAUTH_EXTERNAL_SETUP_GUIDE_20260904.md),
   [HANDOFF_20260903_OAUTH_DIDIT_EXTERNAL_SETUP.md](./HANDOFF_20260903_OAUTH_DIDIT_EXTERNAL_SETUP.md),
   and [HANDOFF_20260904_DIDIT_KEY_OAUTH_NEXT.md](./HANDOFF_20260904_DIDIT_KEY_OAUTH_NEXT.md).
-- The Supabase cutover record is a historical audit, not a current Supabase
-  setup guide: [SUPABASE_TO_NEON_CUTOVER.md](./SUPABASE_TO_NEON_CUTOVER.md).
+- The previous backend cutover record remains historical audit material, not a
+  current setup guide; its own header points to this authority index.
 - [LOCAL_AI_LABEL_DATASET_GATE.md](./LOCAL_AI_LABEL_DATASET_GATE.md) documents
   a future offline Local AI calibration gate only. Its human-label blocker is
   not an alpha blocker; the founder waiver above is current.
