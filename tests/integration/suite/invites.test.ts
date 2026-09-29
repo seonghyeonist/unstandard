@@ -1,8 +1,7 @@
 import assert from "node:assert/strict";
 import { after, describe, it } from "node:test";
 import { eq, inArray, sql } from "drizzle-orm";
-import { createIntegrationDb, getIntegrationDatabaseUrl } from "../helpers";
-import { runDrizzleMigrations } from "../../../lib/db/run-migrations";
+import { closeIntegrationDatabases, createIntegrationDb, getIntegrationDatabaseUrl } from "../helpers";
 import { alphaInvites } from "../../../lib/db/schema/invites";
 import { users } from "../../../lib/db/schema/auth";
 import { profiles } from "../../../lib/db/schema/profiles";
@@ -22,6 +21,10 @@ import {
   normalizeEmail,
 } from "../../../lib/auth/invite-crypto";
 import { createRegistrationTicket, verifyRegistrationTicket } from "../../../lib/auth/invite-ticket";
+import {
+  createEmailVerificationChallenge,
+  verifyEmailVerificationCode,
+} from "../../../lib/auth/email-verification";
 import { observeIntegrationCase } from "../../../lib/readiness/integration-case-log";
 import { extractPgErrorCode } from "../../../lib/db/errors";
 import {
@@ -31,6 +34,7 @@ import {
 } from "../../../lib/legal/acceptance";
 
 const PEPPER = "integration-test-pepper";
+const EMAIL_VERIFICATION_PEPPER = "integration-test-email-verification-pepper";
 const AUTH_SECRET = "integration-test-auth-secret-32chars";
 const fixtureInviteEmails = new Set<string>();
 const fixtureUserIds = new Set<string>();
@@ -53,6 +57,42 @@ function trackInviteEmail(email: string) {
   return normalized;
 }
 
+async function createVerifiedEmailProof(inviteId: string, email: string): Promise<string> {
+  process.env.ALPHA_EMAIL_VERIFICATION_PEPPER = EMAIL_VERIFICATION_PEPPER;
+  const challenge = await createEmailVerificationChallenge({ inviteId, email });
+  assert.equal(challenge.ok, true, "synthetic invite email challenge must be created");
+  if (!challenge.ok) throw new Error("synthetic invite email challenge creation failed");
+
+  const verification = await verifyEmailVerificationCode({
+    challengeId: challenge.challengeId,
+    inviteId,
+    email,
+    code: challenge.code,
+  });
+  assert.equal(verification.ok, true, "synthetic invite email proof must verify");
+  if (!verification.ok) throw new Error("synthetic invite email proof verification failed");
+  return challenge.challengeId;
+}
+
+async function createPendingInviteWithEmailProof(
+  db: ReturnType<typeof createIntegrationDb>,
+  rawCode: string,
+  email: string,
+): Promise<{ inviteId: string; emailVerificationId: string }> {
+  const [invite] = await db
+    .insert(alphaInvites)
+    .values({
+      emailNormalized: normalizeEmail(email),
+      codeHash: hashInviteCode(rawCode, PEPPER),
+      status: "pending",
+      expiresAt: new Date(Date.now() + 60 * 60 * 1000),
+    })
+    .returning({ id: alphaInvites.id });
+  assert.ok(invite?.id, "pending invite fixture must be inserted");
+  const emailVerificationId = await createVerifiedEmailProof(invite.id, email);
+  return { inviteId: invite.id, emailVerificationId };
+}
+
 async function insertAuthUser(db: ReturnType<typeof createIntegrationDb>, suffix: string) {
   const userId = `user-${suffix}`;
   fixtureUserIds.add(userId);
@@ -66,34 +106,37 @@ async function insertAuthUser(db: ReturnType<typeof createIntegrationDb>, suffix
 }
 
 after(async () => {
-  const db = createIntegrationDb(getIntegrationDatabaseUrl());
-  const inviteEmails = [...fixtureInviteEmails];
-  const userIds = [...fixtureUserIds];
+  try {
+    const db = createIntegrationDb(getIntegrationDatabaseUrl());
+    const inviteEmails = [...fixtureInviteEmails];
+    const userIds = [...fixtureUserIds];
 
-  if (inviteEmails.length > 0) {
-    await db.delete(alphaInvites).where(inArray(alphaInvites.emailNormalized, inviteEmails));
-  }
-  if (userIds.length > 0) {
-    await db.delete(users).where(inArray(users.id, userIds));
-  }
+    if (inviteEmails.length > 0) {
+      await db.delete(alphaInvites).where(inArray(alphaInvites.emailNormalized, inviteEmails));
+    }
+    if (userIds.length > 0) {
+      await db.delete(users).where(inArray(users.id, userIds));
+    }
 
-  const remainingInvites = inviteEmails.length
-    ? await db
-        .select({ id: alphaInvites.id })
-        .from(alphaInvites)
-        .where(inArray(alphaInvites.emailNormalized, inviteEmails))
-    : [];
-  const remainingUsers = userIds.length
-    ? await db.select({ id: users.id }).from(users).where(inArray(users.id, userIds))
-    : [];
-  assert.equal(remainingInvites.length, 0, "integration invite fixtures must be removed");
-  assert.equal(remainingUsers.length, 0, "integration auth-user fixtures must be removed");
+    const remainingInvites = inviteEmails.length
+      ? await db
+          .select({ id: alphaInvites.id })
+          .from(alphaInvites)
+          .where(inArray(alphaInvites.emailNormalized, inviteEmails))
+      : [];
+    const remainingUsers = userIds.length
+      ? await db.select({ id: users.id }).from(users).where(inArray(users.id, userIds))
+      : [];
+    assert.equal(remainingInvites.length, 0, "integration invite fixtures must be removed");
+    assert.equal(remainingUsers.length, 0, "integration auth-user fixtures must be removed");
+  } finally {
+    await closeIntegrationDatabases();
+  }
 });
 
 describe("integration: invite reservation lifecycle", () => {
   it("requires separate versioned consent before counting an A/B role", async () => {
     const url = getIntegrationDatabaseUrl();
-    await runDrizzleMigrations(url);
     const db = createIntegrationDb(url);
     const marker = `balance-consent-${Date.now()}`;
 
@@ -134,7 +177,6 @@ describe("integration: invite reservation lifecycle", () => {
   it("legacy_invite_excluded_from_stage1", async () => {
     process.env.ALPHA_INVITE_PEPPER = PEPPER;
     const url = getIntegrationDatabaseUrl();
-    await runDrizzleMigrations(url);
     const db = createIntegrationDb(url);
     const rawCode = generateInviteCode();
     const email = trackInviteEmail(`legacy-invite-${Date.now()}@example.com`);
@@ -168,7 +210,6 @@ describe("integration: invite reservation lifecycle", () => {
 
   it("alpha_stage1_capacity_concurrency", async () => {
     const url = getIntegrationDatabaseUrl();
-    await runDrizzleMigrations(url);
     const db = createIntegrationDb(url);
     const marker = `capacity-${Date.now()}`;
 
@@ -228,7 +269,6 @@ describe("integration: invite reservation lifecycle", () => {
   it("invite_concurrency", async () => {
     process.env.ALPHA_INVITE_PEPPER = PEPPER;
     const url = getIntegrationDatabaseUrl();
-    await runDrizzleMigrations(url);
     const db = createIntegrationDb(url);
 
     const rawCode = generateInviteCode();
@@ -353,18 +393,11 @@ describe("integration: invite finalization transaction", () => {
     delete process.env.UNSTANDARD_TEST_INJECT_FINALIZE_FAILURE;
 
     const url = getIntegrationDatabaseUrl();
-    await runDrizzleMigrations(url);
     const db = createIntegrationDb(url);
     const suffix = `finalize-success-${Date.now()}`;
     const rawCode = generateInviteCode();
     const email = trackInviteEmail(`${suffix}@example.com`);
-
-    await db.insert(alphaInvites).values({
-      emailNormalized: normalizeEmail(email),
-      codeHash: hashInviteCode(rawCode, PEPPER),
-      status: "pending",
-      expiresAt: new Date(Date.now() + 60 * 60 * 1000),
-    });
+    const { emailVerificationId } = await createPendingInviteWithEmailProof(db, rawCode, email);
 
     const reserved = await reserveInviteForEmail(rawCode, email);
     assert.equal(reserved.ok, true);
@@ -377,6 +410,7 @@ describe("integration: invite finalization transaction", () => {
         inviteId: reserved.inviteId,
         userId,
         reservationCapability: reserved.reservationCapability,
+        emailVerificationId,
         email,
         legalAcceptance: testLegalAcceptance(),
       });
@@ -408,13 +442,7 @@ describe("integration: invite finalization transaction", () => {
     const suffix = `finalize-consume-fail-${Date.now()}`;
     const rawCode = generateInviteCode();
     const email = trackInviteEmail(`${suffix}@example.com`);
-
-    await db.insert(alphaInvites).values({
-      emailNormalized: normalizeEmail(email),
-      codeHash: hashInviteCode(rawCode, PEPPER),
-      status: "pending",
-      expiresAt: new Date(Date.now() + 60 * 60 * 1000),
-    });
+    const { emailVerificationId } = await createPendingInviteWithEmailProof(db, rawCode, email);
 
     const reserved = await reserveInviteForEmail(rawCode, email);
     assert.equal(reserved.ok, true);
@@ -428,6 +456,7 @@ describe("integration: invite finalization transaction", () => {
           inviteId: reserved.inviteId,
           userId,
           reservationCapability: reserved.reservationCapability,
+          emailVerificationId,
           email,
           legalAcceptance: testLegalAcceptance(),
         }),
@@ -447,13 +476,7 @@ describe("integration: invite finalization transaction", () => {
     const suffix = `finalize-rollback-${Date.now()}`;
     const rawCode = generateInviteCode();
     const email = trackInviteEmail(`${suffix}@example.com`);
-
-    await db.insert(alphaInvites).values({
-      emailNormalized: normalizeEmail(email),
-      codeHash: hashInviteCode(rawCode, PEPPER),
-      status: "pending",
-      expiresAt: new Date(Date.now() + 60 * 60 * 1000),
-    });
+    const { emailVerificationId } = await createPendingInviteWithEmailProof(db, rawCode, email);
 
     const reserved = await reserveInviteForEmail(rawCode, email);
     assert.equal(reserved.ok, true);
@@ -465,6 +488,7 @@ describe("integration: invite finalization transaction", () => {
         inviteId: reserved.inviteId,
         userId,
         reservationCapability: reserved.reservationCapability,
+        emailVerificationId,
         email,
         legalAcceptance: testLegalAcceptance(),
       }),
@@ -490,13 +514,7 @@ describe("integration: invite finalization transaction", () => {
     const suffix = `finalize-profile-fail-${Date.now()}`;
     const rawCode = generateInviteCode();
     const email = trackInviteEmail(`${suffix}@example.com`);
-
-    await db.insert(alphaInvites).values({
-      emailNormalized: normalizeEmail(email),
-      codeHash: hashInviteCode(rawCode, PEPPER),
-      status: "pending",
-      expiresAt: new Date(Date.now() + 60 * 60 * 1000),
-    });
+    const { emailVerificationId } = await createPendingInviteWithEmailProof(db, rawCode, email);
 
     const reserved = await reserveInviteForEmail(rawCode, email);
     assert.equal(reserved.ok, true);
@@ -508,6 +526,7 @@ describe("integration: invite finalization transaction", () => {
         inviteId: reserved.inviteId,
         userId,
         reservationCapability: reserved.reservationCapability,
+        emailVerificationId,
         email,
         legalAcceptance: testLegalAcceptance(),
       }),

@@ -2,8 +2,7 @@ import { addSyntheticVerifiedBasics } from "../profile-fixture";
 import assert from "node:assert/strict";
 import { after, describe, it } from "node:test";
 import { inArray, sql } from "drizzle-orm";
-import { createIntegrationDb, getIntegrationDatabaseUrl } from "../helpers";
-import { runDrizzleMigrations } from "../../../lib/db/run-migrations";
+import { closeIntegrationDatabases, createIntegrationDb, getIntegrationDatabaseUrl } from "../helpers";
 import { extractPgErrorCode } from "../../../lib/db/errors";
 import { createBlock } from "../../../lib/db/repositories/blocks.repository";
 import { createUnlock } from "../../../lib/db/repositories/unlocks.repository";
@@ -50,22 +49,25 @@ async function insertUserWithProfile(db: ReturnType<typeof createIntegrationDb>,
 }
 
 after(async () => {
-  const db = createIntegrationDb(getIntegrationDatabaseUrl());
   const userIds = [...fixtureUserIds];
-  if (userIds.length === 0) return;
-
-  await db.delete(users).where(inArray(users.id, userIds));
-  const remaining = await db
-    .select({ id: users.id })
-    .from(users)
-    .where(inArray(users.id, userIds));
-  assert.equal(remaining.length, 0, "persistence integration users must be removed");
+  try {
+    if (userIds.length > 0) {
+      const db = createIntegrationDb(getIntegrationDatabaseUrl());
+      await db.delete(users).where(inArray(users.id, userIds));
+      const remaining = await db
+        .select({ id: users.id })
+        .from(users)
+        .where(inArray(users.id, userIds));
+      assert.equal(remaining.length, 0, "persistence integration users must be removed");
+    }
+  } finally {
+    await closeIntegrationDatabases();
+  }
 });
 
 describe("integration: persistence invariants", () => {
   it("message_unlock_block_authorization + message_deletion_residuals", async () => {
     const url = getIntegrationDatabaseUrl();
-    await runDrizzleMigrations(url);
     const db = createIntegrationDb(url);
     const sender = await insertUserWithProfile(db, `message-sender-${Date.now()}`);
     const recipient = await insertUserWithProfile(db, `message-recipient-${Date.now()}`);
@@ -144,7 +146,6 @@ describe("integration: persistence invariants", () => {
   it("waitlist_revisit_and_delete + alpha_metrics_fail_closed_maturity", async () => {
     process.env.WAITLIST_TOKEN_PEPPER = "integration-waitlist-pepper";
     const url = getIntegrationDatabaseUrl();
-    await runDrizzleMigrations(url);
     const db = createIntegrationDb(url);
     const joinedAt = new Date("2026-08-01T12:00:00.000Z");
     const email = `waitlist-${Date.now()}@example.com`;
@@ -191,7 +192,6 @@ describe("integration: persistence invariants", () => {
 
   it("report_user_fk + duplicate_report_idempotency + no_duplicate_report_row", async () => {
     const url = getIntegrationDatabaseUrl();
-    await runDrizzleMigrations(url);
     const db = createIntegrationDb(url);
 
     const reporter = await insertUserWithProfile(db, `reporter-${Date.now()}`);

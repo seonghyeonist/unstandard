@@ -13,13 +13,12 @@ import {
 } from "../../../lib/db/schema/profile-basics";
 import { INTRODUCTION_SCOPE_VERSION, PROFILE_CONSENT_VERSION } from "../../../lib/profile/basics";
 import { IDENTITY_BIOMETRIC_CONSENT_VERSION } from "../../../lib/identity/contracts";
-import { addSyntheticVerifiedBasics } from "../profile-fixture";
+import { addSyntheticProfileBasics, addSyntheticVerifiedBasics } from "../profile-fixture";
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
-import { describe, it } from "node:test";
+import { after, describe, it } from "node:test";
 import { and, eq, inArray, sql } from "drizzle-orm";
-import { createIntegrationDb, getIntegrationDatabaseUrl } from "../helpers";
-import { runDrizzleMigrations } from "../../../lib/db/run-migrations";
+import { closeIntegrationDatabases, createIntegrationDb, getIntegrationDatabaseUrl } from "../helpers";
 import { seedClosedAlphaData } from "../../../lib/db/seed-data";
 import { users } from "../../../lib/db/schema/auth";
 import { profiles, profilePrivate } from "../../../lib/db/schema/profiles";
@@ -30,20 +29,70 @@ import { getDbPrivateProfile } from "../../../lib/db/repositories/profile-privat
 import { observeIntegrationCase } from "../../../lib/readiness/integration-case-log";
 import { createUnlock } from "../../../lib/db/repositories/unlocks.repository";
 
+function safeErrorName(error: unknown): string {
+  const name = (error as { name?: unknown } | null)?.name;
+  return typeof name === "string" && /^[A-Za-z][A-Za-z0-9_]{0,40}$/u.test(name)
+    ? name
+    : "UnknownError";
+}
+
+after(async () => closeIntegrationDatabases());
+
+function safeErrorCode(error: unknown): string | null {
+  const code = (error as { code?: unknown } | null)?.code;
+  return typeof code === "string" && /^[A-Z0-9_]{2,32}$/u.test(code) ? code : null;
+}
+
+async function traceDbStep<T>(name: string, operation: () => Promise<T>): Promise<T> {
+  const startedAt = new Date();
+  console.info(JSON.stringify({
+    event: "integration.db_unlock_sql_boundary",
+    boundary: name,
+    phase: "start",
+    started_at: startedAt.toISOString(),
+  }));
+  try {
+    const value = await operation();
+    console.info(JSON.stringify({
+      event: "integration.db_unlock_sql_boundary",
+      boundary: name,
+      phase: "end",
+      outcome: "PASS",
+      ended_at: new Date().toISOString(),
+      elapsed_ms: Date.now() - startedAt.getTime(),
+    }));
+    return value;
+  } catch (error) {
+    console.info(JSON.stringify({
+      event: "integration.db_unlock_sql_boundary",
+      boundary: name,
+      phase: "end",
+      outcome: "FAIL",
+      ended_at: new Date().toISOString(),
+      elapsed_ms: Date.now() - startedAt.getTime(),
+      error_name: safeErrorName(error),
+      error_code: safeErrorCode(error),
+    }));
+    throw error;
+  }
+}
+
 async function insertOnboardedUser(
   db: ReturnType<typeof createIntegrationDb>,
   suffix: string,
   gender: "male" | "female" = "male",
+  includeVerifiedIdentity = true,
+  includePrivateProfile = true,
 ) {
   const userId = `unlock-user-${suffix}`;
-  await db.insert(users).values({
+  await traceDbStep("insert_user", () => db.insert(users).values({
     id: userId,
     name: `Unlock ${suffix}`,
     email: `${suffix}@example.com`,
     emailVerified: true,
     inviteFinalizedAt: new Date(),
-  });
-  const [profile] = await db
+  }));
+  const [profile] = await traceDbStep("insert_profile", () => db
     .insert(profiles)
     .values({
       userId,
@@ -52,51 +101,116 @@ async function insertOnboardedUser(
       teaser: "작은 장면을 좋아해요.",
       onboardedAt: new Date(),
     })
-    .returning({ id: profiles.id });
+    .returning({ id: profiles.id }));
 
-  await db.insert(profilePrivate).values({
-    profileId: profile.id,
-    letter: `letter-${suffix}`,
-    smallJoys: ["tea"],
-  });
+  if (includePrivateProfile) {
+    await traceDbStep("insert_private_profile", () => db.insert(profilePrivate).values({
+      profileId: profile.id,
+      letter: `letter-${suffix}`,
+      smallJoys: ["tea"],
+    }));
+  }
 
-  await addSyntheticVerifiedBasics(db, userId, gender);
+  if (includeVerifiedIdentity) {
+    await traceDbStep("insert_verified_profile_basics", () => addSyntheticVerifiedBasics(db, userId, gender));
+  } else {
+    await traceDbStep("insert_profile_basics", () => addSyntheticProfileBasics(db, userId, gender));
+  }
   return { userId, profileId: profile.id };
 }
 
 describe("integration: db-backed unlock vertical slice", () => {
   it("queues only opaque Didit references after account deletion and bounds retries", async () => {
     const url = getIntegrationDatabaseUrl();
-    await runDrizzleMigrations(url);
-    await seedClosedAlphaData(url);
-    const db = createIntegrationDb(url);
     const suffix = `purge-${Date.now()}`;
-    const first = await insertOnboardedUser(db, `${suffix}-a`);
-    const userIds = [first.userId];
+    const firstSuffix = `${suffix}-a`;
+    const secondSuffix = `${suffix}-b`;
+    const userIds = [
+      `unlock-user-${firstSuffix}`,
+      `unlock-user-${secondSuffix}`,
+    ];
     const queueIds: string[] = [];
+    let db: ReturnType<typeof createIntegrationDb> | null = null;
+    let phase = "seed_closed_alpha_data";
+    let failure: { phase: string; name: string; code: string | null; operator: string | null } | null = null;
+    let cleanupFailed = false;
+
+    const boundary = async <T>(name: string, operation: () => Promise<T>): Promise<T> => {
+      phase = name;
+      const startedAt = new Date();
+      console.info(JSON.stringify({
+        event: "integration.db_unlock_boundary",
+        boundary: name,
+        phase: "start",
+        started_at: startedAt.toISOString(),
+      }));
+      try {
+        const value = await operation();
+        console.info(JSON.stringify({
+          event: "integration.db_unlock_boundary",
+          boundary: name,
+          phase: "end",
+          outcome: "PASS",
+          ended_at: new Date().toISOString(),
+          elapsed_ms: Date.now() - startedAt.getTime(),
+        }));
+        return value;
+      } catch (error) {
+        console.info(JSON.stringify({
+          event: "integration.db_unlock_boundary",
+          boundary: name,
+          phase: "end",
+          outcome: "FAIL",
+          ended_at: new Date().toISOString(),
+          elapsed_ms: Date.now() - startedAt.getTime(),
+          error_name: safeErrorName(error),
+          error_code: safeErrorCode(error),
+        }));
+        throw error;
+      }
+    };
 
     try {
-      const pending = await identityRepository.begin(
+      db = createIntegrationDb(url);
+      const first = await boundary("insert_first_account", () =>
+        insertOnboardedUser(db!, firstSuffix, "male", false, false),
+      );
+
+      const pending = await boundary("begin_first_identity_request", () => identityRepository.begin(
         first.userId,
         "didit-v3",
         IDENTITY_BIOMETRIC_CONSENT_VERSION,
         new Date(),
-      );
+      ));
+      phase = "assert_first_identity_request_created";
       assert.ok(pending);
       const providerReference = randomUUID();
-      assert.equal(await identityRepository.bindProviderReference(pending!, providerReference), true);
       queueIds.push(pending!.requestId);
-
-      await db.delete(users).where(eq(users.id, first.userId));
+      phase = "bind_first_provider_reference";
       assert.equal(
-        (await db.select().from(identityVerifications).where(eq(identityVerifications.userId, first.userId))).length,
+        await boundary("bind_first_provider_reference", () =>
+          identityRepository.bindProviderReference(pending!, providerReference),
+        ),
+        true,
+        "provider reference binding must succeed",
+      );
+      phase = "assert_first_identity_request_queued";
+
+      await boundary("delete_first_account", () => db!.delete(users).where(eq(users.id, first.userId)));
+      phase = "read_first_verification_after_delete";
+      assert.equal(
+        (await boundary("read_first_verification_after_delete", () =>
+          db!.select().from(identityVerifications).where(eq(identityVerifications.userId, first.userId)),
+        )).length,
         0,
+        "deleting account must remove identity verification",
       );
 
-      const [queued] = await db
+      const [queued] = await boundary("read_first_purge_queue_row", () => db!
         .select()
         .from(identityProviderPurgeQueue)
-        .where(eq(identityProviderPurgeQueue.requestId, pending!.requestId));
+        .where(eq(identityProviderPurgeQueue.requestId, pending!.requestId)));
+      phase = "assert_first_purge_queue_shape";
       assert.ok(queued);
       assert.deepEqual(Object.keys(queued!).sort(), [
         "attemptCount",
@@ -105,56 +219,72 @@ describe("integration: db-backed unlock vertical slice", () => {
         "providerReference",
         "queuedAt",
         "requestId",
-      ]);
-      assert.equal(queued!.provider, "didit-v3");
-      assert.equal(queued!.providerReference, providerReference);
-      assert.equal(queued!.attemptCount, 0);
+      ], "purge queue row must contain opaque reference fields only");
+      phase = "assert_first_purge_provider";
+      assert.equal(queued!.provider, "didit-v3", "purge queue provider mismatch");
+      phase = "assert_first_purge_reference";
+      assert.ok(queued!.providerReference === providerReference, "opaque provider reference mismatch");
+      phase = "assert_first_purge_attempt_count";
+      assert.equal(queued!.attemptCount, 0, "new purge queue attempt count mismatch");
 
       // A repeated cascade with the same opaque request ID must not duplicate
       // or replace the original deletion instruction.
-      const second = await insertOnboardedUser(db, `${suffix}-b`);
-      userIds.push(second.userId);
-      const duplicate = await identityRepository.begin(
+      const second = await boundary("insert_second_account", () =>
+        insertOnboardedUser(db!, secondSuffix, "male", false, false),
+      );
+      const duplicate = await boundary("begin_duplicate_identity_request", () => identityRepository.begin(
         second.userId,
         "didit-v3",
         IDENTITY_BIOMETRIC_CONSENT_VERSION,
         new Date(),
-      );
+      ));
+      phase = "assert_duplicate_identity_request_created";
       assert.ok(duplicate);
       const duplicateProviderReference = randomUUID();
-      assert.equal(await identityRepository.bindProviderReference(duplicate!, duplicateProviderReference), true);
-      const [rekeyed] = await db
+      queueIds.push(duplicate!.requestId);
+      phase = "bind_duplicate_provider_reference";
+      assert.equal(await boundary("bind_duplicate_provider_reference", () =>
+        identityRepository.bindProviderReference(duplicate!, duplicateProviderReference)),
+      true, "duplicate provider reference binding must succeed");
+      const [rekeyed] = await boundary("rekey_duplicate_identity_request", () => db!
         .update(identityVerifications)
         .set({ requestId: pending!.requestId })
         .where(eq(identityVerifications.requestId, duplicate!.requestId))
-        .returning({ requestId: identityVerifications.requestId });
-      assert.equal(rekeyed?.requestId, pending!.requestId);
-      await db.delete(users).where(eq(users.id, second.userId));
-      const duplicateQueueRows = await db
+        .returning({ requestId: identityVerifications.requestId }));
+      phase = "assert_duplicate_request_rekeyed";
+      assert.ok(rekeyed?.requestId === pending!.requestId, "duplicate identity request was not rekeyed");
+      await boundary("delete_second_account", () => db!.delete(users).where(eq(users.id, second.userId)));
+      const duplicateQueueRows = await boundary("read_duplicate_queue_rows", () => db!
         .select()
         .from(identityProviderPurgeQueue)
-        .where(eq(identityProviderPurgeQueue.requestId, pending!.requestId));
-      assert.equal(duplicateQueueRows.length, 1);
-      assert.equal(duplicateQueueRows[0]?.providerReference, providerReference);
+        .where(eq(identityProviderPurgeQueue.requestId, pending!.requestId)));
+      phase = "assert_duplicate_queue_count";
+      assert.equal(duplicateQueueRows.length, 1, "duplicate purge request must remain unique");
+      phase = "assert_original_provider_reference_preserved";
+      assert.ok(duplicateQueueRows[0]?.providerReference === providerReference, "original provider reference must be preserved");
 
       const retryStartedAt = Date.now();
-      await identityProviderPurgeQueueRepository.markProviderPurgeRetry({
+      await boundary("mark_provider_purge_retry", () => identityProviderPurgeQueueRepository.markProviderPurgeRetry({
         requestId: pending!.requestId,
         provider: "didit-v3",
         providerReference,
-      });
-      const [retried] = await db
+      }));
+      const [retried] = await boundary("read_retried_purge_row", () => db!
         .select()
         .from(identityProviderPurgeQueue)
-        .where(eq(identityProviderPurgeQueue.requestId, pending!.requestId));
-      assert.equal(retried?.attemptCount, 1);
+        .where(eq(identityProviderPurgeQueue.requestId, pending!.requestId)));
+      phase = "assert_retry_attempt_count";
+      assert.equal(retried?.attemptCount, 1, "retry attempt count mismatch");
       const retryDelayMs = (retried?.nextAttemptAt.getTime() ?? 0) - retryStartedAt;
-      assert.ok(retryDelayMs >= 50_000 && retryDelayMs <= 90_000);
+      phase = "assert_retry_delay";
+      assert.ok(retryDelayMs >= 50_000 && retryDelayMs <= 90_000, "retry delay is outside configured bounds");
+      phase = "assert_retry_not_due";
       assert.equal(
-        (await identityProviderPurgeQueueRepository.listProviderPurges(100)).some(
+        (await boundary("list_not_due_provider_purges", () => identityProviderPurgeQueueRepository.listProviderPurges(100))).some(
           (entry) => entry.requestId === pending!.requestId,
         ),
         false,
+        "future retry must not be returned as due",
       );
 
       const dueFixtures = Array.from({ length: 51 }, () => ({
@@ -163,28 +293,61 @@ describe("integration: db-backed unlock vertical slice", () => {
         providerReference: randomUUID(),
       }));
       queueIds.push(...dueFixtures.map((entry) => entry.requestId));
-      await db.insert(identityProviderPurgeQueue).values(dueFixtures);
-      const boundedDue = await identityProviderPurgeQueueRepository.listProviderPurges(100);
-      assert.equal(boundedDue.length, 50);
+      await boundary("insert_due_queue_fixtures", () => db!.insert(identityProviderPurgeQueue).values(dueFixtures));
+      const boundedDue = await boundary("list_bounded_due_provider_purges", () => identityProviderPurgeQueueRepository.listProviderPurges(100));
+      phase = "assert_due_queue_limit";
+      assert.equal(boundedDue.length, 50, "provider purge query must enforce row limit");
 
       await observeIntegrationCase("identity_provider_purge_queue_account_deletion", async () => {
-        assert.equal(duplicateQueueRows.length, 1);
-        assert.equal(retried?.attemptCount, 1);
-        assert.equal(boundedDue.length, 50);
+        assert.equal(duplicateQueueRows.length, 1, "duplicate purge request must remain unique");
+        assert.equal(retried?.attemptCount, 1, "retry attempt count mismatch");
+        assert.equal(boundedDue.length, 50, "provider purge query must enforce row limit");
       });
+    } catch (error) {
+      failure = {
+        phase,
+        name: safeErrorName(error),
+        code: safeErrorCode(error),
+        operator:
+          typeof (error as { operator?: unknown } | null)?.operator === "string"
+            ? (error as { operator: string }).operator
+            : null,
+      };
+      console.error(JSON.stringify({
+        event: "integration.db_unlock_failure",
+        phase: failure.phase,
+        error_name: failure.name,
+        error_code: failure.code,
+        assertion_operator: failure.operator,
+      }));
     } finally {
-      await db.delete(users).where(inArray(users.id, userIds));
-      if (queueIds.length > 0) {
-        await db
-          .delete(identityProviderPurgeQueue)
-          .where(inArray(identityProviderPurgeQueue.requestId, queueIds));
+      if (db) {
+        try {
+          await boundary("cleanup_synthetic_users", () => db!.delete(users).where(inArray(users.id, userIds)));
+        } catch {
+          cleanupFailed = true;
+        }
+        if (queueIds.length > 0) {
+          try {
+            await boundary("cleanup_synthetic_queue_rows", () => db!
+              .delete(identityProviderPurgeQueue)
+              .where(inArray(identityProviderPurgeQueue.requestId, queueIds)));
+          } catch {
+            cleanupFailed = true;
+          }
+        }
       }
     }
+
+    if (cleanupFailed) {
+      console.error(JSON.stringify({ event: "integration.db_unlock_cleanup", outcome: "FAIL" }));
+      if (!failure) failure = { phase: "cleanup", name: "CleanupError", code: null, operator: null };
+    }
+    if (failure) throw new Error(`db-unlock purge test failed at ${failure.phase} (${failure.name})`);
   });
 
   it("profile eligibility, direct access, revision binding and deletion fail closed", async () => {
     const url = getIntegrationDatabaseUrl();
-    await runDrizzleMigrations(url);
     await seedClosedAlphaData(url);
     const db = createIntegrationDb(url);
     const a = await insertOnboardedUser(db, `basics-a-${Date.now()}`, "male");
@@ -225,8 +388,14 @@ describe("integration: db-backed unlock vertical slice", () => {
       assert.ok(fresh);
       assert.equal(await identityRepository.find(a.userId, fresh.requestId), null);
       const freshProviderReference = randomUUID();
-      assert.equal(await identityRepository.bindProviderReference(fresh!, freshProviderReference), true);
-      assert.equal(await identityRepository.markVerifiedUnpurged(fresh!, {
+      assert.equal(
+        await identityRepository.bindProviderReference(fresh!, freshProviderReference),
+        true,
+        "fresh provider reference binding must succeed",
+      );
+      const boundFresh = await identityRepository.find(b.userId, fresh!.requestId);
+      assert.ok(boundFresh, "bound identity request must be readable");
+      assert.equal(await identityRepository.markVerifiedUnpurged(boundFresh!, {
         requestId: fresh!.requestId,
         providerReference: freshProviderReference,
         verifiedAt: new Date(),
@@ -235,8 +404,8 @@ describe("integration: db-backed unlock vertical slice", () => {
         faceMatchVerified: true,
         deviceIpVerified: true,
         adultVerified: true,
-      }, new Date()), true);
-      assert.equal(await identityRepository.markVerified(fresh!, new Date()), true);
+      }, new Date()), true, "current bound identity request must accept complete proof");
+      assert.equal(await identityRepository.markVerified(boundFresh!, new Date()), true);
       assert.equal(await canAccessIntroduction(a.userId, b.profileId), true);
       await profileBasicsRepository.withdraw(b.userId);
       assert.equal((await profileBasicsRepository.read(b.userId)).basics, null);
@@ -252,7 +421,6 @@ describe("integration: db-backed unlock vertical slice", () => {
 
   it("pass creates unlock; non-pass does not; isolation + private gate", async () => {
     const url = getIntegrationDatabaseUrl();
-    await runDrizzleMigrations(url);
     await seedClosedAlphaData(url);
     const db = createIntegrationDb(url);
 

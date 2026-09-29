@@ -1,7 +1,9 @@
 // Do not parse or echo unbounded request bodies (especially unsolicited identity data).
 export function isSameOriginMutation(request: Request): boolean {
   const origin = request.headers.get("origin");
-  return origin === new URL(request.url).origin && request.headers.get("sec-fetch-site") !== "cross-site";
+  const requestOrigin = new URL(request.url).origin;
+  const fetchSite = request.headers.get("sec-fetch-site");
+  return origin === requestOrigin && fetchSite !== "cross-site";
 }
 export async function readSmallJson(request: Pick<Request, "headers" | "body">, maxBytes = 2048): Promise<unknown> {
   if (!request.headers.get("content-type")?.toLowerCase().startsWith("application/json")) throw new Error("Invalid body");

@@ -29,7 +29,7 @@ export const REQUIRED_INTEGRATION_CASES = [
   "legacy_invite_excluded_from_stage1",
   "invite_finalization_success",
   "invite_finalization_rollback",
-  "migration_second_run_noop",
+  "migration_schema_inventory_read_only",
   "identity_provider_purge_queue_account_deletion",
   "seed_idempotency",
   "db_unlock_reject_no_row",

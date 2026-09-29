@@ -1,6 +1,16 @@
 # Didit identity legal-gate and Preview release guideline
 
-Status: **NOT READY — keep `IDENTITY_PROVIDER_NOTICE_READY=false`**
+> **HISTORICAL SNAPSHOT — SUPERSEDED for current provider/account facts.**
+> This checklist captured observations on 2026-09-16. Read
+> [CURRENT_ALPHA_AUTHORITY_20260928.md](./CURRENT_ALPHA_AUTHORITY_20260928.md)
+> before acting. The DocuSeal submission is complete: the original signed PDF
+> visibly contains signature marks for both Didit Identity Spain, S.L. and
+> `unstandard`; do not ask the founder to sign again. Account-to-entity binding,
+> recognized customer identity, account-specific processing/access facts, and
+> the notice gate remain unresolved. Keep
+> `IDENTITY_PROVIDER_NOTICE_READY=false`.
+
+Status: **HISTORICAL — current notice gate remains `IDENTITY_PROVIDER_NOTICE_READY=false`**
 
 Date: 2026-09-16  
 Repository: `seonghyeonist/unstandard`  
