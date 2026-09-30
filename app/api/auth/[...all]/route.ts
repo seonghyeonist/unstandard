@@ -1,4 +1,5 @@
 import { getAuth } from "@/lib/auth/auth";
+import { applyPrivateNoStoreHeaders, privateJson } from "@/lib/http/private-json";
 
 function isDisabledOAuthPath(pathname: string): boolean {
   return (
@@ -11,12 +12,19 @@ function isDisabledOAuthPath(pathname: string): boolean {
 async function handler(request: Request) {
   const pathname = new URL(request.url).pathname;
   if (isDisabledOAuthPath(pathname)) {
-    return Response.json(
+    return privateJson(
       { error: "OAuth authentication is disabled" },
-      { status: 404, headers: { "Cache-Control": "no-store" } },
+      { status: 404 },
     );
   }
-  return getAuth().handler(request);
+  const response = await getAuth().handler(request);
+  const headers = new Headers(response.headers);
+  applyPrivateNoStoreHeaders(headers);
+  return new Response(response.body, {
+    status: response.status,
+    statusText: response.statusText,
+    headers,
+  });
 }
 
 export { handler as GET, handler as POST };
