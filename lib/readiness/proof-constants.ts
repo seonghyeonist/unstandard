@@ -87,6 +87,8 @@ export const REQUIRED_HTTP_SMOKE_CASES = [
   "b_to_a_private_after_unlock_ok",
   "bidirectional_viewer_isolation",
   "private_response_no_store",
+  "block_create_idempotent",
+  "post_block_message_denied",
 ] as const;
 
 export type RequiredHttpSmokeCase = (typeof REQUIRED_HTTP_SMOKE_CASES)[number];
