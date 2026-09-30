@@ -13,6 +13,16 @@ type Invite = {
   balanceBucket: string;
 };
 
+const inviteErrors: Record<string, string> = {
+  CAPACITY_REACHED: "Stage 1 초대 좌석이 모두 찼어요.",
+  ACTIVE_EMAIL_EXISTS: "이 이메일의 활성 초대가 이미 있어요. 초대 상태를 확인해 주세요.",
+  EMAIL_ALREADY_REGISTERED: "이미 가입된 이메일이에요. 로그인 화면을 이용해 주세요.",
+  BALANCE_SOFT_WAITLIST: "현재 인원이 많은 쪽의 초대는 균형 회복까지 대기 중이에요.",
+  BALANCE_HARD_GATE: "현재 인원이 많은 쪽의 초대가 제한돼 있어요. 반대쪽 참여자를 모집하면 다시 발급할 수 있어요.",
+  Unauthorized: "운영자 인증이 만료됐어요. 다시 로그인해 주세요.",
+  "Invalid invite": "초대 입력값과 균형 활용 동의를 확인해 주세요.",
+};
+
 async function json(response: Response): Promise<Record<string, unknown>> {
   const value: unknown = await response.json().catch(() => ({}));
   return value && typeof value === "object" ? value as Record<string, unknown> : {};
@@ -69,7 +79,13 @@ export default function OperatorInviteConsole() {
       body: JSON.stringify({ email, recruitmentCohort, acquisitionChannel, balanceBucket, balanceConsent }),
     });
     const body = await json(response); setBusy(false);
-    if (!response.ok || typeof body.inviteLink !== "string") { setMessage("초대를 발급하지 못했어요. 좌석·중복 이메일·균형 조건을 확인해 주세요."); return; }
+    if (!response.ok || typeof body.inviteLink !== "string") {
+      setMessage(typeof body.error === "string" && inviteErrors[body.error]
+        ? inviteErrors[body.error]
+        : "초대 발급 서비스를 사용할 수 없어요. 잠시 후 다시 시도해 주세요.");
+      if (response.status === 403) setAuthorized(false);
+      return;
+    }
     setEmail(""); setInviteLink(body.inviteLink); setMessage("초대를 만들었어요. 아래 링크는 지금만 복사해 안전하게 전달해 주세요.");
     await loadInvites();
   }

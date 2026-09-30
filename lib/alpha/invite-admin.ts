@@ -6,6 +6,7 @@ import {
   ALPHA_STAGE_1_CAP,
   ALPHA_STAGE_1_PHASE,
   evaluateBalanceGate,
+  evaluateInviteBalanceGate,
   isAlphaAcquisitionChannel,
   isAlphaBalanceBucket,
   isAlphaRecruitmentCohort,
@@ -81,14 +82,6 @@ type SeatObservation = {
   bucket_b: number;
 };
 
-function wouldAddToMajority(
-  bucket: AlphaBalanceBucket,
-  gate: ReturnType<typeof evaluateBalanceGate>,
-): boolean {
-  if (bucket === "not_counted" || !gate.minorityBucket) return false;
-  return bucket !== gate.minorityBucket;
-}
-
 /**
  * The database trigger is the final capacity authority. This transaction also
  * holds the same advisory lock so the operator receives deterministic error
@@ -159,17 +152,8 @@ export async function createStage1Invite(
     const bucketB = Number(observation.rows[0]?.bucket_b ?? 0);
     if (seats >= ALPHA_STAGE_1_CAP) throw new Stage1InviteError("CAPACITY_REACHED");
 
-    const projectedA = bucketA + (input.balanceBucket === "bucket_a" ? 1 : 0);
-    const projectedB = bucketB + (input.balanceBucket === "bucket_b" ? 1 : 0);
-    const balanceGate = evaluateBalanceGate(projectedA, projectedB);
-    if (wouldAddToMajority(input.balanceBucket, balanceGate)) {
-      if (balanceGate.gate === "HARD_GATE") {
-        throw new Stage1InviteError("BALANCE_HARD_GATE");
-      }
-      if (balanceGate.gate === "SOFT_WAITLIST") {
-        throw new Stage1InviteError("BALANCE_SOFT_WAITLIST");
-      }
-    }
+    const { balanceGate, rejection } = evaluateInviteBalanceGate(bucketA, bucketB, input.balanceBucket);
+    if (rejection) throw new Stage1InviteError(rejection);
 
     const [created] = await tx
       .insert(alphaInvites)
