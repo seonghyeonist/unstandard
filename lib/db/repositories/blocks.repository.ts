@@ -15,11 +15,11 @@ export type CreateBlockInput = {
 
 export type CreateBlockResult =
   | { ok: true; blockId: string; inserted: boolean }
-  | { ok: false; code: "SELF_BLOCK" | "DUPLICATE" | "DB_ERROR" };
+  | { ok: false; code: "SELF_BLOCK" | "DB_ERROR" };
 
 export type CreateBlockForProfileResult =
   | { ok: true; inserted: boolean }
-  | { ok: false; code: "INVALID_PROFILE_ID" | "PROFILE_NOT_FOUND" | "SELF_BLOCK" | "DUPLICATE" | "DB_ERROR" };
+  | { ok: false; code: "INVALID_PROFILE_ID" | "PROFILE_NOT_FOUND" | "SELF_BLOCK" | "DB_ERROR" };
 
 export async function createBlock(input: CreateBlockInput): Promise<CreateBlockResult> {
   if (input.blockerUserId === input.blockedUserId) {
@@ -57,7 +57,6 @@ export async function createBlock(input: CreateBlockInput): Promise<CreateBlockR
       if (existing) {
         return { ok: true, blockId: existing.id, inserted: false };
       }
-      return { ok: false, code: "DUPLICATE" };
     }
     return { ok: false, code: "DB_ERROR" };
   }
