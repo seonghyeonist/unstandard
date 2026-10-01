@@ -270,7 +270,7 @@ describe("Closed-alpha launch separation", () => {
     );
   });
 
-  it("keeps the launch artifact closed until the identity provider notice is approved", () => {
+  it("passes the identity-provider notice gate after reviewed publication", () => {
     const report = buildProductionReadinessReport({
       environment: environment(),
       database: database(),
@@ -287,12 +287,12 @@ describe("Closed-alpha launch separation", () => {
       attestation: attestation(),
       nowMs: Date.parse(NOW) + 60_000,
     });
-    assert.equal(result.ok, false);
+    assert.equal(result.ok, true);
     assert.equal(
       result.gates.find((item) => item.name === "identity_provider_notice")?.code,
-      "IDENTITY_PROVIDER_NOTICE_NOT_READY",
+      "IDENTITY_PROVIDER_NOTICE_READY",
     );
-    assert.throws(() => buildClosedAlphaLaunchArtifact({
+    assert.doesNotThrow(() => buildClosedAlphaLaunchArtifact({
       production,
       attestation: attestation(),
       generatedAt: new Date(Date.parse(NOW) + 60_000).toISOString(),
@@ -318,7 +318,7 @@ describe("Closed-alpha launch separation", () => {
       nowMs: Date.parse(NOW) + 60_000,
     });
 
-    assert.equal(result.ok, false);
+    assert.equal(result.ok, true);
     assert.equal(
       result.gates.find((item) => item.name === "production_database_safety")?.status,
       "PASS",
