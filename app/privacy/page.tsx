@@ -19,6 +19,7 @@ const sections = [
         <p className="mt-3">사진, 결제정보, 정밀 위치정보는 현재 Closed Alpha에서 자체 수집하지 않습니다. 신원 확인을 시작한 경우 인증용 문서·얼굴·기기 관련 정보는 아래 Didit 호스팅 화면에서 처리될 수 있습니다.</p>
         <p className="mt-3">질문과 메시지는 민감정보를 요구하도록 설계하지 않습니다. 종교·정치적 견해·건강·성생활 등 민감정보를 입력하지 않아도 서비스를 사용할 수 있으며, 실수로 입력한 경우 개인정보 문의로 삭제·처리정지를 요청할 수 있습니다.</p>
         <p className="mt-3">첫 대화 역할은 서울 수도권에서 일대일 로맨틱 대화를 원하는 성인의 Stage-1 수급 균형에만 사용합니다. 별도 질문에 선택적으로 답하고 해당 사용에 동의한 경우만 A/B로 집계하며, 이 역할 선택에서 성별·성적 지향·정체성을 추론하지 않습니다. 성별은 기본 프로필에서 본인이 별도로 선택하며, A/B 역할 집계와 남녀 집계는 분리합니다. 성적 지향은 질문하거나 인증하지 않습니다.</p>
+        <p className="mt-3">첫 대화 역할 사용 동의는 선택 사항입니다. 초대 사용 전에는 철회 후 집계 제외 초대로 재발급할 수 있고, 사용 후에는 개인정보 담당자에게 정정·처리정지를 요청할 수 있습니다.</p>
       </>
     ),
   },
@@ -98,7 +99,7 @@ export default function PrivacyPage() {
         <Link href="/" className="text-xl font-black tracking-[-0.04em]">unstandard</Link>
         <Link href="/app/settings" className="text-sm font-semibold text-accent">설정</Link>
       </nav>
-      <p className="text-xs font-bold uppercase tracking-[0.2em] text-accent">effective on identity-notice v2 deployment</p>
+      <p className="text-xs font-bold uppercase tracking-[0.2em] text-accent">effective on profile-feature deployment · identity notice v2</p>
       <h1 className="mt-3 text-4xl font-black tracking-[-0.06em]">개인정보 처리방침</h1>
       <p className="mt-5 text-base leading-7 text-foreground/75">Unstandard Closed Alpha의 실제 수집·보유·삭제·국외 이전 범위를 설명합니다. 처리 항목이나 수탁자가 바뀌면 시행 전에 이 페이지를 갱신합니다.</p>
       <div className="mt-10 space-y-9 text-sm leading-7 text-foreground/75">
