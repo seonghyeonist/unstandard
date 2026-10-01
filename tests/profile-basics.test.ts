@@ -6,13 +6,13 @@ import { ProfileBasicsForm } from "../components/profile/profile-basics-form";
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { canIntroduce, isIntroductionEligible, profileBasicsSchema, PROFILE_CONSENT_VERSION, INTRODUCTION_SCOPE_VERSION, type EligibilityFacts } from "../lib/profile/basics";
-import { IDENTITY_BIOMETRIC_CONSENT_VERSION } from "../lib/identity/contracts";
+import { IDENTITY_BIOMETRIC_CONSENT_VERSION, IDENTITY_NOTICE_VERSION } from "../lib/identity/contracts";
 import { isSameOriginMutation, readSmallJson } from "../lib/http/profile-request";
 
 const now = new Date("2026-08-28T00:00:00Z");
 const facts: EligibilityFacts = { gender: "male", age: 22, region: "서울", profileConsentVersion: PROFILE_CONSENT_VERSION,
   introductionScopeVersion: INTRODUCTION_SCOPE_VERSION, introductionScopeAccepted: true, updatedAt: now,
-  identityNoticeVersion: "alpha-identity-v1", identityBiometricConsentVersion: IDENTITY_BIOMETRIC_CONSENT_VERSION,
+  identityNoticeVersion: IDENTITY_NOTICE_VERSION, identityBiometricConsentVersion: IDENTITY_BIOMETRIC_CONSENT_VERSION,
   identityStatus: "verified", providerReference: "provider-reference-1",
   onboarded: true, revision: "revision-1", verifiedRevision: "revision-1", verifiedAt: now, providerPurgedAt: now };
 const input = { nickname: "여름", gender: "male", age: 22, region: "서울", introductionScopeAccepted: true,
