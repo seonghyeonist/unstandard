@@ -1,8 +1,8 @@
 # Current Closed Alpha Authority — 2026-09-28
 
-This index records the current founder decisions and points future work to the
-active implementation evidence. If an older handoff conflicts with this file,
-the current founder decisions and the live GitHub code take precedence.
+> Historical snapshot only. Superseded for current Didit retention and release-gate decisions by [CURRENT_DIDIT_OPERATIONAL_AUTHORITY_20261001.md](./CURRENT_DIDIT_OPERATIONAL_AUTHORITY_20261001.md). The two-year Sandbox retention value below was the earlier observation and is not current.
+
+This index records a dated 2026-09-28 snapshot for provenance. It is retained as historical evidence and is no longer the current operational authority for Didit; use the superseding record linked above.
 
 ## Authentication and release path
 
