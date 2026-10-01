@@ -197,15 +197,16 @@ describe("identity verification boundary", () => {
     assert.match(JSON.stringify(events), /canonical_decision_request_failed/);
     assert.doesNotMatch(JSON.stringify(events), /raw-name|private-number/);
   });
-  it("keeps the production factory closed and classifies readiness without raw identity columns", () => {
+  it("publishes the reviewed notice while keeping environment/config readiness fail-closed", () => {
     const factory = readFileSync("lib/server/identity/provider.ts", "utf8");
     assert.match(factory, /provider: null/);
     assert.match(factory, /classifyIdentityReadiness/);
     assert.doesNotMatch(factory, /if \(!IDENTITY_PROVIDER_NOTICE_READY\) return null/);
-    assert.equal(IDENTITY_PROVIDER_NOTICE_READY, false, "release must publish reviewed provider terms before enabling");
-    assert.equal(classifyIdentityReadiness(env, false), "NOTICE_NOT_READY");
-    assert.equal(classifyIdentityReadiness({ ...env, DIDIT_WEBHOOK_SECRET: undefined }, true), "WEBHOOK_NOT_CONFIGURED");
-    assert.equal(classifyIdentityReadiness(env, true), "READY");
+    assert.equal(IDENTITY_PROVIDER_NOTICE_READY, true);
+    assert.equal(classifyIdentityReadiness({}, IDENTITY_PROVIDER_NOTICE_READY), "ENV_DISABLED");
+    assert.equal(classifyIdentityReadiness({ ...env, UNSTANDARD_IDENTITY_ENABLED: "false" }, IDENTITY_PROVIDER_NOTICE_READY), "ENV_DISABLED");
+    assert.equal(classifyIdentityReadiness({ ...env, DIDIT_WEBHOOK_SECRET: undefined }, IDENTITY_PROVIDER_NOTICE_READY), "WEBHOOK_NOT_CONFIGURED");
+    assert.equal(classifyIdentityReadiness(env, IDENTITY_PROVIDER_NOTICE_READY), "READY");
     const migration = readFileSync("drizzle/migrations/0011_premium_rhodey.sql", "utf8");
     assert.doesNotMatch(migration, /\b(real_name|phone_number|phone|birth_date|ci|di|otp)\b/i);
     assert.doesNotMatch(migration, /UPDATE\s+profiles/i);
@@ -380,20 +381,8 @@ describe("Didit webhook boundary", () => {
   it("verifies Didit's raw-body signature fallback", () => {
     const rawBody = new TextEncoder().encode(JSON.stringify(webhook));
     const signature = createHmac("sha256", env.DIDIT_WEBHOOK_SECRET).update(rawBody).digest("hex");
-    assert.equal(verifyDiditWebhookRawSignature({
-      rawBody,
-      signature,
-      timestamp: String(webhook.timestamp),
-      secret: env.DIDIT_WEBHOOK_SECRET,
-      nowSeconds: webhook.timestamp,
-    }), true);
-    assert.equal(verifyDiditWebhookRawSignature({
-      rawBody: new TextEncoder().encode(JSON.stringify({ ...webhook, status: "Declined" })),
-      signature,
-      timestamp: String(webhook.timestamp),
-      secret: env.DIDIT_WEBHOOK_SECRET,
-      nowSeconds: webhook.timestamp,
-    }), false);
+    assert.equal(verifyDiditWebhookRawSignature({ rawBody, signature, timestamp: String(webhook.timestamp), secret: env.DIDIT_WEBHOOK_SECRET, nowSeconds: webhook.timestamp }), true);
+    assert.equal(verifyDiditWebhookRawSignature({ rawBody: new TextEncoder().encode(JSON.stringify({ ...webhook, status: "Declined" })), signature, timestamp: String(webhook.timestamp), secret: env.DIDIT_WEBHOOK_SECRET, nowSeconds: webhook.timestamp }), false);
   });
   it("accepts the documented simple envelope signature only for canonical re-fetch", () => {
     const timestamp = String(webhook.timestamp);
@@ -403,12 +392,14 @@ describe("Didit webhook boundary", () => {
     assert.equal(verifyDiditWebhookSimpleSignature({ timestamp, sessionId: webhook.session_id, status: webhook.status, webhookType: webhook.webhook_type, signature, secret: env.DIDIT_WEBHOOK_SECRET, nowSeconds: webhook.timestamp }), true);
     assert.equal(verifyDiditWebhookSimpleSignature({ timestamp, sessionId: webhook.session_id, status: "Declined", webhookType: webhook.webhook_type, signature, secret: env.DIDIT_WEBHOOK_SECRET, nowSeconds: webhook.timestamp }), false);
   });
-  it("keeps the production webhook endpoint closed through the readiness gate", () => {
+  it("keeps the webhook endpoint fail-closed unless full runtime readiness is satisfied", () => {
     const route = readFileSync("app/api/identity/webhook/route.ts", "utf8");
     assert.match(route, /getIdentityReadiness/);
     assert.match(route, /if \(!readiness\.available \|\| !config\?\.webhookSecret\)/);
     assert.match(route, /status: 404/);
-    assert.equal(IDENTITY_PROVIDER_NOTICE_READY, false);
+    assert.equal(IDENTITY_PROVIDER_NOTICE_READY, true);
+    assert.equal(classifyIdentityReadiness({}, IDENTITY_PROVIDER_NOTICE_READY), "ENV_DISABLED");
+    assert.equal(classifyIdentityReadiness(env, IDENTITY_PROVIDER_NOTICE_READY), "READY");
   });
   it("durably schedules canonical completion before acknowledgement and keeps storage failures retryable", () => {
     const route = readFileSync("app/api/identity/webhook/route.ts", "utf8");
