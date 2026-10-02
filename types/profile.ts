@@ -1,8 +1,9 @@
 export type Candidate = {
   id: string;
   nickname: string;
-  /** Optional — DB-backed public candidates may omit age. */
+  /** Self-reported age at profile update, not verified age. Mock cards may omit it. */
   age?: number;
+  gender?: "male" | "female";
   city: string;
   teaser: string;
   question: string;

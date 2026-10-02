@@ -143,10 +143,6 @@ async function main(): Promise<void> {
   const cases: ProofCase[] = [];
   const futureNotApplicable: FutureCase[] = [
     {
-      name: "duplicate_block_rejected",
-      reason: "No HTTP block endpoint in alpha rebuild",
-    },
-    {
       name: "user_a_cannot_modify_user_b_profile",
       reason: "No profile mutation HTTP endpoint in alpha rebuild",
     },
@@ -620,6 +616,46 @@ async function main(): Promise<void> {
       bAfterPrivate.status === 200 &&
       isPrivateNoStore(afterPrivate.headers) &&
       isPrivateNoStore(bAfterPrivate.headers),
+  );
+
+  // Block only after the bidirectional unlock/messaging proofs: blocking is
+  // persistent pair state and must not invalidate the earlier preconditions.
+  const blockRequest = {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ profileId: profileBId }),
+  };
+  const firstBlock = await fetchJson("/api/blocks", blockRequest, jarA);
+  const repeatBlock = await fetchJson("/api/blocks", blockRequest, jarA);
+  const firstBlockBody = firstBlock.body as { blocked?: boolean; inserted?: boolean };
+  const repeatBlockBody = repeatBlock.body as { blocked?: boolean; inserted?: boolean };
+  pushCase(
+    cases,
+    "block_create_idempotent",
+    firstBlock.status === 201 && firstBlockBody?.blocked === true &&
+      firstBlockBody.inserted === true && repeatBlock.status === 200 &&
+      repeatBlockBody?.blocked === true && repeatBlockBody.inserted === false &&
+      isPrivateNoStore(firstBlock.headers) && isPrivateNoStore(repeatBlock.headers),
+  );
+
+  const blockedConversation = await fetchJson(`/api/messages/${profileBId}`, {}, jarA);
+  const blockedMessage = await fetchJson(
+    `/api/messages/${profileBId}`,
+    {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ body: "차단 후 전송되어서는 안 되는 합성 테스트 메시지입니다." }),
+    },
+    jarA,
+  );
+  pushCase(
+    cases,
+    "post_block_message_denied",
+    blockedConversation.status === 403 &&
+      (blockedConversation.body as { code?: string })?.code === "BLOCKED" &&
+      blockedMessage.status === 403 &&
+      (blockedMessage.body as { code?: string })?.code === "BLOCKED" &&
+      isPrivateNoStore(blockedConversation.headers) && isPrivateNoStore(blockedMessage.headers),
   );
 
   const getSession = async (jar: CookieJar) => {

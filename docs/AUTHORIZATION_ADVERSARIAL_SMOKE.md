@@ -86,7 +86,7 @@ export UNSTANDARD_READINESS_EVIDENCE_PATH=./tmp/readiness-proof.json
 npm run readiness:alpha
 ```
 
-## Required deployed HTTP cases (37; must all PASS)
+## Required deployed HTTP cases (39; must all PASS)
 
 The executable source of truth is `REQUIRED_HTTP_SMOKE_CASES`. The cases are
 listed explicitly so a shortened narrative cannot hide a missing proof:
@@ -117,11 +117,19 @@ listed explicitly so a shortened narrative cannot hide a missing proof:
   `b_to_a_private_after_unlock_ok`
 - final privacy/isolation: `bidirectional_viewer_isolation`,
   `private_response_no_store`
+- block boundary: `block_create_idempotent`, `post_block_message_denied`
 
 The waitlist case uses a unique synthetic address, verifies join and same-browser
 capability deletion, and must leave the final state unjoined. The messaging
 cases prove database persistence, recipient visibility, and private/no-store
 HTTP caching; they do not claim notifications or a full inbox product.
+
+The block cases run after the bidirectional unlock/messaging proofs. They require
+the first `POST /api/blocks` to return `201`, `blocked=true`, `inserted=true`,
+and the repeat to return `200`, `blocked=true`, `inserted=false`. Both responses
+must be private/no-store. After blocking, conversation GET and message POST must
+both return `403` with `code=BLOCKED` and private/no-store headers. Operator
+fixture cleanup must remove the synthetic block before another smoke run.
 
 ## Hostname restrictions
 

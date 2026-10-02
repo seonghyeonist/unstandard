@@ -11,6 +11,7 @@ import {
   isAlphaRecruitmentCohort,
 } from "../../lib/alpha/stage1-policy";
 import { createStage1Invite, Stage1InviteError } from "../../lib/alpha/invite-admin";
+import { buildInviteLink } from "../../lib/alpha/invite-link";
 import { getDb } from "../../lib/db/client";
 import { alphaInvites } from "../../lib/db/schema/invites";
 import { normalizeEmail } from "../../lib/auth/invite-crypto";
@@ -75,10 +76,10 @@ async function createInvite(email: string): Promise<void> {
 
   console.log("INVITE_CREATED");
   console.log(`email=${created.email}`);
-  console.log(`code=${created.rawCode}`);
+  console.log(`invite_link=${buildInviteLink(created.rawCode)}`);
   console.log(`occupied_seats=${created.occupiedSeats}/50`);
   console.log(`balance_gate=${created.balanceGate.gate}`);
-  console.log("Store this code securely — it will not be shown again.");
+  console.log("Store this invitation link securely — it will not be shown again.");
 }
 
 async function revokeInvite(email: string): Promise<void> {

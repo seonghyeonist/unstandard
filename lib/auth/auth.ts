@@ -7,8 +7,11 @@ import { APIError, createAuthMiddleware } from "better-auth/api";
 import { cookies } from "next/headers";
 import { eq } from "drizzle-orm";
 import { getDb } from "@/lib/db/client";
-import { users } from "@/lib/db/schema/auth";
 import { schema } from "@/lib/db/schema";
+import { users } from "@/lib/db/schema/auth";
+import { isEmailVerificationTicketUsable } from "@/lib/auth/email-verification";
+import { normalizeEmail } from "@/lib/auth/invite-crypto";
+import { isAcceptableNewPassword } from "@/lib/auth/password-policy";
 import { verifyInviteReservation } from "@/lib/auth/invite-gate";
 import {
   compensateFailedRegistration,
@@ -16,43 +19,20 @@ import {
   finalizeInviteRegistration,
   isUserInviteFinalized,
 } from "@/lib/auth/invite-finalization";
-import { normalizeEmail } from "@/lib/auth/invite-crypto";
 import {
   getRegistrationTicketCookieName,
   verifyRegistrationTicket,
 } from "@/lib/auth/invite-ticket";
+import { sendPasswordResetEmail } from "@/lib/email/transactional";
+import { getCanonicalAuthOrigin } from "@/lib/auth/canonical-origin";
 
 function getTrustedOrigins(): string[] {
-  const origins = new Set<string>();
-  const authUrl = process.env.BETTER_AUTH_URL?.trim();
-  if (authUrl) origins.add(authUrl.replace(/\/$/, ""));
-  const appUrl = process.env.UNSTANDARD_APP_URL?.trim();
-  if (appUrl) origins.add(appUrl.replace(/\/$/, ""));
-  for (const hostname of [
-    process.env.VERCEL_URL,
-    process.env.VERCEL_BRANCH_URL,
-  ]) {
-    const value = hostname?.trim();
-    if (!value) continue;
-
-    const origin = value.startsWith("http://") || value.startsWith("https://")
-      ? value
-      : `https://${value}`;
-
-    origins.add(origin.replace(/\/$/, ""));
-  }
-
-  if (process.env.NODE_ENV !== "production") {
-    origins.add("http://localhost:3000");
-  }
-  return [...origins];
+  return [getCanonicalAuthOrigin()];
 }
 
 function requireAuthSecret(): string {
   const secret = process.env.BETTER_AUTH_SECRET?.trim();
-  if (!secret) {
-    throw new Error("BETTER_AUTH_SECRET is not configured");
-  }
+  if (!secret) throw new Error("BETTER_AUTH_SECRET is not configured");
   return secret;
 }
 
@@ -68,29 +48,15 @@ const inviteGatePlugin = () => ({
   hooks: {
     before: [
       {
-        matcher: (context: { path?: string }) => context.path === "/sign-up/email",
+        matcher: (context: { path?: string }) => context.path === "/sign-up/email" || context.path === "/reset-password",
         handler: createAuthMiddleware(async (ctx) => {
-          const ticket = await readRegistrationTicket();
-          if (!ticket) {
-            throw APIError.from("FORBIDDEN", {
-              code: "INVITE_REQUIRED",
-              message: "Registration is invite-only",
-            });
-          }
-
-          const email = normalizeEmail(String(ctx.body?.email ?? ""));
-          if (email !== ticket.email) {
-            throw APIError.from("FORBIDDEN", {
-              code: "INVITE_REQUIRED",
-              message: "Registration is invite-only",
-            });
-          }
-
-          const reservationValid = await verifyInviteReservation(ticket);
-          if (!reservationValid) {
-            throw APIError.from("FORBIDDEN", {
-              code: "INVITE_RESERVATION_INVALID",
-              message: "Invite reservation is no longer valid",
+          const candidate = ctx.path === "/reset-password"
+            ? ctx.body?.newPassword
+            : ctx.body?.password;
+          if (!isAcceptableNewPassword(candidate)) {
+            throw APIError.from("BAD_REQUEST", {
+              code: "PASSWORD_TOO_WEAK",
+              message: "Password does not meet the minimum security requirements",
             });
           }
         }),
@@ -101,8 +67,7 @@ const inviteGatePlugin = () => ({
           const email = normalizeEmail(String(ctx.body?.email ?? ""));
           if (!email) return;
 
-          const db = getDb();
-          const [existingUser] = await db
+          const [existingUser] = await getDb()
             .select({ id: users.id })
             .from(users)
             .where(eq(users.email, email))
@@ -132,25 +97,72 @@ const inviteGatePlugin = () => ({
   },
 });
 
+async function requireInviteRegistration(email: string) {
+  const ticket = await readRegistrationTicket();
+  const proofUsable = ticket
+    ? await isEmailVerificationTicketUsable({
+        inviteId: ticket.inviteId,
+        email: ticket.email,
+        challengeId: ticket.emailVerificationId,
+        exp: ticket.exp,
+      })
+    : false;
+  const reservationValid = ticket ? await verifyInviteReservation(ticket) : false;
+
+  if (
+    !ticket ||
+    !proofUsable ||
+    !reservationValid ||
+    normalizeEmail(email) !== ticket.email
+  ) {
+    throw APIError.from("FORBIDDEN", {
+      code: "INVITE_REQUIRED",
+      message: "A verified personal invitation is required to create an account",
+    });
+  }
+}
+
 let authInstance: ReturnType<typeof betterAuth> | null = null;
 
 export function getAuth(): ReturnType<typeof betterAuth> {
-  if (authInstance) {
-    return authInstance;
-  }
+  if (authInstance) return authInstance;
 
   authInstance = betterAuth({
     database: drizzleAdapter(getDb(), {
       provider: "pg",
       schema,
       usePlural: true,
+      // Better Auth's user + credential-account creation must share one
+      // PostgreSQL transaction. App-owned invite proof/finalization follows
+      // in the post-commit hook with compensation on failure.
+      transaction: true,
     }),
     secret: requireAuthSecret(),
-    baseURL: process.env.BETTER_AUTH_URL,
+    baseURL: getCanonicalAuthOrigin(),
     trustedOrigins: getTrustedOrigins(),
     emailAndPassword: {
       enabled: true,
       minPasswordLength: 10,
+      maxPasswordLength: 128,
+      resetPasswordTokenExpiresIn: 15 * 60,
+      revokeSessionsOnPasswordReset: true,
+      sendResetPassword: async ({ user, url }) => {
+        try {
+          await sendPasswordResetEmail({ to: user.email, url });
+        } catch {
+          // Keep reset requests enumeration-safe. Operational logs carry only
+          // a stable failure code; the address and token never enter logs.
+          console.error({ action: "password_reset_delivery_failed", code: "EMAIL_DELIVERY_FAILED" });
+        }
+      },
+    },
+    account: {
+      accountLinking: {
+        enabled: false,
+        disableImplicitLinking: true,
+        allowDifferentEmails: false,
+        updateUserInfoOnLink: false,
+      },
     },
     user: {
       deleteUser: {
@@ -165,12 +177,13 @@ export function getAuth(): ReturnType<typeof betterAuth> {
       customRules: {
         "/sign-in/email": { window: 60, max: 5 },
         "/sign-up/email": { window: 60, max: 5 },
+        "/request-password-reset": { window: 60, max: 5 },
+        "/reset-password": { window: 60, max: 10 },
         "/delete-user": { window: 3_600, max: 3 },
       },
     },
     advanced: {
       ipAddress: {
-        // Vercel overwrites this header with the public client IP.
         ipAddressHeaders: ["x-forwarded-for"],
       },
     },
@@ -178,6 +191,13 @@ export function getAuth(): ReturnType<typeof betterAuth> {
     databaseHooks: {
       user: {
         create: {
+          before: async (user) => {
+            await requireInviteRegistration(user.email);
+            // The custom pre-account challenge is the email ownership proof.
+            // Marking this true prevents Better Auth's built-in post-account
+            // verification flow from creating a second, weaker path.
+            return { data: { emailVerified: true } };
+          },
           after: async (user) => {
             const ticket = await readRegistrationTicket();
             if (!ticket) {
@@ -191,6 +211,7 @@ export function getAuth(): ReturnType<typeof betterAuth> {
                 inviteId: ticket.inviteId,
                 userId: user.id,
                 reservationCapability: ticket.capability,
+                emailVerificationId: ticket.emailVerificationId,
                 email: user.email,
                 legalAcceptance: ticket.legalAcceptance,
               });

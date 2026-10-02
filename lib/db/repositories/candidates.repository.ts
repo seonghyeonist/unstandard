@@ -1,6 +1,8 @@
 import "server-only";
 
-import { and, eq, isNotNull, ne } from "drizzle-orm";
+import { and, eq, isNotNull, ne, sql } from "drizzle-orm";
+import { eligibleProfileSql, introductionPairSql } from "@/lib/db/repositories/introduction-policy";
+import { profileBasics } from "@/lib/db/schema/profile-basics";
 import { getDb } from "@/lib/db/client";
 import { profiles } from "@/lib/db/schema/profiles";
 import { getConfiguredUnlockQuestion } from "@/lib/server/unlock/question-config";
@@ -12,6 +14,8 @@ export type PublicCandidateRow = {
   city: string;
   teaser: string;
   question: string;
+  age: number;
+  gender: "male" | "female";
 };
 
 export type PublicProfileRow = PublicCandidateRow & {
@@ -30,7 +34,10 @@ export type PublicProfileRow = PublicCandidateRow & {
  */
 export async function listPublicCandidatesForViewer(
   viewerUserId: string,
-): Promise<PublicCandidateRow[] | "question_missing"> {
+): Promise<PublicCandidateRow[] | "question_missing" | "setup_required"> {
+  const eligibility = await getDb().execute(sql`SELECT ${eligibleProfileSql(sql`${viewerUserId}`)} AS eligible`);
+  if (!eligibility.rows[0]?.eligible) return "setup_required";
+
   const question = await getConfiguredUnlockQuestion();
   if (!question) {
     return "question_missing";
@@ -41,16 +48,21 @@ export async function listPublicCandidatesForViewer(
     .select({
       id: profiles.id,
       nickname: profiles.nickname,
-      city: profiles.city,
+      city: profileBasics.region,
+      age: profileBasics.age,
+      gender: profileBasics.gender,
       teaser: profiles.teaser,
     })
     .from(profiles)
-    .where(and(isNotNull(profiles.onboardedAt), ne(profiles.userId, viewerUserId)))
+    .innerJoin(profileBasics, eq(profileBasics.userId, profiles.userId))
+    .where(and(isNotNull(profiles.onboardedAt), ne(profiles.userId, viewerUserId), introductionPairSql(viewerUserId, sql`${profiles.userId}`)))
     .limit(50);
 
   return rows.map((row) => ({
     id: row.id,
     nickname: row.nickname,
+    age: row.age,
+    gender: row.gender as "male" | "female",
     city: row.city?.trim() || "미정",
     teaser: row.teaser?.trim() || "아직 짧은 소개가 없어요.",
     question: question.prompt,
@@ -59,6 +71,7 @@ export async function listPublicCandidatesForViewer(
 
 export async function getPublicProfileById(
   profileId: string,
+  viewerUserId: string,
 ): Promise<PublicProfileRow | "invalid" | "not_found" | "question_missing"> {
   if (!isUuid(profileId)) {
     return "invalid";
@@ -74,12 +87,15 @@ export async function getPublicProfileById(
     .select({
       id: profiles.id,
       nickname: profiles.nickname,
-      city: profiles.city,
+      city: profileBasics.region,
+      age: profileBasics.age,
+      gender: profileBasics.gender,
       teaser: profiles.teaser,
       onboardedAt: profiles.onboardedAt,
     })
     .from(profiles)
-    .where(eq(profiles.id, profileId))
+    .innerJoin(profileBasics, eq(profileBasics.userId, profiles.userId))
+    .where(and(eq(profiles.id, profileId), introductionPairSql(viewerUserId, sql`${profiles.userId}`)))
     .limit(1);
 
   if (!row || !row.onboardedAt) {
@@ -89,6 +105,8 @@ export async function getPublicProfileById(
   return {
     id: row.id,
     nickname: row.nickname,
+    age: row.age,
+    gender: row.gender as "male" | "female",
     city: row.city?.trim() || "미정",
     teaser: row.teaser?.trim() || "아직 짧은 소개가 없어요.",
     question: question.prompt,
