@@ -32,7 +32,7 @@ const request: IdentityRequest = {
   userId: "synthetic-user",
   requestId,
   profileRevision: "44444444-4444-4444-8444-444444444444",
-  provider: "test-only",
+  provider: "didit-v3",
   providerReference,
   biometricConsentVersion: IDENTITY_BIOMETRIC_CONSENT_VERSION,
   requestedAt: new Date(now.getTime() - 1000),
@@ -46,9 +46,26 @@ const request: IdentityRequest = {
 
 function fixture() {
   let calls = 0;
+  let starts = 0;
   let unpurged = 0;
   let purged = 0;
   const current = { ...request };
+  const purgeEntries = new Map<string, { requestId: string; provider: string; providerReference: string }>();
+  const purgeQueue = {
+    async enqueueProviderPurge(entry: { requestId: string; provider: string; providerReference: string }) {
+      const existing = purgeEntries.get(entry.requestId);
+      if (existing && (existing.provider !== entry.provider || existing.providerReference !== entry.providerReference)) {
+        throw new Error("queue conflict");
+      }
+      purgeEntries.set(entry.requestId, entry);
+    },
+    async hasProviderPurge(id: string) { return purgeEntries.has(id); },
+    async deleteProviderPurge(entry: { requestId: string; provider: string; providerReference: string }) {
+      const existing = purgeEntries.get(entry.requestId);
+      if (!existing || existing.provider !== entry.provider || existing.providerReference !== entry.providerReference) return false;
+      return purgeEntries.delete(entry.requestId);
+    },
+  };
   const repo: IdentityRepository = {
     begin: async () => current,
     removePending: async () => { current.providerReference = null; current.status = "pending"; return true; },
@@ -95,13 +112,13 @@ function fixture() {
     adultVerified: true,
   };
   const provider: IdentityProvider = {
-    id: "test-only",
-    start: async () => { calls++; return launch; },
+    id: "didit-v3",
+    start: async () => { calls++; starts++; return launch; },
     verify: async () => { calls++; return proof; },
     purge: async () => { calls++; return true; },
   };
-  const deps = { provider: provider as IdentityProvider | null, repository: repo, limit: async () => true, now: () => now };
-  return { deps, repo, provider, proof, calls: () => calls, unpurged: () => unpurged, purged: () => purged };
+  const deps = { provider: provider as IdentityProvider | null, repository: repo, purgeQueue, limit: async () => true, now: () => now };
+  return { deps, repo, provider, proof, calls: () => calls, starts: () => starts, queuedProviderPurges: () => [...purgeEntries.values()], unpurged: () => unpurged, purged: () => purged };
 }
 
 describe("identity verification boundary", () => {
@@ -111,6 +128,47 @@ describe("identity verification boundary", () => {
     assert.deepEqual(await identityService(f.deps).complete(request.userId, request.requestId), { ok: false, code: "PROVIDER_UNAVAILABLE" });
     assert.equal(f.calls(), 0); assert.equal(f.unpurged(), 0); assert.equal(f.purged(), 0);
   });
+  it("queues a session durably when binding fails and immediate purge returns false", async () => {
+    const f = fixture();
+    (await f.repo.findCurrent(request.userId))!.providerReference = null;
+    f.repo.bindProviderReference = async () => false;
+    f.provider.purge = async () => false;
+
+    assert.deepEqual(await identityService(f.deps).start(request.userId), { ok: false, code: "PURGE_PENDING" });
+    assert.deepEqual(f.queuedProviderPurges(), [{ requestId, provider: "didit-v3", providerReference }]);
+    const starts = f.starts();
+    assert.deepEqual(await identityService(f.deps).start(request.userId), { ok: false, code: "PURGE_PENDING" });
+    assert.equal(f.starts(), starts, "a new provider session waits until the queued purge is reconciled");
+  });
+
+  it("keeps a failed-bind session queued when immediate purge throws", async () => {
+    const f = fixture();
+    (await f.repo.findCurrent(request.userId))!.providerReference = null;
+    f.repo.bindProviderReference = async () => false;
+    f.provider.purge = async () => { throw new Error("synthetic purge failure"); };
+
+    assert.deepEqual(await identityService(f.deps).start(request.userId), { ok: false, code: "PURGE_PENDING" });
+    assert.deepEqual(f.queuedProviderPurges(), [{ requestId, provider: "didit-v3", providerReference }]);
+  });
+
+  it("removes the queued cleanup after a failed bind is immediately purged", async () => {
+    const f = fixture();
+    (await f.repo.findCurrent(request.userId))!.providerReference = null;
+    f.repo.bindProviderReference = async () => false;
+    f.provider.purge = async () => true;
+
+    assert.deepEqual(await identityService(f.deps).start(request.userId), { ok: false, code: "PROVIDER_UNAVAILABLE" });
+    assert.deepEqual(f.queuedProviderPurges(), []);
+  });
+
+  it("keeps the normal start result unchanged without creating a purge record", async () => {
+    const f = fixture();
+    (await f.repo.findCurrent(request.userId))!.providerReference = null;
+
+    assert.deepEqual(await identityService(f.deps).start(request.userId), { ok: true, requestId, launch });
+    assert.deepEqual(f.queuedProviderPurges(), []);
+  });
+
   it("requires all four provider-neutral proof bits and confirms purge before success", async () => {
     const f = fixture();
     assert.deepEqual(await identityService(f.deps).complete(request.userId, request.requestId), { ok: true, requestId });

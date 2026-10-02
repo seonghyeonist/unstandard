@@ -68,6 +68,19 @@ export interface IdentityRepository {
   markVerifiedUnpurged(request: IdentityRequest, proof: IdentityProof, now: Date): Promise<boolean>;
   markVerified(request: IdentityRequest, purgedAt: Date): Promise<boolean>;
 }
+
+export type IdentityProviderPurgeEntry = {
+  requestId: string;
+  provider: string;
+  providerReference: string;
+};
+
+export interface IdentityProviderPurgeQueue {
+  enqueueProviderPurge(entry: IdentityProviderPurgeEntry): Promise<void>;
+  hasProviderPurge(requestId: string): Promise<boolean>;
+  deleteProviderPurge(entry: IdentityProviderPurgeEntry): Promise<boolean>;
+}
+
 export type IdentityResult =
   | { ok: true; requestId: string; launch?: IdentityLaunch }
   | { ok: false; code: "PROVIDER_UNAVAILABLE" | "PROFILE_REQUIRED" | "VERIFICATION_FAILED" | "PURGE_PENDING" | "TOO_MANY_REQUESTS" };

@@ -347,6 +347,38 @@ export type IdentityProviderPurgeQueueEntry = {
 };
 
 export const identityProviderPurgeQueueRepository = {
+  async enqueueProviderPurge(entry: IdentityProviderPurgeQueueEntry): Promise<void> {
+    const inserted = await getDb()
+      .insert(identityProviderPurgeQueue)
+      .values({
+        requestId: entry.requestId,
+        provider: entry.provider,
+        providerReference: entry.providerReference,
+      })
+      .onConflictDoNothing({ target: identityProviderPurgeQueue.requestId })
+      .returning({ requestId: identityProviderPurgeQueue.requestId });
+    if (inserted.length === 1) return;
+
+    const [existing] = await getDb()
+      .select({
+        provider: identityProviderPurgeQueue.provider,
+        providerReference: identityProviderPurgeQueue.providerReference,
+      })
+      .from(identityProviderPurgeQueue)
+      .where(eq(identityProviderPurgeQueue.requestId, entry.requestId));
+    if (existing?.provider !== entry.provider || existing.providerReference !== entry.providerReference) {
+      throw new Error("Identity provider purge queue conflict");
+    }
+  },
+
+  async hasProviderPurge(requestId: string): Promise<boolean> {
+    const [entry] = await getDb()
+      .select({ requestId: identityProviderPurgeQueue.requestId })
+      .from(identityProviderPurgeQueue)
+      .where(eq(identityProviderPurgeQueue.requestId, requestId));
+    return Boolean(entry);
+  },
+
   async listProviderPurges(limit: number): Promise<IdentityProviderPurgeQueueEntry[]> {
     const boundedLimit = Math.max(1, Math.min(Math.trunc(limit), 50));
     return getDb()

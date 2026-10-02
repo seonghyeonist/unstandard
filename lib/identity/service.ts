@@ -4,6 +4,7 @@ import {
   identityLaunchSchema,
   type IdentityProvider,
   type IdentityRepository,
+  type IdentityProviderPurgeQueue,
   type IdentityLimiter,
   type IdentityProof,
   type IdentityResult,
@@ -14,6 +15,7 @@ import {
 export function identityService(deps: {
   provider: IdentityProvider | null;
   repository: IdentityRepository;
+  purgeQueue: IdentityProviderPurgeQueue;
   limit: IdentityLimiter;
   now?: () => Date;
   log?: IdentityEventLogger;
@@ -112,6 +114,13 @@ export function identityService(deps: {
           }
         }
 
+        // A failed bind can leave a provider session in the purge outbox. Do not
+        // create another session with the same vendor_data until cleanup finishes.
+        if (await deps.purgeQueue.hasProviderPurge(request.requestId)) {
+          report("start", "error", "PURGE_PENDING");
+          return { ok: false, code: "PURGE_PENDING" };
+        }
+
         let launch;
         try {
           launch = identityLaunchSchema.safeParse(await p.start({ requestId: request.requestId }));
@@ -130,9 +139,37 @@ export function identityService(deps: {
           bound = false;
         }
         if (!bound) {
-          try { await p.purge({ requestId: request.requestId, providerReference: launch.data.providerReference }); } catch { /* best effort */ }
+          const purgeEntry = {
+            requestId: request.requestId,
+            provider: p.id,
+            providerReference: launch.data.providerReference,
+          };
+          let queued = false;
+          try {
+            await deps.purgeQueue.enqueueProviderPurge(purgeEntry);
+            queued = true;
+          } catch {
+            // Still attempt immediate deletion if durable queueing is unavailable.
+          }
+
+          let purged = false;
+          try {
+            purged = await p.purge({ requestId: request.requestId, providerReference: launch.data.providerReference });
+          } catch {
+            purged = false;
+          }
+
+          let cleanupPending = queued && !purged;
+          if (queued && purged) {
+            try {
+              await deps.purgeQueue.deleteProviderPurge(purgeEntry);
+              cleanupPending = await deps.purgeQueue.hasProviderPurge(request.requestId);
+            } catch {
+              cleanupPending = true;
+            }
+          }
           report("start", "error", "PROVIDER_REFERENCE_BIND_FAILED");
-          return { ok: false, code: "PROVIDER_UNAVAILABLE" };
+          return { ok: false, code: cleanupPending ? "PURGE_PENDING" : "PROVIDER_UNAVAILABLE" };
         }
         report("start", "ok", "SESSION_CREATED");
         return { ok: true, requestId: request.requestId, launch: launch.data };
