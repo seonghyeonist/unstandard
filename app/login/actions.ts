@@ -1,6 +1,7 @@
 "use server";
 
 import { cookies, headers } from "next/headers";
+import { isAPIError } from "better-auth/api";
 import { isDatabaseAuthConfigured, isMockAuthAllowed } from "@/lib/config/auth-mode";
 import { getAuth } from "@/lib/auth/auth";
 import { isAcceptableNewPassword } from "@/lib/auth/password-policy";
@@ -38,33 +39,40 @@ export async function endMockSession() {
 
 export async function signInWithEmailPassword(email: string, password: string) {
   if (!isDatabaseAuthConfigured()) {
-    throw new Error("Database auth is not configured for this environment.");
+    return { ok: false as const, errorCode: "service_unavailable" as const };
   }
 
   const normalized = email.trim();
   if (!normalized || !normalized.includes("@")) {
-    throw new Error("Enter a valid email address.");
+    return { ok: false as const, errorCode: "invalid_credentials" as const };
   }
   if (password.length < 10) {
-    throw new Error("Password must be at least 10 characters.");
+    return { ok: false as const, errorCode: "invalid_credentials" as const };
   }
 
-  const auth = getAuth();
-  let result;
   try {
-    result = await auth.api.signInEmail({
+    const auth = getAuth();
+    const result = await auth.api.signInEmail({
       body: {
         email: normalized,
         password,
       },
       headers: await headers(),
     });
-  } catch {
-    throw new Error("Email or password is incorrect.");
-  }
 
-  if (!result?.user) {
-    throw new Error("Email or password is incorrect.");
+    if (!result?.user) {
+      return { ok: false as const, errorCode: "invalid_credentials" as const };
+    }
+  } catch (error) {
+    if (isAPIError(error) && (error.status === "UNAUTHORIZED" || error.status === "FORBIDDEN")) {
+      return { ok: false as const, errorCode: "invalid_credentials" as const };
+    }
+
+    // Keep infrastructure details and submitted credentials out of the
+    // server-action response while ensuring expected auth failures aren't
+    // surfaced as opaque React Server Component errors.
+    console.error({ action: "email_password_sign_in_failed", code: "AUTH_SIGN_IN_FAILED" });
+    return { ok: false as const, errorCode: "service_unavailable" as const };
   }
 
   return { ok: true as const };

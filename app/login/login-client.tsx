@@ -23,6 +23,11 @@ function resolveLoginError(errorCode?: string): string | null {
   return null;
 }
 
+function resolveSignInError(errorCode: "invalid_credentials" | "service_unavailable"): string {
+  if (errorCode === "invalid_credentials") return "Email or password is incorrect.";
+  return "Authentication is temporarily unavailable. Try again shortly.";
+}
+
 export default function LoginClient({
   canonicalOrigin,
   mockAllowed,
@@ -33,6 +38,7 @@ export default function LoginClient({
   const queryClient = useQueryClient();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [signInError, setSignInError] = useState<string | null>(null);
   const loginError = resolveLoginError(errorCode);
 
   useEffect(() => {
@@ -50,7 +56,13 @@ export default function LoginClient({
 
   const signInMutation = useMutation({
     mutationFn: async () => signInWithEmailPassword(email, password),
-    onSuccess: async () => {
+    onSuccess: async (result) => {
+      if (!result.ok) {
+        setSignInError(resolveSignInError(result.errorCode));
+        return;
+      }
+
+      setSignInError(null);
       await queryClient.invalidateQueries({ queryKey: ["current-user"] });
       router.push("/onboarding");
     },
@@ -68,6 +80,7 @@ export default function LoginClient({
               className="mt-6 space-y-3"
               onSubmit={(event) => {
                 event.preventDefault();
+                setSignInError(null);
                 signInMutation.mutate();
               }}
             >
@@ -99,7 +112,8 @@ export default function LoginClient({
         {!mockAllowed && !databaseAuthEnabled ? <p className="mt-4 text-sm text-danger">Database auth is required in this environment.</p> : null}
         {loginError ? <p className="mt-3 text-sm text-danger">{loginError}</p> : null}
         {mockMutation.isError ? <p className="mt-3 text-sm text-danger">{(mockMutation.error as Error).message}</p> : null}
-        {signInMutation.isError ? <p className="mt-3 text-sm text-danger">{(signInMutation.error as Error).message}</p> : null}
+        {signInError ? <p className="mt-3 text-sm text-danger" role="alert">{signInError}</p> : null}
+        {signInMutation.isError ? <p className="mt-3 text-sm text-danger" role="alert">Authentication is temporarily unavailable. Try again shortly.</p> : null}
         <Link className="mt-6 inline-block text-sm text-foreground/60 underline" href="/">Back to home</Link>
       </Card>
     </AppShell>
