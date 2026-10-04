@@ -46,6 +46,8 @@ export const EXPECTED_MIGRATION_LEDGER = [
   { file: "0010_identity_notice_version.sql", hash: "2da6d6365c0785bb89450d4531441981547564f00395886a7f211c25019f0f00" },
   { file: "0011_premium_rhodey.sql", hash: "3648cb4aee3e85e87057f2912b2fec8c13f211c2afb69d33b4880ae74f24e659" },
   { file: "0012_blue_lady_ursula.sql", hash: "163ca3f5604e1e24b58e95c03fb3cee66fb4d145c3a1c843c5e6ac321c9fe1c2" },
+  { file: "0013_identity_webhook_reconciliation.sql", hash: "3b8889a0addf091a48573f3a4782be96f0015247c4797af2b4d78cdf4039f4b6" },
+  { file: "0014_identity_provider_purge_queue.sql", hash: "d82cbfdf48d64c76b85256b01bc853c92d35b2b55865d62921617a202291da8b" },
 ] as const;
 
 export const EXPECTED_MIGRATION_HASHES = EXPECTED_MIGRATION_LEDGER.map(
