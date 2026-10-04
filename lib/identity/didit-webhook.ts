@@ -1,4 +1,28 @@
 import { createHash, createHmac, timingSafeEqual } from "node:crypto";
+import { z } from "zod";
+import { diditEnvironmentSchema, type DiditEnvironment } from "./didit-environment";
+
+export const diditSessionWebhookSchema = z.object({
+  event_id: z.string().uuid(),
+  webhook_type: z.enum(["status.updated", "data.updated"]),
+  timestamp: z.number().int().nonnegative(),
+  session_id: z.string().uuid(),
+  status: z.string().trim().min(1).max(64),
+  environment: diditEnvironmentSchema,
+  session_kind: z.literal("user").optional(),
+  workflow_id: z.string().uuid().optional(),
+  vendor_data: z.string().uuid(),
+}).passthrough();
+
+/** Sandbox must use a signature that authenticates the environment field itself. */
+export function diditWebhookSignatureAllowed(input: {
+  expectedEnvironment: DiditEnvironment;
+  bodyBoundSignatureVerified: boolean;
+  simpleSignatureVerified: boolean;
+}): boolean {
+  return input.bodyBoundSignatureVerified ||
+    (input.expectedEnvironment === "live" && input.simpleSignatureVerified);
+}
 
 /** Match Didit's V3 canonical form: recursively sorted keys, compact JSON, UTF-8 Unicode. */
 function sortAndShorten(value: unknown): unknown {

@@ -6,6 +6,7 @@ import {
   type IdentityProvider,
 } from "@/lib/identity/contracts";
 import { readSmallJson } from "@/lib/http/profile-request";
+import { diditEnvironmentSchema, matchesExpectedDiditEnvironment } from "@/lib/identity/didit-environment";
 
 const DIDIT_API_ORIGIN = "https://verification.didit.me";
 const DIDIT_HOSTED_ORIGIN = "https://verify.didit.me";
@@ -13,6 +14,7 @@ const DIDIT_REQUEST_TIMEOUT_MS = 8_000;
 
 const configSchema = z.object({
   enabled: z.literal("true"),
+  expectedEnvironment: diditEnvironmentSchema,
   apiKey: z.string().trim().min(1).max(4096).regex(/^\S+$/),
   workflowId: z.string().uuid(),
   callbackUrl: z.string().url().refine((value) => {
@@ -45,12 +47,18 @@ export function parseDiditIdentityConfig(env: Record<string, string | undefined>
   }
   const parsed = configSchema.safeParse({
     enabled: env.UNSTANDARD_IDENTITY_ENABLED,
+    expectedEnvironment: env.DIDIT_EXPECTED_ENVIRONMENT,
     apiKey: env.DIDIT_API_KEY,
     workflowId: env.DIDIT_WORKFLOW_ID,
     callbackUrl,
     webhookSecret: env.DIDIT_WEBHOOK_SECRET,
   });
-  return parsed.success ? parsed.data : null;
+  if (!parsed.success) return null;
+  // Vercel Preview is reserved for the Sandbox provider application. Production
+  // can use Live only after its separate release configuration is reviewed.
+  if (env.VERCEL_ENV === "preview" && parsed.data.expectedEnvironment !== "sandbox") return null;
+  if (env.VERCEL_ENV === "production" && parsed.data.expectedEnvironment !== "live") return null;
+  return parsed.data;
 }
 
 const providerResponseId = identityProviderReferenceSchema;
@@ -61,6 +69,7 @@ const idVerificationSchema = featureResultSchema.extend({
 const decisionSchema = z.object({
   session_id: providerResponseId,
   session_kind: z.literal("user"),
+  environment: diditEnvironmentSchema,
   workflow_id: z.string().uuid(),
   vendor_data: identityRequestIdSchema,
   status: z.literal("Approved"),
@@ -247,6 +256,7 @@ export function createDiditIdentityProvider(
         const parsed = decisionSchema.safeParse(await readSmallJson(response, 256 * 1024));
         if (!parsed.success || parsed.data.session_id !== providerReference ||
           parsed.data.vendor_data !== requestId || parsed.data.workflow_id !== config.workflowId ||
+          !matchesExpectedDiditEnvironment(parsed.data.environment, config.expectedEnvironment) ||
           !hasExactWorkflowFeatures(parsed.data.features)) {
           diagnostic?.({ operation: "verify", code: "DECISION_INVALID" });
           return null;

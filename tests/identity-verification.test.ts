@@ -3,6 +3,7 @@ import { describe, it } from "node:test";
 import { readFileSync } from "node:fs";
 import { createHmac } from "node:crypto";
 import { createDiditIdentityProvider, parseDiditIdentityConfig } from "../lib/identity/didit";
+import { matchesExpectedDiditEnvironment } from "../lib/identity/didit-environment";
 import { reconcileIdentityCompletions } from "../lib/identity/reconciliation";
 import { identityService } from "../lib/identity/service";
 import { classifyIdentityReadiness } from "../lib/identity/readiness";
@@ -17,6 +18,8 @@ import { IDENTITY_PROVIDER_NOTICE_READY } from "../lib/identity/notice";
 import { completeBrowserIdentity, startBrowserIdentity } from "../lib/identity/browser-flow";
 import {
   canonicalizeDiditWebhook,
+  diditSessionWebhookSchema,
+  diditWebhookSignatureAllowed,
   verifyDiditWebhookRawSignature,
   verifyDiditWebhookSimpleSignature,
   verifyDiditWebhookSignature,
@@ -273,6 +276,7 @@ describe("identity verification boundary", () => {
 
 const env = {
   UNSTANDARD_IDENTITY_ENABLED: "true",
+  DIDIT_EXPECTED_ENVIRONMENT: "sandbox",
   DIDIT_API_KEY: "synthetic-test-secret-not-a-credential",
   DIDIT_WORKFLOW_ID: workflowId,
   UNSTANDARD_APP_URL: "https://unstandard.example",
@@ -305,9 +309,14 @@ describe("Didit V3 canonical adapter (synthetic HTTP only)", () => {
     assert.equal(parseDiditIdentityConfig({}), null);
     for (const patch of [
       { UNSTANDARD_IDENTITY_ENABLED: "false" }, { UNSTANDARD_IDENTITY_ENABLED: "test" },
+      { DIDIT_EXPECTED_ENVIRONMENT: undefined }, { DIDIT_EXPECTED_ENVIRONMENT: "Sandbox" },
       { DIDIT_API_KEY: "" }, { DIDIT_API_KEY: "secret\nAuthorization:bad" },
       { DIDIT_WORKFLOW_ID: "other" }, { UNSTANDARD_APP_URL: "http://unstandard.example" },
     ]) assert.equal(parseDiditIdentityConfig({ ...env, ...patch }), null);
+    assert.equal(parseDiditIdentityConfig({ ...env, VERCEL_ENV: "preview", DIDIT_EXPECTED_ENVIRONMENT: "live" }), null);
+    assert.equal(parseDiditIdentityConfig({ ...env, VERCEL_ENV: "production", DIDIT_EXPECTED_ENVIRONMENT: "sandbox" }), null);
+    assert.equal(parseDiditIdentityConfig({ ...env, VERCEL_ENV: "preview" })?.expectedEnvironment, "sandbox");
+    assert.equal(parseDiditIdentityConfig({ ...env, VERCEL_ENV: "production", DIDIT_EXPECTED_ENVIRONMENT: "live" })?.expectedEnvironment, "live");
   });
   it("creates only a server-bound opaque session with no customer payload", async () => {
     let calls = 0;
@@ -339,6 +348,9 @@ describe("Didit V3 canonical adapter (synthetic HTTP only)", () => {
   it("requires the target workflow's ID, liveness, face-match, IP and adult checks", async () => {
     const bad = [
       { status: "In Review" },
+      { environment: "live" },
+      { environment: undefined },
+      { session_id: "55555555-5555-4555-8555-555555555555" },
       { vendor_data: "stolen" },
       { workflow_id: "55555555-5555-4555-8555-555555555555" },
       { features: ["ID_VERIFICATION", "LIVENESS", "FACE_MATCH"] },
@@ -428,7 +440,33 @@ describe("browser identity flow (hosted Didit redirect)", () => {
 });
 
 describe("Didit webhook boundary", () => {
-  const webhook = { event_id: "66666666-6666-4666-8666-666666666666", webhook_type: "status.updated", timestamp: 1_777_000_000, session_id: providerReference, session_kind: "user", workflow_id: workflowId, vendor_data: requestId, status: "Approved", decision: { raw: "untrusted" }, name: "Unicode 이름" };
+  const webhook = { event_id: "66666666-6666-4666-8666-666666666666", webhook_type: "status.updated", timestamp: 1_777_000_000, session_id: providerReference, session_kind: "user", workflow_id: workflowId, vendor_data: requestId, status: "Approved", environment: "sandbox", decision: { raw: "untrusted" }, name: "Unicode 이름" };
+  it("accepts a signed Sandbox webhook and rejects a Live or missing environment before scheduling", () => {
+    const signatureFor = (payload: unknown) => createHmac("sha256", env.DIDIT_WEBHOOK_SECRET)
+      .update(canonicalizeDiditWebhook(payload), "utf8").digest("hex");
+    const sandbox = diditSessionWebhookSchema.safeParse(webhook);
+    assert.equal(sandbox.success, true);
+    const sandboxSignature = signatureFor(webhook);
+    assert.equal(matchesExpectedDiditEnvironment(webhook.environment, "sandbox") && verifyDiditWebhookSignature({ payload: webhook, signature: sandboxSignature, timestamp: String(webhook.timestamp), secret: env.DIDIT_WEBHOOK_SECRET, nowSeconds: webhook.timestamp }), true);
+    assert.equal(diditWebhookSignatureAllowed({ expectedEnvironment: "sandbox", bodyBoundSignatureVerified: true, simpleSignatureVerified: false }), true);
+    assert.equal(diditWebhookSignatureAllowed({ expectedEnvironment: "sandbox", bodyBoundSignatureVerified: false, simpleSignatureVerified: true }), false);
+    assert.equal(verifyDiditWebhookSignature({ payload: webhook, signature: "0".repeat(64), timestamp: String(webhook.timestamp), secret: env.DIDIT_WEBHOOK_SECRET, nowSeconds: webhook.timestamp }), false);
+
+    const live = { ...webhook, environment: "live" };
+    const liveSignature = signatureFor(live);
+    assert.equal(diditSessionWebhookSchema.safeParse(live).success, true);
+    assert.equal(verifyDiditWebhookSignature({ payload: live, signature: liveSignature, timestamp: String(live.timestamp), secret: env.DIDIT_WEBHOOK_SECRET, nowSeconds: live.timestamp }), true);
+    assert.equal(matchesExpectedDiditEnvironment(live.environment, "sandbox"), false);
+    const missingEnvironment = { ...webhook } as Record<string, unknown>;
+    delete missingEnvironment.environment;
+    assert.equal(diditSessionWebhookSchema.safeParse(missingEnvironment).success, false);
+
+    const route = readFileSync("app/api/identity/webhook/route.ts", "utf8");
+    const environmentGate = route.indexOf("matchesExpectedDiditEnvironment");
+    const requestLookup = route.indexOf("findByProviderReference");
+    const scheduling = route.indexOf("markCompletionRequested");
+    assert.ok(environmentGate >= 0 && environmentGate < requestLookup && requestLookup < scheduling);
+  });
   it("verifies V2 sorted Unicode-preserving signatures and rejects stale/tampered values", () => {
     const signature = createHmac("sha256", env.DIDIT_WEBHOOK_SECRET).update(canonicalizeDiditWebhook(webhook), "utf8").digest("hex");
     assert.equal(verifyDiditWebhookSignature({ payload: webhook, signature, timestamp: String(webhook.timestamp), secret: env.DIDIT_WEBHOOK_SECRET, nowSeconds: webhook.timestamp }), true);
