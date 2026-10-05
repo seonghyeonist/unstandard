@@ -1,7 +1,7 @@
 import { z } from "zod";
 
-export const IDENTITY_NOTICE_VERSION = "alpha-identity-v2";
-export const IDENTITY_BIOMETRIC_CONSENT_VERSION = "alpha-biometric-identity-v2";
+export const IDENTITY_NOTICE_VERSION = "alpha-identity-v3";
+export const IDENTITY_BIOMETRIC_CONSENT_VERSION = "alpha-biometric-identity-v3";
 export const IDENTITY_REQUEST_TTL_MS = 10 * 60 * 1000;
 export const identityRequestIdSchema = z.string().uuid();
 export const identityProviderReferenceSchema = z.string().uuid();

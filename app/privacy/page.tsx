@@ -99,7 +99,7 @@ export default function PrivacyPage() {
         <Link href="/" className="text-xl font-black tracking-[-0.04em]">unstandard</Link>
         <Link href="/app/settings" className="text-sm font-semibold text-accent">설정</Link>
       </nav>
-      <p className="text-xs font-bold uppercase tracking-[0.2em] text-accent">effective on profile-feature deployment · identity notice v2</p>
+      <p className="text-xs font-bold uppercase tracking-[0.2em] text-accent">effective on profile-feature deployment · identity notice v3</p>
       <h1 className="mt-3 text-4xl font-black tracking-[-0.06em]">개인정보 처리방침</h1>
       <p className="mt-5 text-base leading-7 text-foreground/75">Unstandard Closed Alpha의 실제 수집·보유·삭제·국외 이전 범위를 설명합니다. 처리 항목이나 수탁자가 바뀌면 시행 전에 이 페이지를 갱신합니다.</p>
       <div className="mt-10 space-y-9 text-sm leading-7 text-foreground/75">

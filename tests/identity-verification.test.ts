@@ -260,6 +260,18 @@ describe("identity verification boundary", () => {
   });
   it("publishes the reviewed notice while keeping environment/config readiness fail-closed", () => {
     const factory = readFileSync("lib/server/identity/provider.ts", "utf8");
+    const privacy = readFileSync("app/privacy/page.tsx", "utf8");
+    const profile = readFileSync("components/profile/profile-basics-form.tsx", "utf8");
+    assert.equal(IDENTITY_NOTICE_VERSION, "alpha-identity-v3");
+    assert.equal(IDENTITY_BIOMETRIC_CONSENT_VERSION, "alpha-biometric-identity-v3");
+    assert.match(privacy, /identity notice v3/);
+    assert.match(privacy, /Didit Identity Spain, S\.L\./);
+    assert.match(privacy, /주된 처리 인프라는 EEA/);
+    assert.match(privacy, /기본 보관은 무제한/);
+    assert.match(privacy, /Sandbox 설정은 1개월/);
+    assert.doesNotMatch(profile, /계약과 확정 고지 후에만 연결/);
+    assert.match(profile, /Didit Identity Spain, S\.L\./);
+    assert.match(profile, /Sandbox는 보유기간 1개월/);
     assert.match(factory, /provider: null/);
     assert.match(factory, /classifyIdentityReadiness/);
     assert.doesNotMatch(factory, /if \(!IDENTITY_PROVIDER_NOTICE_READY\) return null/);
