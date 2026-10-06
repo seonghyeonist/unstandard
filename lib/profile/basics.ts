@@ -24,6 +24,55 @@ export type BasicProfile = {
   nickname: string; gender: Gender; age: number; region: string;
   introductionScopeAccepted: boolean; updatedAt: string;
 };
+export type ProfileBasicsDraft = {
+  nickname: string; gender: string; age: string; region: string;
+  introductionScopeAccepted: boolean;
+};
+export type ProfileBasicsMutationState = {
+  nickname: string; city: string | null; gender: string; age: number; region: string;
+  introductionScopeAccepted: boolean; introductionScopeVersion: string; profileConsentVersion: string;
+};
+
+export function hasProfileBasicsDraftChanges(current: BasicProfile | null, draft: ProfileBasicsDraft): boolean {
+  const age = Number(draft.age);
+  if (!current) {
+    return Boolean(draft.nickname.trim()) &&
+      (draft.gender === "male" || draft.gender === "female") &&
+      Number.isInteger(age) && age >= 19 && age <= 120 &&
+      ACTIVITY_REGIONS.includes(draft.region as typeof ACTIVITY_REGIONS[number]);
+  }
+  return current.nickname !== draft.nickname.trim() ||
+    current.gender !== draft.gender ||
+    current.age !== age ||
+    current.region !== draft.region ||
+    current.introductionScopeAccepted !== draft.introductionScopeAccepted;
+}
+
+export function assessProfileBasicsMutation(
+  current: ProfileBasicsMutationState | null,
+  next: ProfileBasicsInput,
+  identityStatus: string | null,
+): "unchanged" | "blocked" | "update" {
+  const unchanged = current !== null &&
+    current.nickname === next.nickname &&
+    current.city === next.region &&
+    current.gender === next.gender &&
+    current.age === next.age &&
+    current.region === next.region &&
+    current.introductionScopeAccepted === next.introductionScopeAccepted &&
+    current.introductionScopeVersion === next.introductionScopeVersion &&
+    current.profileConsentVersion === next.profileConsentVersion;
+  if (unchanged) return "unchanged";
+  if (identityStatus === "pending" || identityStatus === "verified_unpurged") return "blocked";
+  return "update";
+}
+
+export function canSaveProfileBasics(state: {
+  busy: boolean; consent: boolean; actualProfileDirty: boolean; identityInProgress: boolean;
+}): boolean {
+  return !state.busy && state.consent && state.actualProfileDirty && !state.identityInProgress;
+}
+
 export type ProfileSetupView = {
   basics: BasicProfile | null;
   eligible: boolean;

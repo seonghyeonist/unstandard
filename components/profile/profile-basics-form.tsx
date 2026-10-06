@@ -5,7 +5,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { TextInput } from "@/components/ui/form-field";
-import { ACTIVITY_REGIONS, PROFILE_CONSENT_VERSION, INTRODUCTION_SCOPE_VERSION, type ProfileSetupView } from "@/lib/profile/basics";
+import { ACTIVITY_REGIONS, PROFILE_CONSENT_VERSION, INTRODUCTION_SCOPE_VERSION, canSaveProfileBasics, hasProfileBasicsDraftChanges, type ProfileSetupView } from "@/lib/profile/basics";
 import { completeBrowserIdentity, startBrowserIdentity } from "@/lib/identity/browser-flow";
 
 async function readSetup(): Promise<ProfileSetupView> {
@@ -45,7 +45,11 @@ export function ProfileBasicsForm({ setup }: { setup: ProfileSetupView }) {
       nickname, gender, age: Number(age), region, introductionScopeAccepted: scope, profileConsentAccepted: consent,
       profileConsentVersion: PROFILE_CONSENT_VERSION, introductionScopeVersion: INTRODUCTION_SCOPE_VERSION,
     }) });
-    if (!response.ok) throw new Error(response.status === 429 ? "저장 요청이 많아요. 잠시 뒤 다시 시도해 주세요." : "입력 항목과 동의를 확인해 주세요. 저장되지 않았어요.");
+    if (!response.ok) {
+      const failure = await response.json().catch(() => null) as { message?: unknown } | null;
+      throw new Error(typeof failure?.message === "string" ? failure.message :
+        response.status === 429 ? "저장 요청이 많아요. 잠시 뒤 다시 시도해 주세요." : "입력 항목과 동의를 확인해 주세요. 저장되지 않았어요.");
+    }
   }, onMutate: () => setSaveFeedback("idle"), onSuccess: async () => {
     await refresh();
     // The legal consent is intentionally re-affirmed for the next mutation.
@@ -67,6 +71,12 @@ export function ProfileBasicsForm({ setup }: { setup: ProfileSetupView }) {
     setStartedRequestId(undefined);
   }, onSettled: refresh });
   const busy = save.isPending || withdraw.isPending || verify.isPending;
+  const actualProfileDirty = hasProfileBasicsDraftChanges(setup.basics, {
+    nickname, gender, age, region, introductionScopeAccepted: scope,
+  });
+  const identityInProgress = setup.verification === "pending" || setup.verification === "purge_pending";
+  const identityCleanupRequired = identityInProgress || setup.verification === "expired";
+  const canSave = canSaveProfileBasics({ busy, consent, actualProfileDirty, identityInProgress: identityCleanupRequired });
   return <div className="space-y-5">
     <Card>
       <h2 className="text-xl font-black">기본 프로필</h2>
@@ -79,9 +89,12 @@ export function ProfileBasicsForm({ setup }: { setup: ProfileSetupView }) {
         <label className="flex gap-3 text-sm leading-6"><input type="checkbox" checked={scope} onChange={(e) => { setScope(e.target.checked); markDirty(); }} className="mt-1" /><span>이번 알파는 남성과 여성 간 소개만 제공함을 확인했고, 이 범위의 소개를 원해요. 성적 지향을 확인하거나 인증하는 절차는 아니에요. 선택하지 않으면 상대 노출·조회·대화가 중단돼요.</span></label>
         <label className="flex gap-3 text-sm leading-6"><input type="checkbox" required checked={consent} onChange={(e) => { setConsent(e.target.checked); markDirty(); }} className="mt-1" /><span>프로필 표시·소개 대상 제한·운영 집계를 위해 위 항목과 동의 버전·시각을 탈퇴 또는 프로필 정보 삭제까지 보관하는 데 동의해요. 거부할 수 있으며, 거부하면 소개 기능은 이용할 수 없어요. <Link className="underline" href="/privacy">개인정보 안내</Link></span></label>
         <p className="text-xs leading-5 text-foreground/65">수정·저장하면 이전 인증이 해제되고 재인증 전까지 상대에게 보이지 않아요. 만 나이는 입력 시점 기준이며, 1년이 지나면 다시 입력·인증해야 해요.</p>
-        <Button className="w-full" disabled={busy || !consent}>{save.isPending ? "저장 중…" : "기본 프로필 저장"}</Button>
+        <Button className="w-full" disabled={!canSave}>{save.isPending ? "저장 중…" : "기본 프로필 저장"}</Button>
+        {identityCleanupRequired ? <p role="status" aria-live="polite" className="text-sm">{setup.verification === "expired"
+          ? "인증 요청이 만료됐어요. 새 인증을 시작해 이전 요청을 정리해 주세요."
+          : "인증 결과 확인이 진행 중이에요. 인증을 마친 뒤 기본 정보를 수정해 주세요."}</p> : null}
         {save.isPending ? <p role="status" aria-live="polite" className="text-sm">기본 프로필을 저장하는 중이에요.</p> : null}
-        {!save.isPending && saveFeedback === "dirty" && !save.isError ? <p role="status" aria-live="polite" className="text-sm">저장하지 않은 변경사항이 있어요.</p> : null}
+        {!save.isPending && saveFeedback === "dirty" && actualProfileDirty && !save.isError ? <p role="status" aria-live="polite" className="text-sm">저장하지 않은 변경사항이 있어요.</p> : null}
         {!save.isPending && saveFeedback === "saved" ? <p role="status" aria-live="polite" className="text-sm text-accent">저장 완료. 다음 수정 때 현재 동의를 다시 확인해 주세요.</p> : null}
         {save.isError ? <p role="alert" className="text-sm text-danger">{save.error.message}</p> : null}
       </form>
@@ -92,8 +105,8 @@ export function ProfileBasicsForm({ setup }: { setup: ProfileSetupView }) {
       <p className="mt-3 text-sm leading-6 text-foreground/70">신원 확인은 Didit Identity Spain, S.L.의 호스팅 화면에서 진행돼요. 신분증 정보, 셀피·영상 기반의 수동적 생체활성, 얼굴 일치용 생체정보, 성인 여부와 필요한 기기·IP 분석이 처리될 수 있어요. 계약상 주된 처리 인프라는 EEA이며 기본 보유기간은 무제한이에요. 2026-10-01 확인한 Sandbox는 보유기간 1개월·세션과 함께 얼굴 템플릿 삭제 설정이에요. 인증 후 앱이 세션 삭제를 요청하고, 공급자 삭제 확인 전에는 소개를 열지 않아요. 즉시 물리 삭제를 보장하지 않아요. 앱 DB·로그에는 원문을 저장하지 않고 최소 인증 상태만 기록해요. 자세한 내용은 <Link className="underline" href="/privacy">개인정보 안내</Link>를 확인해 주세요.</p>
       <p className="mt-3 text-sm">인증 상태: {({ not_started: "미인증", pending: "확인 대기", purge_pending: "삭제 확인 대기", verified: "확인 완료", expired: "요청 만료" })[setup.verification]}</p>
       <label className="mt-4 flex gap-3 text-sm"><input type="checkbox" disabled={!setup.verificationAvailable} checked={identityConsent} onChange={(e) => setIdentityConsent(e.target.checked)} /><span>신분증·수동적 생체활성·얼굴 일치·성인 여부와 필요한 기기/IP 분석 처리, 인증 결과 기록 및 인증 세션 삭제 확인에 동의해요. 거부하면 소개 기능을 이용할 수 없어요.</span></label>
-      <Button className="mt-4 w-full" disabled={busy || !setup.verificationAvailable || !setup.basics?.introductionScopeAccepted || !identityConsent} onClick={() => verify.mutate("start")}>신원·성인 인증 시작</Button>
-      {identityRequest ? <Button className="mt-3 w-full" disabled={busy || !setup.verificationAvailable} onClick={() => verify.mutate("complete")}>인증 결과 확인</Button> : null}
+      {identityRequest ? <Button className={identityInProgress ? "mt-3 w-full font-bold ring-2 ring-accent" : "mt-3 w-full"} disabled={busy || !setup.verificationAvailable} onClick={() => verify.mutate("complete")}>인증 결과 확인</Button> : null}
+      <Button className="mt-4 w-full" disabled={busy || identityInProgress || !setup.verificationAvailable || !setup.basics?.introductionScopeAccepted || !identityConsent} onClick={() => verify.mutate("start")}>신원·성인 인증 시작</Button>
       {verify.isError ? <p role="alert" className="mt-3 text-sm text-danger">{verify.error.message}</p> : null}
     </Card>
     <Card>

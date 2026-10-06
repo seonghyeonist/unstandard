@@ -5,6 +5,7 @@ import { isSameOriginMutation, readSmallJson } from "@/lib/http/profile-request"
 import { profileBasicsSchema } from "@/lib/profile/basics";
 import { consumeRateLimit } from "@/lib/security/rate-limit";
 import { readProfileSetup, saveProfileBasics, withdrawProfileBasics } from "@/lib/server/profile/profile-basics.service";
+import { IdentityInProgressError } from "@/lib/server/profile/profile-basics.repository.interface";
 
 export async function GET() {
   try {
@@ -28,7 +29,13 @@ async function mutate(request: Request, remove: boolean) {
       await saveProfileBasics(user.id, body);
     }
     return privateJson(await readProfileSetup(user.id));
-  } catch (e) { return privateJson({ error: "Profile unavailable" }, { status: e instanceof AuthError ? 401 : 503 }); }
+  } catch (e) {
+    if (e instanceof IdentityInProgressError) return privateJson({
+      error: "IDENTITY_IN_PROGRESS",
+      message: "인증 결과 확인이 진행 중이에요. 인증을 마친 뒤 기본 정보를 수정해 주세요.",
+    }, { status: 409 });
+    return privateJson({ error: "Profile unavailable" }, { status: e instanceof AuthError ? 401 : 503 });
+  }
 }
 export async function PUT(request: Request) { return mutate(request, false); }
 export async function DELETE(request: Request) { return mutate(request, true); }

@@ -5,7 +5,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { ProfileBasicsForm } from "../components/profile/profile-basics-form";
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { canIntroduce, isIntroductionEligible, profileBasicsSchema, PROFILE_CONSENT_VERSION, INTRODUCTION_SCOPE_VERSION, type EligibilityFacts } from "../lib/profile/basics";
+import { assessProfileBasicsMutation, canIntroduce, canSaveProfileBasics, hasProfileBasicsDraftChanges, isIntroductionEligible, profileBasicsSchema, PROFILE_CONSENT_VERSION, INTRODUCTION_SCOPE_VERSION, type BasicProfile, type EligibilityFacts } from "../lib/profile/basics";
 import { IDENTITY_BIOMETRIC_CONSENT_VERSION, IDENTITY_NOTICE_VERSION } from "../lib/identity/contracts";
 import { isSameOriginMutation, readSmallJson } from "../lib/http/profile-request";
 
@@ -42,6 +42,39 @@ describe("basic profile consent and eligibility", () => {
     });
   }
 });
+describe("profile save state", () => {
+  const current: BasicProfile = { nickname: "여름", gender: "male", age: 22, region: "서울",
+    introductionScopeAccepted: true, updatedAt: now.toISOString() };
+  const persisted = { nickname: "여름", city: "서울", gender: "male", age: 22, region: "서울",
+    introductionScopeAccepted: true, introductionScopeVersion: INTRODUCTION_SCOPE_VERSION,
+    profileConsentVersion: PROFILE_CONSENT_VERSION };
+  const parsedInput = profileBasicsSchema.parse(input);
+
+  it("treats a consent-only/no-op save as unchanged even during pending completion", () => {
+    assert.equal(assessProfileBasicsMutation(persisted, parsedInput, "pending"), "unchanged");
+    assert.equal(assessProfileBasicsMutation(persisted, parsedInput, "verified_unpurged"), "unchanged");
+    assert.equal(assessProfileBasicsMutation(persisted, parsedInput, "verified"), "unchanged");
+    assert.equal(hasProfileBasicsDraftChanges(current, { nickname: "여름", gender: "male", age: "22",
+      region: "서울", introductionScopeAccepted: true }), false);
+  });
+  it("blocks a material change during identity work but permits the Alpha re-verification policy after verified", () => {
+    const changed = profileBasicsSchema.parse({ ...input, nickname: "겨울" });
+    assert.equal(assessProfileBasicsMutation(persisted, changed, "pending"), "blocked");
+    assert.equal(assessProfileBasicsMutation(persisted, changed, "verified_unpurged"), "blocked");
+    assert.equal(assessProfileBasicsMutation(persisted, changed, "verified"), "update");
+  });
+  it("marks only a complete initial profile or a material edit as dirty", () => {
+    const draft = { nickname: "여름", gender: "male", age: "22", region: "서울", introductionScopeAccepted: true };
+    assert.equal(hasProfileBasicsDraftChanges(null, { ...draft, nickname: "" }), false);
+    assert.equal(hasProfileBasicsDraftChanges(null, draft), true);
+    assert.equal(hasProfileBasicsDraftChanges(current, { ...draft, nickname: "겨울" }), true);
+    assert.equal(hasProfileBasicsDraftChanges(current, draft), false);
+    assert.equal(canSaveProfileBasics({ busy: false, consent: true, actualProfileDirty: false, identityInProgress: false }), false);
+    assert.equal(canSaveProfileBasics({ busy: false, consent: true, actualProfileDirty: true, identityInProgress: false }), true);
+    assert.equal(canSaveProfileBasics({ busy: false, consent: true, actualProfileDirty: true, identityInProgress: true }), false);
+  });
+});
+
 describe("profile request privacy", () => {
   it("rejects cross-site and missing origin mutations", () => {
     assert.equal(isSameOriginMutation(new Request("https://unstandard.app/api/profile/basics")), false);
@@ -66,12 +99,20 @@ describe("basic profile server-rendered form", () => {
     assert.doesNotMatch(html, /type="tel"|name="realName"|name="phone"|name="birth/);
     assert.match(html, /지원·계정 삭제/);
   });
+  it("keeps an existing pristine profile save disabled while its values are unchanged", () => {
+    const html = renderToStaticMarkup(createElement(QueryClientProvider, { client: new QueryClient() },
+      createElement(ProfileBasicsForm, { setup: { basics: { nickname: "여름", gender: "male", age: 22,
+        region: "서울", introductionScopeAccepted: true, updatedAt: now.toISOString() },
+        eligible: true, verification: "verified", verificationAvailable: true } })));
+    assert.match(html, /<button[^>]*disabled=""[^>]*>기본 프로필 저장/);
+  });
   it("offers result recovery from the authenticated pending request without rendering its ID or personal input fields", () => {
     const pendingIdentityRequestId = "11111111-1111-4111-8111-111111111111";
     const html = renderToStaticMarkup(createElement(QueryClientProvider, { client: new QueryClient() },
       createElement(ProfileBasicsForm, { setup: { basics: null, eligible: false, verification: "pending",
         verificationAvailable: true, pendingIdentityRequestId } })));
     assert.match(html, /인증 결과 확인/); assert.match(html, /확인 대기/);
+    assert.match(html, /인증 결과 확인이 진행 중이에요/);
     assert.doesNotMatch(html, new RegExp(pendingIdentityRequestId));
     assert.doesNotMatch(html, /type="tel"|name="realName"|name="phone"|name="birth/);
   });
@@ -79,6 +120,8 @@ describe("basic profile server-rendered form", () => {
     const source = readFileSync("components/profile/profile-basics-form.tsx", "utf8");
     assert.doesNotMatch(source, /<ProfileBasicsForm key=/);
     assert.match(source, /저장 완료/);
+    assert.match(source, /canSaveProfileBasics/);
+    assert.match(source, /identityInProgress/);
     assert.match(source, /aria-live="polite"/);
     assert.match(source, /setConsent\(false\)/);
   });

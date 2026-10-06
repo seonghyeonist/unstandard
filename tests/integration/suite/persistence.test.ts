@@ -1,5 +1,6 @@
 import { addSyntheticVerifiedBasics } from "../profile-fixture";
 import assert from "node:assert/strict";
+import { randomUUID } from "node:crypto";
 import { after, describe, it } from "node:test";
 import { inArray, sql } from "drizzle-orm";
 import { closeIntegrationDatabases, createIntegrationDb, getIntegrationDatabaseUrl } from "../helpers";
@@ -13,6 +14,11 @@ import { alphaActivityDays } from "../../../lib/db/schema/alpha-activity";
 import { alphaProfileExposures } from "../../../lib/db/schema/alpha-exposures";
 import { waitlistEntries, waitlistVisitDays } from "../../../lib/db/schema/waitlist";
 import { profiles } from "../../../lib/db/schema/profiles";
+import { identityProviderPurgeQueue, identityVerifications, profileBasics } from "../../../lib/db/schema/profile-basics";
+import { IDENTITY_BIOMETRIC_CONSENT_VERSION, IDENTITY_NOTICE_VERSION } from "../../../lib/identity/contracts";
+import { createProfileBasicsRepository } from "../../../lib/db/repositories/profile-basics.repository";
+import { IdentityInProgressError } from "../../../lib/server/profile/profile-basics.repository.interface";
+import { INTRODUCTION_SCOPE_VERSION, PROFILE_CONSENT_VERSION } from "../../../lib/profile/basics";
 import { users } from "../../../lib/db/schema/auth";
 import { observeIntegrationCase } from "../../../lib/readiness/integration-case-log";
 import { createMessage, listConversation } from "../../../lib/db/repositories/messages.repository";
@@ -63,6 +69,109 @@ after(async () => {
   } finally {
     await closeIntegrationDatabases();
   }
+});
+
+async function insertIdentityProfileFixture(
+  db: ReturnType<typeof createIntegrationDb>,
+  member: { userId: string },
+  input: { nickname: string; gender: "male" | "female"; age: number; region: string; introductionScopeAccepted: boolean },
+  status: "pending" | "verified",
+) {
+  const now = new Date();
+  const revision = randomUUID();
+  const requestId = randomUUID();
+  await db.insert(profileBasics).values({
+    userId: member.userId, gender: input.gender, age: input.age, region: input.region,
+    introductionScopeAccepted: input.introductionScopeAccepted,
+    introductionScopeVersion: INTRODUCTION_SCOPE_VERSION, profileConsentVersion: PROFILE_CONSENT_VERSION,
+    consentedAt: now, revision, updatedAt: now,
+  });
+  await db.update(profiles).set({ city: input.region, updatedAt: now })
+    .where(sql`${profiles.userId} = ${member.userId}`);
+  await db.insert(identityVerifications).values({
+    userId: member.userId, requestId, profileRevision: revision, status, provider: "didit-v3",
+    providerReference: randomUUID(), biometricConsentVersion: IDENTITY_BIOMETRIC_CONSENT_VERSION,
+    noticeVersion: IDENTITY_NOTICE_VERSION, requestedAt: now, expiresAt: new Date(now.getTime() + 60 * 60 * 1000),
+    completionRequestedAt: status === "pending" ? now : null,
+    completionEventId: status === "pending" ? randomUUID() : null,
+    verifiedAt: status === "verified" ? now : null, providerPurgedAt: status === "verified" ? now : null,
+  });
+  return { revision, requestId };
+}
+
+describe("integration: profile save and identity state", () => {
+  it("preserves a webhook-scheduled pending request on a no-op save and blocks real edits", async () => {
+    const db = createIntegrationDb(getIntegrationDatabaseUrl());
+    const suffix = "profile-pending-" + Date.now();
+    const member = await insertUserWithProfile(db, suffix);
+    const input = { nickname: "nick-" + suffix, gender: "male" as const, age: 22, region: "서울",
+      introductionScopeAccepted: true, profileConsentAccepted: true as const,
+      profileConsentVersion: PROFILE_CONSENT_VERSION, introductionScopeVersion: INTRODUCTION_SCOPE_VERSION };
+    const seeded = await insertIdentityProfileFixture(db, member, input, "pending");
+    const repository = createProfileBasicsRepository(() => db);
+    const before = await repository.read(member.userId);
+    assert.equal(before.verification, "pending");
+    assert.equal(before.pendingIdentityRequestId, seeded.requestId);
+    await repository.save(member.userId, input);
+
+    const afterNoop = await repository.read(member.userId);
+    assert.equal(afterNoop.verification, "pending");
+    assert.equal(afterNoop.pendingIdentityRequestId, seeded.requestId);
+    assert.equal(afterNoop.eligible, false);
+    const [basicsAfterNoop] = await db.select({ revision: profileBasics.revision }).from(profileBasics)
+      .where(sql`${profileBasics.userId} = ${member.userId}`);
+    const [verificationAfterNoop] = await db.select({ requestId: identityVerifications.requestId,
+      status: identityVerifications.status, completionRequestedAt: identityVerifications.completionRequestedAt })
+      .from(identityVerifications).where(sql`${identityVerifications.userId} = ${member.userId}`);
+    const queued = await db.select({ requestId: identityProviderPurgeQueue.requestId }).from(identityProviderPurgeQueue)
+      .where(sql`${identityProviderPurgeQueue.requestId} = ${seeded.requestId}`);
+    assert.equal(basicsAfterNoop?.revision, seeded.revision);
+    assert.equal(verificationAfterNoop?.requestId, seeded.requestId);
+    assert.equal(verificationAfterNoop?.status, "pending");
+    assert.ok(verificationAfterNoop?.completionRequestedAt);
+    assert.equal(queued.length, 0);
+
+    await assert.rejects(() => repository.save(member.userId, { ...input, nickname: "material-change" }),
+      (error: unknown) => error instanceof IdentityInProgressError);
+    const afterBlocked = await repository.read(member.userId);
+    assert.equal(afterBlocked.pendingIdentityRequestId, seeded.requestId);
+    assert.equal(afterBlocked.verification, "pending");
+    const [basicsAfterBlocked] = await db.select({ revision: profileBasics.revision }).from(profileBasics)
+      .where(sql`${profileBasics.userId} = ${member.userId}`);
+    const queuedAfterBlocked = await db.select({ requestId: identityProviderPurgeQueue.requestId })
+      .from(identityProviderPurgeQueue).where(sql`${identityProviderPurgeQueue.requestId} = ${seeded.requestId}`);
+    assert.equal(basicsAfterBlocked?.revision, seeded.revision);
+    assert.equal(queuedAfterBlocked.length, 0);
+  });
+
+  it("preserves verified eligibility on a no-op and requires re-verification after a material edit", async () => {
+    const db = createIntegrationDb(getIntegrationDatabaseUrl());
+    const suffix = "profile-verified-" + Date.now();
+    const member = await insertUserWithProfile(db, suffix);
+    const input = { nickname: "nick-" + suffix, gender: "male" as const, age: 22, region: "서울",
+      introductionScopeAccepted: true, profileConsentAccepted: true as const,
+      profileConsentVersion: PROFILE_CONSENT_VERSION, introductionScopeVersion: INTRODUCTION_SCOPE_VERSION };
+    const seeded = await insertIdentityProfileFixture(db, member, input, "verified");
+    const repository = createProfileBasicsRepository(() => db);
+    const before = await repository.read(member.userId);
+    assert.equal(before.verification, "verified");
+    assert.equal(before.eligible, true);
+    await repository.save(member.userId, input);
+    const afterNoop = await repository.read(member.userId);
+    assert.equal(afterNoop.verification, "verified");
+    assert.equal(afterNoop.eligible, true);
+    const [basicsAfterNoop] = await db.select({ revision: profileBasics.revision }).from(profileBasics)
+      .where(sql`${profileBasics.userId} = ${member.userId}`);
+    assert.equal(basicsAfterNoop?.revision, seeded.revision);
+
+    await repository.save(member.userId, { ...input, nickname: "changed-" + suffix });
+    const afterEdit = await repository.read(member.userId);
+    assert.equal(afterEdit.verification, "not_started");
+    assert.equal(afterEdit.eligible, false);
+    const remaining = await db.select({ requestId: identityVerifications.requestId }).from(identityVerifications)
+      .where(sql`${identityVerifications.userId} = ${member.userId}`);
+    assert.equal(remaining.length, 0);
+  });
 });
 
 describe("integration: persistence invariants", () => {
