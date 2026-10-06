@@ -208,6 +208,34 @@ describe("identity verification boundary", () => {
       assert.equal((await identityService(f.deps).start(request.userId)).ok, false); assert.equal(f.calls(), 0);
     }
   });
+  it("reconciles a timely signed completion after browser TTL with canonical lookup and purge", async () => {
+    const f = fixture();
+    const current = (await f.repo.findCurrent(request.userId))!;
+    current.expiresAt = new Date(now.getTime() - 60_000);
+    current.requestedAt = new Date(now.getTime() - 120_000);
+    current.completionRequestedAt = new Date(now.getTime() - 90_000);
+    current.completionEventId = requestId;
+    assert.deepEqual(await identityService(f.deps).complete(request.userId, requestId), { ok: true, requestId });
+    assert.equal(f.calls(), 2);
+    assert.equal(f.unpurged(), 1);
+    assert.equal(f.purged(), 1);
+  });
+  it("rejects late, unsigned, future and over-grace completion signals", async () => {
+    for (const kind of ["late", "unsigned", "future", "over-grace"]) {
+      const f = fixture();
+      const current = (await f.repo.findCurrent(request.userId))!;
+      current.expiresAt = new Date(now.getTime() - (kind === "over-grace" ? 3_600_001 : 60_000));
+      current.requestedAt = new Date(current.expiresAt.getTime() - 600_000);
+      current.completionRequestedAt = new Date(current.expiresAt.getTime() - 1000);
+      current.completionEventId = requestId;
+      if (kind === "late") current.completionRequestedAt = current.expiresAt;
+      if (kind === "future") current.completionRequestedAt = new Date(now.getTime() + 1000);
+      if (kind === "unsigned") current.completionEventId = null;
+      assert.equal((await identityService(f.deps).complete(request.userId, requestId)).ok, false, kind);
+      assert.equal(f.unpurged(), 0, kind);
+      assert.equal(f.calls(), 1, "purge only");
+    }
+  });
   it("never sends a stale external reference to a different provider", async () => {
     const f = fixture();
     f.repo.begin = async () => ({ ...request, provider: "old-provider", providerReference });
@@ -511,9 +539,10 @@ describe("Didit webhook boundary", () => {
   });
   it("durably schedules canonical completion before acknowledgement and keeps storage failures retryable", () => {
     const route = readFileSync("app/api/identity/webhook/route.ts", "utf8");
-    assert.equal(route.includes('from "next/server"'), false);
-    assert.equal(route.includes("after("), false);
-    assert.equal(route.includes("await createIdentityService().complete"), false);
+    assert.equal(route.includes('from "next/server"'), true);
+    assert.equal(route.includes("after("), true);
+    assert.ok(route.indexOf("markCompletionRequested") < route.lastIndexOf("after("));
+    assert.equal(route.includes("await createIdentityService().complete"), true);
     assert.equal(route.includes("markCompletionRequested"), true);
     assert.equal(route.includes("RECONCILIATION_SCHEDULED"), true);
     assert.equal(route.includes("status: 503"), true);

@@ -112,7 +112,7 @@ describe("basic profile server-rendered form", () => {
       createElement(ProfileBasicsForm, { setup: { basics: null, eligible: false, verification: "pending",
         verificationAvailable: true, pendingIdentityRequestId } })));
     assert.match(html, /인증 결과 확인/); assert.match(html, /확인 대기/);
-    assert.match(html, /인증 결과 확인이 진행 중이에요/);
+    assert.match(html, /인증 결과와 인증사 세션 삭제를 확인하고 있어요/);
     assert.doesNotMatch(html, new RegExp(pendingIdentityRequestId));
     assert.doesNotMatch(html, /type="tel"|name="realName"|name="phone"|name="birth/);
   });

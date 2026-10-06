@@ -1,6 +1,6 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "framework": "nextjs",
-  "buildCommand": "npm run build",
+  "buildCommand": "if [ \"$VERCEL_ENV\" = \"preview\" ] && [ \"$VERCEL_GIT_COMMIT_REF\" = \"alpha-rc-closure-20260929\" ]; then IDENTITY_RECONCILE_LIMIT=1 npm run identity:reconcile || exit 1; fi; npm run build",
   "installCommand": "npm ci"
 }

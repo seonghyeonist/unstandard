@@ -3,6 +3,7 @@ import "server-only";
 import { randomUUID } from "node:crypto";
 import { and, asc, eq, inArray, isNotNull, isNull, lte, or, sql } from "drizzle-orm";
 import { getDb } from "@/lib/db/client";
+import { identityCompletionDeadline } from "@/lib/identity/completion-window";
 import { identityProviderPurgeQueue, profileBasics, identityVerifications } from "@/lib/db/schema/profile-basics";
 import { profiles } from "@/lib/db/schema/profiles";
 import { INTRODUCTION_SCOPE_VERSION, PROFILE_CONSENT_VERSION, PROFILE_FRESHNESS_MS } from "@/lib/profile/basics";
@@ -259,7 +260,7 @@ export const identityRepository: IdentityRepository = {
         verification.providerReference !== request.providerReference ||
         verification.noticeVersion !== IDENTITY_NOTICE_VERSION ||
         verification.biometricConsentVersion !== IDENTITY_BIOMETRIC_CONSENT_VERSION ||
-        verification.expiresAt <= now ||
+        identityCompletionDeadline(verification) <= now ||
         verification.requestedAt > now ||
         !Number.isFinite(proof.verifiedAt.getTime()) ||
         proof.verifiedAt < verification.requestedAt ||

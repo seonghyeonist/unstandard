@@ -1,4 +1,5 @@
 import "server-only";
+import { after } from "next/server";
 
 import { privateJson } from "@/lib/http/private-json";
 import { readSmallJson } from "@/lib/http/profile-request";
@@ -14,6 +15,9 @@ import {
 import { identityRepository } from "@/lib/db/repositories/identity.repository";
 import { getIdentityReadiness } from "@/lib/server/identity/provider";
 import { logIdentityEvent } from "@/lib/server/identity/identity-logger";
+import { createIdentityService } from "@/lib/server/identity/service";
+
+export const maxDuration = 60;
 
 export async function POST(request: Request) {
   const readiness = getIdentityReadiness();
@@ -91,7 +95,8 @@ export async function POST(request: Request) {
   // A valid webhook is only a signal to schedule canonical provider lookup.
   // Didit has a five-second response budget, whereas decision lookup plus
   // provider purge may take longer. Persist the bounded work item before 202;
-  // the reconciliation command owns canonical lookup and purge afterwards.
+  // after() continues canonical lookup/purge outside that response budget.
+  // The durable row remains available to the reconciliation command on failure.
   let requestRow;
   try {
     requestRow = await identityRepository.findByProviderReference(envelope.data.session_id);
@@ -124,5 +129,13 @@ export async function POST(request: Request) {
   }
 
   logIdentityEvent({ event: "identity.webhook.scheduled", stage: "webhook", status: "ok", code: "RECONCILIATION_SCHEDULED" });
+  const { userId, requestId } = requestRow;
+  after(async () => {
+    try {
+      await createIdentityService().complete(userId, requestId);
+    } catch {
+      logIdentityEvent({ event: "identity.webhook.continuation_failed", stage: "webhook", status: "error", code: "RECONCILIATION_RETRYABLE" });
+    }
+  });
   return privateJson({ accepted: true }, { status: 202 });
 }

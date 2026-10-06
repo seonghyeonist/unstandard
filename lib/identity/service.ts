@@ -11,6 +11,7 @@ import {
   type IdentityEventLogger,
   type IdentityRequest,
 } from "@/lib/identity/contracts";
+import { identityCompletionDeadline } from "@/lib/identity/completion-window";
 
 export function identityService(deps: {
   provider: IdentityProvider | null;
@@ -208,7 +209,7 @@ export function identityService(deps: {
         const boundRequest = { ...request, providerReference };
 
         if (request.status === "pending") {
-          if (request.expiresAt <= time) {
+          if (identityCompletionDeadline(request) <= time) {
             return purgeRejectedOrExpiredRequest(boundRequest, p);
           }
           let proof: IdentityProof | null;
@@ -220,7 +221,7 @@ export function identityService(deps: {
           }
           const completedAt = now();
           if (!proof || !hasCompleteProof(proof, { requestId: request.requestId, providerReference }, completedAt) || proof.verifiedAt < request.requestedAt ||
-            request.expiresAt <= completedAt || completedAt.getTime() - proof.verifiedAt.getTime() >= IDENTITY_REQUEST_TTL_MS ||
+            identityCompletionDeadline(request) <= completedAt || completedAt.getTime() - proof.verifiedAt.getTime() >= IDENTITY_REQUEST_TTL_MS ||
             request.biometricConsentVersion !== IDENTITY_BIOMETRIC_CONSENT_VERSION) {
             return purgeRejectedOrExpiredRequest(boundRequest, p);
           }

@@ -14,7 +14,9 @@ async function readSetup(): Promise<ProfileSetupView> {
   return response.json();
 }
 export function ProfileSetup() {
-  const query = useQuery({ queryKey: ["profile-setup"], queryFn: readSetup });
+  const query = useQuery({ queryKey: ["profile-setup"], queryFn: readSetup,
+    refetchInterval: (current) => ["pending", "purge_pending"].includes(current.state.data?.verification ?? "") ? 2000 : false,
+  });
   if (query.isLoading) return <p role="status">프로필을 불러오는 중이에요.</p>;
   if (!query.data || query.isError) return <Card><p role="alert">프로필을 불러오지 못했어요.</p><Button onClick={() => query.refetch()}>다시 시도</Button></Card>;
   return <ProfileBasicsForm setup={query.data} />;
@@ -92,7 +94,7 @@ export function ProfileBasicsForm({ setup }: { setup: ProfileSetupView }) {
         <Button className="w-full" disabled={!canSave}>{save.isPending ? "저장 중…" : "기본 프로필 저장"}</Button>
         {identityCleanupRequired ? <p role="status" aria-live="polite" className="text-sm">{setup.verification === "expired"
           ? "인증 요청이 만료됐어요. 새 인증을 시작해 이전 요청을 정리해 주세요."
-          : "인증 결과 확인이 진행 중이에요. 인증을 마친 뒤 기본 정보를 수정해 주세요."}</p> : null}
+          : "인증 결과와 인증사 세션 삭제를 확인하고 있어요. 완료되면 상태가 갱신돼요. 오래 걸리면 아래 ‘인증 결과 확인’을 눌러 주세요."}</p> : null}
         {save.isPending ? <p role="status" aria-live="polite" className="text-sm">기본 프로필을 저장하는 중이에요.</p> : null}
         {!save.isPending && saveFeedback === "dirty" && actualProfileDirty && !save.isError ? <p role="status" aria-live="polite" className="text-sm">저장하지 않은 변경사항이 있어요.</p> : null}
         {!save.isPending && saveFeedback === "saved" ? <p role="status" aria-live="polite" className="text-sm text-accent">저장 완료. 다음 수정 때 현재 동의를 다시 확인해 주세요.</p> : null}

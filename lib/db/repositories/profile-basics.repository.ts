@@ -3,6 +3,7 @@ import "server-only";
 import { randomUUID } from "node:crypto";
 import { eq, sql } from "drizzle-orm";
 import { getDb } from "@/lib/db/client";
+import { identityCompletionDeadline } from "@/lib/identity/completion-window";
 import { profileBasics, identityVerifications } from "@/lib/db/schema/profile-basics";
 import { profiles } from "@/lib/db/schema/profiles";
 import { eligibleProfileSql } from "@/lib/db/repositories/introduction-policy";
@@ -22,7 +23,7 @@ export function createProfileBasicsRepository(database: typeof getDb = getDb): P
       if (!row) return { basics: null, verification: "not_started", eligible: false };
       const v = row.verification;
       const status = !v || v.noticeVersion !== IDENTITY_NOTICE_VERSION || v.biometricConsentVersion !== IDENTITY_BIOMETRIC_CONSENT_VERSION || v.profileRevision !== row.basics.revision ? "not_started" :
-        v.status === "verified" ? "verified" : v.status === "verified_unpurged" ? "purge_pending" : v.expiresAt <= new Date() ? "expired" : "pending";
+        v.status === "verified" ? "verified" : v.status === "verified_unpurged" ? "purge_pending" : identityCompletionDeadline(v) <= new Date() ? "expired" : "pending";
       return { basics: { nickname: row.nickname, gender: row.basics.gender as Gender, age: row.basics.age,
         region: row.basics.region, introductionScopeAccepted: row.basics.introductionScopeAccepted,
         updatedAt: row.basics.updatedAt.toISOString() }, verification: status, eligible: row.eligible,
