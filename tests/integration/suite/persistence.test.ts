@@ -17,6 +17,8 @@ import { profiles } from "../../../lib/db/schema/profiles";
 import { identityProviderPurgeQueue, identityVerifications, profileBasics } from "../../../lib/db/schema/profile-basics";
 import { IDENTITY_BIOMETRIC_CONSENT_VERSION, IDENTITY_NOTICE_VERSION } from "../../../lib/identity/contracts";
 import { createProfileBasicsRepository } from "../../../lib/db/repositories/profile-basics.repository";
+import { identityRepository } from "../../../lib/db/repositories/identity.repository";
+import { IDENTITY_RECONCILIATION_GRACE_MS } from "../../../lib/identity/completion-window";
 import { IdentityInProgressError } from "../../../lib/server/profile/profile-basics.repository.interface";
 import { INTRODUCTION_SCOPE_VERSION, PROFILE_CONSENT_VERSION } from "../../../lib/profile/basics";
 import { users } from "../../../lib/db/schema/auth";
@@ -30,6 +32,7 @@ import {
 import { buildAlphaMetricsSnapshot } from "../../../lib/alpha/metrics-snapshot";
 
 const fixtureUserIds = new Set<string>();
+const fixtureIdentityRequestIds = new Set<string>();
 
 async function insertUserWithProfile(db: ReturnType<typeof createIntegrationDb>, suffix: string) {
   const userId = `user-${suffix}`;
@@ -65,6 +68,16 @@ after(async () => {
         .from(users)
         .where(inArray(users.id, userIds));
       assert.equal(remaining.length, 0, "persistence integration users must be removed");
+      // These IDs were generated locally, never created at the provider. Remove
+      // only their synthetic trigger outbox entries after the cascade check.
+      const requestIds = [...fixtureIdentityRequestIds];
+      if (requestIds.length > 0) {
+        await db.delete(identityProviderPurgeQueue)
+          .where(inArray(identityProviderPurgeQueue.requestId, requestIds));
+        const residual = await db.select({ requestId: identityProviderPurgeQueue.requestId })
+          .from(identityProviderPurgeQueue).where(inArray(identityProviderPurgeQueue.requestId, requestIds));
+        assert.equal(residual.length, 0, "synthetic provider outbox entries must be removed");
+      }
     }
   } finally {
     await closeIntegrationDatabases();
@@ -80,6 +93,7 @@ async function insertIdentityProfileFixture(
   const now = new Date();
   const revision = randomUUID();
   const requestId = randomUUID();
+  fixtureIdentityRequestIds.add(requestId);
   await db.insert(profileBasics).values({
     userId: member.userId, gender: input.gender, age: input.age, region: input.region,
     introductionScopeAccepted: input.introductionScopeAccepted,
@@ -100,6 +114,44 @@ async function insertIdentityProfileFixture(
 }
 
 describe("integration: profile save and identity state", () => {
+  for (const scenario of ["timely", "missing", "late", "missing-event", "future", "grace-expired"] as const) {
+    it(`enforces the persisted completion window: ${scenario}`, async () => {
+      const db = createIntegrationDb(getIntegrationDatabaseUrl());
+      const member = await insertUserWithProfile(db, `completion-${scenario}-${Date.now()}`);
+      const input = { nickname: `completion-${scenario}`, gender: "male" as const, age: 22,
+        region: "서울", introductionScopeAccepted: true };
+      const seeded = await insertIdentityProfileFixture(db, member, input, "pending");
+      const completedAt = new Date();
+      const expiresAt = new Date(completedAt.getTime() - (scenario === "grace-expired"
+        ? IDENTITY_RECONCILIATION_GRACE_MS + 1_000 : 60_000));
+      const requestedAt = new Date(expiresAt.getTime() - 10 * 60 * 1_000);
+      const timelyAt = new Date(requestedAt.getTime() + 60_000);
+      await db.update(identityVerifications).set({ requestedAt, expiresAt,
+        completionRequestedAt: scenario === "missing" ? null : scenario === "late" ? expiresAt :
+          scenario === "future" ? new Date(completedAt.getTime() + 60_000) : timelyAt,
+        completionEventId: scenario === "missing-event" || scenario === "missing" ? null : randomUUID(),
+      }).where(sql`${identityVerifications.requestId} = ${seeded.requestId}`);
+      const request = await identityRepository.find(member.userId, seeded.requestId);
+      assert.ok(request?.providerReference);
+      const proof = { requestId: seeded.requestId, providerReference: request.providerReference,
+        verifiedAt: completedAt, documentVerified: true, livenessVerified: true,
+        faceMatchVerified: true, deviceIpVerified: true, adultVerified: true };
+      const accepted = await identityRepository.markVerifiedUnpurged(request, proof, completedAt);
+      assert.equal(accepted, scenario === "timely");
+      const repository = createProfileBasicsRepository(() => db);
+      const beforePurge = await repository.read(member.userId);
+      assert.equal(beforePurge.eligible, false);
+      if (accepted) {
+        assert.equal(beforePurge.verification, "purge_pending");
+        assert.equal(await identityRepository.markVerified(request, new Date()), true);
+        assert.equal((await repository.read(member.userId)).eligible, true);
+      } else {
+        assert.equal((await identityRepository.find(member.userId, seeded.requestId))?.status, "pending");
+        assert.equal(beforePurge.verification, "expired");
+      }
+    });
+  }
+
   it("preserves a webhook-scheduled pending request on a no-op save and blocks real edits", async () => {
     const db = createIntegrationDb(getIntegrationDatabaseUrl());
     const suffix = "profile-pending-" + Date.now();

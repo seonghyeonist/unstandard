@@ -373,6 +373,12 @@ describe("integration: db-backed unlock vertical slice", () => {
       assert.equal(await listPublicCandidatesForViewer(b.userId), "setup_required");
       const pending = await identityRepository.begin(b.userId, "test-only", IDENTITY_BIOMETRIC_CONSENT_VERSION, new Date());
       assert.ok(pending);
+      await assert.rejects(
+        profileBasicsRepository.save(b.userId, { ...input, age: 24 }),
+        { name: "IdentityInProgressError" },
+        "material edits must fail while identity verification is pending",
+      );
+      assert.equal(await identityRepository.removePending(pending!), true);
       await profileBasicsRepository.save(b.userId, { ...input, age: 24 });
       assert.equal(await identityRepository.markVerifiedUnpurged(pending!, {
         requestId: pending!.requestId,

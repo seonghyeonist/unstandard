@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import { IDENTITY_BIOMETRIC_CONSENT_VERSION, IDENTITY_NOTICE_VERSION } from "../../lib/identity/contracts";
 import { profileBasics, identityVerifications } from "../../lib/db/schema/profile-basics";
 import { PROFILE_CONSENT_VERSION, INTRODUCTION_SCOPE_VERSION, type Gender } from "../../lib/profile/basics";
 import type { IntegrationDb } from "./helpers";
@@ -15,7 +16,7 @@ export async function addSyntheticProfileBasics(db: IntegrationDb, userId: strin
 export async function addSyntheticVerifiedBasics(db: IntegrationDb, userId: string, gender: Gender) {
   const { revision, now } = await addSyntheticProfileBasics(db, userId, gender);
   await db.insert(identityVerifications).values({ userId, requestId: randomUUID(), profileRevision: revision,
-    provider: "integration-fixture-only", providerReference: randomUUID(), biometricConsentVersion: "alpha-biometric-identity-v1",
-    noticeVersion: "alpha-identity-v1", status: "verified", requestedAt: now, verifiedAt: now,
+    provider: "integration-fixture-only", providerReference: randomUUID(), biometricConsentVersion: IDENTITY_BIOMETRIC_CONSENT_VERSION,
+    noticeVersion: IDENTITY_NOTICE_VERSION, status: "verified", requestedAt: now, verifiedAt: now,
     providerPurgedAt: now, expiresAt: new Date(now.getTime() + 600000) });
 }
