@@ -168,8 +168,8 @@ Exit codes: `0` PASS · `1` FAIL · `2` BLOCKED_EXTERNAL
 
 When controlled members have already signed in but their passwords are unavailable,
 set SMOKE_SESSION_INPUT_FILE to an absolute private 0600 JSON file containing
-baseUrl, profileAId, profileBId, tokensA (three distinct existing sessions),
-tokensB (one distinct existing session), and operatorToken. Never commit or log it.
+baseUrl, profileAId, profileBId, tokensA (at least one existing session),
+tokensB (at least one distinct existing session), and operatorToken. Never commit or log it.
 Use only server-issued, unexpired sessions of the authorized test members read
 from the verified non-default RC DB. Do not INSERT sessions or reconstruct
 identity eligibility. Member A/B labels may be assigned to the existing members
@@ -193,3 +193,8 @@ All 39 authorization assertions, genuine ownership, initial pair cleanliness,
 bidirectional unlock, persistence, report/block and session revocation are unchanged.
 After evidence, remove local input files and use supported logout/delete cleanup.
 Do not label this mode as a new password-login test.
+
+Existing-session revocation uses separate local-clear and stale-pre-logout jars.
+The normal logout and stale replay share a real server logout, while each result
+is independently asserted. This avoids requiring three extra password logins.
+Console output includes every actual case result on both PASS and FAIL.

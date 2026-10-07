@@ -13,7 +13,7 @@ import { messages } from "../../../lib/db/schema/messages";
 import { alphaActivityDays } from "../../../lib/db/schema/alpha-activity";
 import { alphaProfileExposures } from "../../../lib/db/schema/alpha-exposures";
 import { waitlistEntries, waitlistVisitDays } from "../../../lib/db/schema/waitlist";
-import { profiles } from "../../../lib/db/schema/profiles";
+import { profiles, profilePrivate } from "../../../lib/db/schema/profiles";
 import { identityProviderPurgeQueue, identityVerifications, profileBasics } from "../../../lib/db/schema/profile-basics";
 import { IDENTITY_BIOMETRIC_CONSENT_VERSION, IDENTITY_NOTICE_VERSION } from "../../../lib/identity/contracts";
 import { createProfileBasicsRepository } from "../../../lib/db/repositories/profile-basics.repository";
@@ -21,6 +21,8 @@ import { identityRepository } from "../../../lib/db/repositories/identity.reposi
 import { IDENTITY_RECONCILIATION_GRACE_MS } from "../../../lib/identity/completion-window";
 import { IdentityInProgressError } from "../../../lib/server/profile/profile-basics.repository.interface";
 import { INTRODUCTION_SCOPE_VERSION, PROFILE_CONSENT_VERSION } from "../../../lib/profile/basics";
+import { ensureProfileForUser } from "../../../lib/db/repositories/profile-bootstrap";
+import { createDrizzleAnswersRepository } from "../../../lib/db/repositories/answers.repository";
 import { users } from "../../../lib/db/schema/auth";
 import { observeIntegrationCase } from "../../../lib/readiness/integration-case-log";
 import { createMessage, listConversation } from "../../../lib/db/repositories/messages.repository";
@@ -471,5 +473,32 @@ describe("integration: persistence invariants", () => {
         assert.equal(duplicateUnlock.inserted, false);
       }
     });
+  });
+});
+
+
+describe("integration: private profile container lifecycle", () => {
+  it("normal profile bootstrap repairs an omitted private container without overwriting content", async () => {
+    const db = createIntegrationDb(getIntegrationDatabaseUrl());
+    const member = await insertUserWithProfile(db, `private-repair-${Date.now()}`);
+    await ensureProfileForUser({ id: member.userId, nickname: "private fixture" }, db);
+    const [first] = await db.select().from(profilePrivate).where(sql`${profilePrivate.profileId} = ${member.profileId}`);
+    assert.ok(first); assert.equal(first.letter, null);
+    await db.update(profilePrivate).set({ letter: "Existing private fixture content", smallJoys: ["fixture joy"] }).where(sql`${profilePrivate.profileId} = ${member.profileId}`);
+    await ensureProfileForUser({ id: member.userId, nickname: "different" }, db);
+    const rows = await db.select().from(profilePrivate).where(sql`${profilePrivate.profileId} = ${member.profileId}`);
+    assert.equal(rows.length, 1); assert.equal(rows[0].letter, "Existing private fixture content"); assert.deepEqual(rows[0].smallJoys, ["fixture joy"]);
+  });
+  it("onboarding finalization persists the private container and duplicate submission remains idempotent", async () => {
+    const db = createIntegrationDb(getIntegrationDatabaseUrl());
+    const member = await insertUserWithProfile(db, `private-finalize-${Date.now()}`);
+    const q = await db.execute(sql`SELECT id FROM questions WHERE active=true LIMIT 1`);
+    assert.ok(q.rows[0]?.id);
+    const input = { userId: member.userId, nickname: "private fixture", questionId: String(q.rows[0].id), answerText: "Synthetic onboarding fixture with a concrete reflective answer.", evaluation: { verdict: "PASS" as const, score: 0.6, path: "integration-fixture", reasonCodes: [], modelVersion: "fixture" } };
+    const repository = createDrizzleAnswersRepository();
+    assert.equal((await repository.saveOnboardingAnswer(input)).ok, true);
+    assert.equal((await repository.saveOnboardingAnswer(input)).ok, true);
+    const containers = await db.select().from(profilePrivate).where(sql`${profilePrivate.profileId} = ${member.profileId}`);
+    assert.equal(containers.length, 1); assert.equal(containers[0].letter, null);
   });
 });

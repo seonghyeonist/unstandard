@@ -200,7 +200,7 @@ async function main(): Promise<void> {
   }
 
   if (sessionInput) {
-    if (sessionInput.baseUrl !== baseUrl || sessionInput.profileAId !== profileAId || sessionInput.profileBId !== profileBId || sessionInput.tokensA.length < 3 || sessionInput.tokensB.length < 1 || new Set([...sessionInput.tokensA, ...sessionInput.tokensB]).size !== sessionInput.tokensA.length + sessionInput.tokensB.length) {
+    if (sessionInput.baseUrl !== baseUrl || sessionInput.profileAId !== profileAId || sessionInput.profileBId !== profileBId || sessionInput.tokensA.length < 1 || sessionInput.tokensB.length < 1 || new Set([...sessionInput.tokensA, ...sessionInput.tokensB]).size !== sessionInput.tokensA.length + sessionInput.tokensB.length) {
       blocked("Session input target/binding/distinct-session preflight failed");
     }
     const operatorLogin = await fetchJson("/api/alpha/operator/login", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ token: sessionInput.operatorToken }) }, operatorJar);
@@ -692,6 +692,17 @@ async function main(): Promise<void> {
     return { status: result.status };
   };
 
+  if (sessionInput) {
+    // Local clear and server logout/replay are separate observed assertions.
+    // One existing session suffices; no additional password login or token minting.
+    const clearedPass = await proveClearedCookieDenied({ jar: jarA.clone(), getSession });
+    const stalePreLogout = jarA.clone();
+    const logoutPass = await proveLogoutInvalidatesSession({ jar: jarA, getSession, logout });
+    const staleReplay = await getSession(stalePreLogout);
+    pushCase(cases, "cleared_cookie_denied", clearedPass);
+    pushCase(cases, "logout_invalidates_session", logoutPass);
+    pushCase(cases, "revoked_session_rejected", logoutPass && stalePreLogout.size() > 0 && staleReplay.status === 401);
+  } else {
   const logoutPass = await proveLogoutInvalidatesSession({ jar: jarA, getSession, logout });
   pushCase(cases, "logout_invalidates_session", logoutPass);
 
@@ -713,6 +724,8 @@ async function main(): Promise<void> {
   } else {
     const revoked = await proveRevokedSessionRejected({ jar: revokedJar, getSession, logout });
     pushCase(cases, "revoked_session_rejected", revoked.pass && revoked.usedStaleClone);
+  }
+
   }
 
   const requiredSet = new Set<string>(REQUIRED_HTTP_SMOKE_CASES);
@@ -763,6 +776,7 @@ async function main(): Promise<void> {
         deploymentGitSha,
         deploymentId,
         caseNames: activeRequired.map((item) => item.name),
+        caseResults: activeRequired,
         futureNotApplicable: futureNotApplicable.map((item) => item.name),
         timestamp: built.artifact.timestamp,
       },
