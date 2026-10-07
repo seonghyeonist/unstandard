@@ -694,14 +694,17 @@ async function main(): Promise<void> {
 
   if (sessionInput) {
     // Local clear and server logout/replay are separate observed assertions.
-    // One existing session suffices; no additional password login or token minting.
+    // One delegated session suffices; the original login is preserved.
     const clearedPass = await proveClearedCookieDenied({ jar: jarA.clone(), getSession });
     const stalePreLogout = jarA.clone();
+    const replayHadCookie = stalePreLogout.size() > 0;
     const logoutPass = await proveLogoutInvalidatesSession({ jar: jarA, getSession, logout });
     const staleReplay = await getSession(stalePreLogout);
     pushCase(cases, "cleared_cookie_denied", clearedPass);
     pushCase(cases, "logout_invalidates_session", logoutPass);
-    pushCase(cases, "revoked_session_rejected", logoutPass && stalePreLogout.size() > 0 && staleReplay.status === 401);
+    // A rejected replay can clear cookies in its response. Prove the request
+    // carried the stale cookie before allowing response ingestion to erase it.
+    pushCase(cases, "revoked_session_rejected", logoutPass && replayHadCookie && staleReplay.status === 401);
   } else {
   const logoutPass = await proveLogoutInvalidatesSession({ jar: jarA, getSession, logout });
   pushCase(cases, "logout_invalidates_session", logoutPass);
