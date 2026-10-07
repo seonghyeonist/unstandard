@@ -163,3 +163,33 @@ Output redacts emails, passwords, cookies, tokens, and full IDs.
 Artifacts never store credentials, cookies, bypass secrets, or database URLs.
 
 Exit codes: `0` PASS · `1` FAIL · `2` BLOCKED_EXTERNAL
+
+## Existing issued session mode (named Sandbox RC only)
+
+When controlled members have already signed in but their passwords are unavailable,
+set SMOKE_SESSION_INPUT_FILE to an absolute private 0600 JSON file containing
+baseUrl, profileAId, profileBId, tokensA (three distinct existing sessions),
+tokensB (one distinct existing session), and operatorToken. Never commit or log it.
+Use only server-issued, unexpired sessions of the authorized test members read
+from the verified non-default RC DB. Do not INSERT sessions or reconstruct
+identity eligibility. Member A/B labels may be assigned to the existing members
+according to available sessions; account roles/balance/profile ownership do not change.
+
+The operator signs in normally, then the named RC session-import endpoint validates
+each existing token through Better Auth and proves expected profile ownership.
+It returns a normal Secure HttpOnly session cookie, with at most 15-minute cookie
+TTL and no increase to the original DB session expiry. The normal deployed member
+API validates it again. Operator cookies are not included in member requests.
+The endpoint is restricted to Preview/database/test-or-staging/Sandbox and the
+named RC DB, and stops working at its Oct12 expiration. It never creates a session.
+Wrong environment, anonymous operator, different origin, invalid/revoked/expired
+token, or wrong profile is denied. No general bearer plugin is enabled.
+
+Artifacts record authenticationMode=existing_issued_sessions. In this mode the
+user_a_login/user_b_login cases prove existing-session admission plus ordinary
+member session validation; they do NOT prove a fresh email/password sign-in.
+Password endpoint/Auth regression evidence must retain its original provenance.
+All 39 authorization assertions, genuine ownership, initial pair cleanliness,
+bidirectional unlock, persistence, report/block and session revocation are unchanged.
+After evidence, remove local input files and use supported logout/delete cleanup.
+Do not label this mode as a new password-login test.
