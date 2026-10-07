@@ -8,6 +8,7 @@ const sandboxPreview = {
 };
 it("permits bounded manual erasure only in a Sandbox database Preview", () => {
   assert.equal(canOperateSandboxPurges(sandboxPreview), true);
+  assert.equal(canOperateSandboxPurges({ ...sandboxPreview, DATABASE_ENV: "staging" }), true);
 });
 for (const [key, value] of Object.entries({
   VERCEL_ENV: "production", DATABASE_ENV: "production",

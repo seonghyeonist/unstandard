@@ -10,7 +10,7 @@ The endpoint selects at most two due entries from the durable deletion outbox
 and invokes the existing provider reconciler. Its private/no-store response
 contains only selected, purged and retryable counts.
 
-This path is available only with VERCEL_ENV=preview, DATABASE_ENV=test,
+This path is available only with VERCEL_ENV=preview, DATABASE_ENV=test or staging,
 UNSTANDARD_RUNTIME_MODE=database and DIDIT_EXPECTED_ENVIRONMENT=sandbox.
 Other environments receive 404. Missing operator session or invalid origin
 receives 403. This endpoint does not create sessions or change verified member
