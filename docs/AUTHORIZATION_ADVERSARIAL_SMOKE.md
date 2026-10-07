@@ -177,16 +177,18 @@ according to available sessions; account roles/balance/profile ownership do not 
 
 The operator signs in normally, then the named RC session-import endpoint validates
 each existing token through Better Auth and proves expected profile ownership.
-It returns a normal Secure HttpOnly session cookie, with at most 15-minute cookie
-TTL and no increase to the original DB session expiry. The normal deployed member
+After parent validation it uses Better Auth's normal session adapter to issue a
+child credential expiring at the earlier of parent expiry and 15 minutes. The
+parent remains unchanged. Named RC sessions disable automatic refresh so the
+child cannot expand to the default seven days. It returns a Secure HttpOnly cookie. The normal deployed member
 API validates it again. Operator cookies are not included in member requests.
 The endpoint is restricted to Preview/database/test-or-staging/Sandbox and the
-named RC DB, and stops working at its Oct12 expiration. It never creates a session.
+named RC DB, and stops working at its Oct12 expiration. It never accepts a caller-supplied user ID or inserts auth/identity rows with SQL.
 Wrong environment, anonymous operator, different origin, invalid/revoked/expired
 token, or wrong profile is denied. No general bearer plugin is enabled.
 
-Artifacts record authenticationMode=existing_issued_sessions. In this mode the
-user_a_login/user_b_login cases prove existing-session admission plus ordinary
+Artifacts record authenticationMode=delegated_issued_sessions. In this mode the
+user_a_login/user_b_login cases prove validated-parent/short-lived-child admission plus ordinary
 member session validation; they do NOT prove a fresh email/password sign-in.
 Password endpoint/Auth regression evidence must retain its original provenance.
 All 39 authorization assertions, genuine ownership, initial pair cleanliness,
@@ -198,3 +200,8 @@ Existing-session revocation uses separate local-clear and stale-pre-logout jars.
 The normal logout and stale replay share a real server logout, while each result
 is independently asserted. This avoids requiring three extra password logins.
 Console output includes every actual case result on both PASS and FAIL.
+
+Child sessions use the auth adapter's normal cryptographic token generation and
+DB persistence after real parent authentication. This is credential delegation,
+not mock authentication or password-login proof. Revocation tests act on child
+credentials only, preserving the original member sessions for remaining UX.

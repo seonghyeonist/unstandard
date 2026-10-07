@@ -751,7 +751,7 @@ async function main(): Promise<void> {
     deploymentGitSha,
     deploymentId,
     databaseFingerprintSha,
-    authenticationMode: sessionInput ? "existing_issued_sessions" : "password",
+    authenticationMode: sessionInput ? "delegated_issued_sessions" : "password",
     migrationChecksum: migrationSetChecksum(),
     previewHostname,
     cases: activeRequired,
@@ -767,7 +767,7 @@ async function main(): Promise<void> {
     JSON.stringify(
       {
         verdict,
-        authenticationMode: sessionInput ? "existing_issued_sessions" : "password",
+        authenticationMode: sessionInput ? "delegated_issued_sessions" : "password",
         kind: "smoke",
         matrix: "deployed_http_alpha_surface",
         previewHostname,

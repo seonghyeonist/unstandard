@@ -24,6 +24,7 @@ import {
   verifyRegistrationTicket,
 } from "@/lib/auth/invite-ticket";
 import { sendPasswordResetEmail } from "@/lib/email/transactional";
+import { canImportPreviewSession } from "@/lib/auth/preview-session-import";
 import { getCanonicalAuthOrigin } from "@/lib/auth/canonical-origin";
 
 function getTrustedOrigins(): string[] {
@@ -140,6 +141,8 @@ export function getAuth(): ReturnType<typeof betterAuth> {
     secret: requireAuthSecret(),
     baseURL: getCanonicalAuthOrigin(),
     trustedOrigins: getTrustedOrigins(),
+    // Named RC only: delegated 15-minute sessions must never refresh to 7 days.
+    ...(canImportPreviewSession(process.env) ? { session: { disableSessionRefresh: true } } : {}),
     emailAndPassword: {
       enabled: true,
       minPasswordLength: 10,

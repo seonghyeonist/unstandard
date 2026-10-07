@@ -79,7 +79,7 @@ export const smokeProofArtifactSchema = z
     deploymentGitSha: fullGitShaSchema,
     deploymentId: z.string().regex(/^dpl_[A-Za-z0-9]+$/),
     databaseFingerprintSha: sha256Schema,
-    authenticationMode: z.enum(["password", "existing_issued_sessions"]).optional(),
+    authenticationMode: z.enum(["password", "delegated_issued_sessions"]).optional(),
   })
   .strict();
 
@@ -405,7 +405,7 @@ export type BuildSmokeArtifactInput = BuildIntegrationArtifactInput & {
   deploymentGitSha: string;
   deploymentId: string;
   databaseFingerprintSha: string;
-  authenticationMode?: "password" | "existing_issued_sessions";
+  authenticationMode?: "password" | "delegated_issued_sessions";
 };
 
 export function buildIntegrationArtifact(

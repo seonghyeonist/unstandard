@@ -19,16 +19,23 @@ export async function POST(request: Request) {
     }
     const cookie = existingSessionCookie(body.sessionToken, process.env.BETTER_AUTH_SECRET?.trim() ?? "");
     // Normal Better Auth validation: existing DB token, user, expiry and revocation.
-    // No createSession, INSERT or impersonation from a supplied user ID.
+    // Parent authority is never inferred from a caller-supplied user ID.
     const session = await getAuth().api.getSession({ headers: new Headers({ cookie }), query: { disableRefresh: true } });
     if (!session?.user || !(await isUserInviteFinalized(session.user.id))) return privateJson({ error: "Unauthorized" }, { status: 401 });
     const [profile] = await getDb().select({ id: profiles.id }).from(profiles).where(eq(profiles.userId, session.user.id)).limit(1);
     if (profile?.id !== body.profileId) return privateJson({ error: "Unauthorized" }, { status: 403 });
     const remaining = Math.floor((new Date(session.session.expiresAt).getTime() - Date.now()) / 1000);
     if (remaining <= 0) return privateJson({ error: "Unauthorized" }, { status: 401 });
-    const response = privateJson({ ok: true, authenticationMode: "existing_issued_sessions" });
-    response.headers.set("Set-Cookie", `${cookie}; Path=/; HttpOnly; Secure; SameSite=Strict; Max-Age=${Math.min(remaining, 900)}`);
-    console.info(JSON.stringify({ event: "alpha.session_import", code: "EXISTING_SESSION_VALIDATED" }));
+    // Issue a short-lived child through the normal auth adapter after validating
+    // the existing parent. Logout tests revoke the child, preserving human login.
+    const expiresAt = new Date(Math.min(new Date(session.session.expiresAt).getTime(), Date.now() + 900_000));
+    const context = await getAuth().$context;
+    const child = await context.internalAdapter.createSession(session.user.id, true, { expiresAt, userAgent: "unstandard-rc-acceptance-delegation" }, true);
+    if (!child) return privateJson({ error: "Session unavailable" }, { status: 503 });
+    const childCookie = existingSessionCookie(child.token, process.env.BETTER_AUTH_SECRET?.trim() ?? "");
+    const response = privateJson({ ok: true, authenticationMode: "delegated_issued_sessions" });
+    response.headers.set("Set-Cookie", `${childCookie}; Path=/; HttpOnly; Secure; SameSite=Strict; Max-Age=${Math.min(remaining, 900)}`);
+    console.info(JSON.stringify({ event: "alpha.session_import", code: "PARENT_VALIDATED_CHILD_ISSUED" }));
     return response;
   } catch {
     return privateJson({ error: "Invalid session input" }, { status: 400 });
