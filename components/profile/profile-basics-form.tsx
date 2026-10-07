@@ -80,6 +80,15 @@ export function ProfileBasicsForm({ setup }: { setup: ProfileSetupView }) {
   const identityCleanupRequired = identityInProgress || setup.verification === "expired";
   const canSave = canSaveProfileBasics({ busy, consent, actualProfileDirty, identityInProgress: identityCleanupRequired });
   return <div className="space-y-5">
+    {setup.verification === "verified" ? <Card>
+      <h2 className="text-xl font-black">{setup.eligible ? "소개 준비가 완료됐어요" : "신원·성인 확인이 완료됐어요"}</h2>
+      <p role="status" aria-live="polite" className="mt-3 text-sm leading-6">{setup.eligible
+        ? "이제 상대를 살펴보고 첫 대화를 시작할 수 있어요."
+        : "첫 질문에 답하면 소개 준비가 완료돼요. 아래 버튼으로 이어가 주세요."}</p>
+      <Link className="mt-4 inline-flex min-h-11 w-full items-center justify-center rounded-full bg-accent px-5 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-[#ad392c]" href={setup.eligible ? "/app/home" : "/onboarding"}>
+        {setup.eligible ? "상대 살펴보기" : "첫 질문 작성하고 계속하기"}
+      </Link>
+    </Card> : null}
     <Card>
       <h2 className="text-xl font-black">기본 프로필</h2>
       <p className="mt-3 text-sm leading-6 text-foreground/70">닉네임·성별·입력 시점의 만 나이·시도 단위 활동 지역을 사용해요. 상세 주소·학교·직장은 받지 않아요. 나이와 성별은 본인이 입력한 정보이며 본인인증만으로 검증됐다는 뜻은 아니에요.</p>
@@ -113,7 +122,7 @@ export function ProfileBasicsForm({ setup }: { setup: ProfileSetupView }) {
     </Card>
     <Card>
       <p className="text-sm leading-6" role="status">{setup.eligible ? "기본 정보·소개 범위 확인·인증·첫 질문 입력이 완료되어 소개 기능을 이용할 수 있어요." : "필수 정보·소개 범위 확인·인증·첫 질문 입력이 모두 완료되기 전에는 상대에게 보이지 않으며, 상대 조회와 대화도 제한돼요."}</p>
-      <div className="mt-4 flex flex-wrap gap-4 text-sm font-semibold"><Link className="underline" href="/onboarding">첫 질문 작성</Link>{setup.eligible ? <Link className="underline" href="/app/home">상대 살펴보기</Link> : null}<Link className="underline" href="/app/settings">지원·계정 삭제</Link></div>
+      <div className="mt-4 flex flex-wrap gap-4 text-sm font-semibold">{setup.verification !== "verified" ? <Link className="underline" href="/onboarding">첫 질문 작성</Link> : null}<Link className="underline" href="/app/settings">지원·계정 삭제</Link></div>
       {setup.basics ? <Button className="mt-5 w-full" disabled={busy} onClick={() => { if (window.confirm("성별·나이·활동 지역과 인증 결과를 삭제하고 상대 노출·대화를 중단할까요? 닉네임과 기존 대화는 계정 삭제 전까지 남아요.")) withdraw.mutate(); }}>기본 정보 삭제·소개 참여 철회</Button> : null}
       {withdraw.isError ? <p role="alert" className="mt-3 text-sm text-danger">{withdraw.error.message}</p> : null}
     </Card>
