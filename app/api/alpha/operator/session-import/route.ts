@@ -20,7 +20,7 @@ export async function POST(request: Request) {
     const cookie = existingSessionCookie(body.sessionToken, process.env.BETTER_AUTH_SECRET?.trim() ?? "");
     // Normal Better Auth validation: existing DB token, user, expiry and revocation.
     // No createSession, INSERT or impersonation from a supplied user ID.
-    const session = await getAuth().api.getSession({ headers: new Headers({ cookie }) });
+    const session = await getAuth().api.getSession({ headers: new Headers({ cookie }), query: { disableRefresh: true } });
     if (!session?.user || !(await isUserInviteFinalized(session.user.id))) return privateJson({ error: "Unauthorized" }, { status: 401 });
     const [profile] = await getDb().select({ id: profiles.id }).from(profiles).where(eq(profiles.userId, session.user.id)).limit(1);
     if (profile?.id !== body.profileId) return privateJson({ error: "Unauthorized" }, { status: 403 });
