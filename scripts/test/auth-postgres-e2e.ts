@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { randomBytes, randomUUID } from "node:crypto";
+import { createHmac, randomBytes, randomUUID } from "node:crypto";
 import { spawn, type ChildProcess } from "node:child_process";
 import net from "node:net";
 import { Pool, neonConfig } from "@neondatabase/serverless";
@@ -8,6 +8,7 @@ import {
   hashEmailVerificationCode,
   EMAIL_VERIFICATION_TTL_MS,
 } from "../../lib/auth/email-verification-crypto";
+import { canonicalizeDiditWebhook } from "../../lib/identity/didit-webhook";
 import { generateInviteCode, hashInviteCode } from "../../lib/auth/invite-crypto";
 import {
   CLOSED_ALPHA_SAFETY_RULES_VERSION,
@@ -29,6 +30,8 @@ const AUTH_SCENARIOS = [
   "profile-visibility",
   "password-reset-delete",
   "invite-replay",
+  "support-lifecycle",
+  "didit-security",
 ] as const;
 type AuthScenario = (typeof AUTH_SCENARIOS)[number];
 
@@ -232,6 +235,14 @@ async function startServer(injection?: "consume" | "finalize" | "profile"): Prom
   env.DATABASE_URL = mustEnv("TEST_DATABASE_URL");
   env.BETTER_AUTH_URL = origin;
   env.UNSTANDARD_APP_URL = origin;
+  if (process.argv[2] === "didit-security") {
+    env.UNSTANDARD_APP_URL = "https://isolated-synthetic.example.test";
+    env.UNSTANDARD_IDENTITY_ENABLED = "true";
+    env.DIDIT_EXPECTED_ENVIRONMENT = "sandbox";
+    env.DIDIT_API_KEY = "synthetic-test-no-provider-access";
+    env.DIDIT_WORKFLOW_ID = "11111111-1111-4111-8111-111111111111";
+    env.DIDIT_WEBHOOK_SECRET = mustEnv("DIDIT_WEBHOOK_SECRET");
+  }
   env.BETTER_AUTH_SECRET = mustEnv("BETTER_AUTH_SECRET");
   env.ALPHA_INVITE_PEPPER = mustEnv("ALPHA_INVITE_PEPPER");
   env.ALPHA_EMAIL_VERIFICATION_PEPPER = mustEnv("ALPHA_EMAIL_VERIFICATION_PEPPER");
@@ -695,6 +706,89 @@ async function testProfileOnboardingAndPrivacy(fixture: Fixture, jar: CookieJar)
   writeCase("profile_withdrawal_reduces_visibility");
 }
 
+async function testDiditSecurity(): Promise<void> {
+  const now = Math.floor(Date.now() / 1000);
+  const secret = mustEnv("DIDIT_WEBHOOK_SECRET");
+  const body = { event_id: randomUUID(), webhook_type: "status.updated", timestamp: now, session_id: randomUUID(), vendor_data: randomUUID(), environment: "sandbox", workflow_id: "11111111-1111-4111-8111-111111111111", status: "Approved" };
+  const sign = (payload: unknown) => createHmac("sha256", secret).update(canonicalizeDiditWebhook(payload), "utf8").digest("hex");
+  async function post(payload: unknown, signature: string | null, timestamp: number, expected: number, name: string) {
+    const headers: Record<string,string> = { "Content-Type": "application/json", "x-timestamp": String(timestamp) };
+    if (signature) headers["x-signature-v2"] = signature;
+    const response = await fetch(new URL("/api/identity/webhook", server!.target), { method: "POST", headers, body: JSON.stringify(payload), signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS) });
+    assert.equal(response.status, expected, name);
+    assert.match(response.headers.get("cache-control") ?? "", /private.*no-store/iu);
+    writeCase(name);
+  }
+  await post(body, null, now, 401, "didit_missing_signature_denied");
+  await post(body, "0".repeat(64), now, 401, "didit_invalid_signature_denied");
+  await post({ ...body, status: "Declined" }, sign(body), now, 401, "didit_tampered_body_denied");
+  const old = { ...body, timestamp: now - 301 };
+  await post(old, sign(old), old.timestamp, 401, "didit_stale_signed_body_denied");
+  await post(old, sign(old), now, 401, "didit_fresh_header_cannot_revive_stale_body");
+  const live = { ...body, environment: "live" };
+  await post(live, sign(live), now, 401, "didit_signed_environment_mismatch_denied");
+  const workflow = { ...body, workflow_id: randomUUID() };
+  await post(workflow, sign(workflow), now, 401, "didit_signed_workflow_mismatch_denied");
+  await post(body, sign(body), now, 200, "didit_unknown_request_ignored");
+  await post(body, sign(body), now, 200, "didit_unknown_request_replay_ignored");
+  const [counts] = await query<{ identities: number; queued: number }>("SELECT (SELECT count(*)::int FROM identity_verifications) identities, (SELECT count(*)::int FROM identity_provider_purge_queue) queued");
+  assert.deepEqual(counts, { identities: 0, queued: 0 });
+  writeCase("didit_negative_matrix_has_no_identity_or_provider_purge_side_effect");
+}
+
+async function testSupportLifecycle(fixture: Fixture, jar: CookieJar): Promise<void> {
+  await testProfileOnboardingAndPrivacy(fixture, jar);
+  expectStatus(await api(server!, jar, "/api/profile/basics", { method: "DELETE" }), 200, "PROFILE_WITHDRAW_FAILED");
+  const [withdrawn] = await query<{ count: number }>("SELECT count(*)::int AS count FROM profile_basics b JOIN users u ON u.id=b.user_id WHERE u.email=$1", [fixture.email]);
+  assert.equal(withdrawn?.count, 0, "PROFILE_WITHDRAW_RESIDUAL");
+  writeCase("profile_withdrawal_removes_basics_without_verified_identity_fixture");
+  expectStatus(await api(server!, new Map(), "/api/support"), 401, "ANONYMOUS_SUPPORT_READ");
+  expectStatus(await api(server!, new Map(), "/api/alpha/operator/support"), 403, "ANONYMOUS_OPERATOR_READ");
+  expectStatus(await api(server!, jar, "/api/alpha/operator/support", { body: {} }), 403, "MEMBER_OPERATOR_ESCALATION");
+  const created = await api(server!, jar, "/api/support", { body: { category: "technical", message: "Synthetic support lifecycle request only." } });
+  expectStatus(created, 201, "SUPPORT_CREATE_FAILED");
+  const ticketId = created.body.ticketId;
+  const second = await makeFixture("support-other-member");
+  const secondJar: CookieJar = new Map();
+  await beginRegistration(server!, second, secondJar);
+  expectStatus(await register(server!, second, secondJar), 200, "SECOND_SUPPORT_MEMBER_FAILED");
+  const other = await api(server!, secondJar, "/api/support");
+  expectStatus(other, 200, "SECOND_MEMBER_SUPPORT_READ_FAILED");
+  assert.deepEqual(other.body.tickets, [], "CROSS_MEMBER_SUPPORT_LEAK");
+  const operatorJar: CookieJar = new Map();
+  expectStatus(await api(server!, operatorJar, "/api/alpha/operator/login", { body: { token: mustEnv("UNSTANDARD_INVITE_OPERATOR_TOKEN") } }), 200, "OPERATOR_LOGIN_FAILED");
+  const inventory = await api(server!, operatorJar, "/api/alpha/operator/support");
+  expectStatus(inventory, 200, "OPERATOR_SUPPORT_READ_FAILED");
+  assert.match(inventory.headers.get("cache-control") ?? "", /private.*no-store/iu);
+  const ticket = (inventory.body.tickets as { id: string; status: string; updatedAt: string }[]).find(t => t.id === ticketId);
+  assert.ok(ticket, "SUPPORT_TICKET_MISSING");
+  const update = { ticketId, expectedStatus: ticket.status, expectedUpdatedAt: ticket.updatedAt, status: "CLOSED", assignedTo: "seonghyeonist", response: "Synthetic support response delivered in the member inbox." };
+  const crossOrigin = await fetch(new URL("/api/alpha/operator/support", server!.target), { method: "POST", headers: { Origin: "https://attacker.example", "Content-Type": "application/json", Cookie: [...operatorJar].map(([k,v]) => `${k}=${v}`).join("; ") }, body: JSON.stringify(update) });
+  assert.equal(crossOrigin.status, 403, "CROSS_ORIGIN_SUPPORT_WRITE");
+  const concurrent = await Promise.all([api(server!, operatorJar, "/api/alpha/operator/support", { body: update }), api(server!, operatorJar, "/api/alpha/operator/support", { body: update })]);
+  assert.deepEqual(concurrent.map(r => r.status).sort(), [200,409], "SUPPORT_CONCURRENT_DUPLICATE_RESPONSE");
+  const inbox = await api(server!, jar, "/api/support");
+  const own = (inbox.body.tickets as { id: string; status: string; replies: { response: string }[] }[]).find(t => t.id === ticketId);
+  assert.equal(own?.status, "CLOSED"); assert.equal(own?.replies.length, 1); assert.equal(own?.replies[0]?.response, update.response);
+  const [audit] = await query<{ count: number; assigned: boolean }>("SELECT count(*)::int AS count, bool_and(assigned_to='seonghyeonist' AND actor IN ('member','invite_operator')) AS assigned FROM support_events WHERE ticket_id=$1", [ticketId]);
+  assert.equal(audit?.count, 2); assert.equal(audit?.assigned, true);
+  writeCase("support_owner_reply_member_isolation_csrf_audit_concurrent_replay");
+  const stale = new Map(jar);
+  expectStatus(await api(server!, jar, "/api/auth/logout", { body: {} }), 200, "LIFECYCLE_LOGOUT_FAILED");
+  expectStatus(await api(server!, stale, "/api/auth/session"), 401, "STALE_LOGOUT_COOKIE_ACCEPTED");
+  expectStatus(await signIn(server!, fixture.email, PASSWORD_OLD, jar), 200, "LIFECYCLE_PASSWORD_LOGIN_FAILED");
+  expectAnyError(await api(server!, jar, "/api/auth/delete-user", { body: {} }), "PASSWORDLESS_DELETE_ALLOWED");
+  expectAnyError(await api(server!, jar, "/api/auth/delete-user", { body: { password: "Wrong-password-20261009!" } }), "WRONG_PASSWORD_DELETE_ALLOWED");
+  const staleDelete = new Map(jar);
+  expectStatus(await api(server!, jar, "/api/auth/delete-user", { body: { password: PASSWORD_OLD } }), 200, "LIFECYCLE_CORRECT_PASSWORD_DELETE_FAILED");
+  expectStatus(await api(server!, staleDelete, "/api/auth/session"), 401, "STALE_DELETED_SESSION_ACCEPTED");
+  assertNoAccountFootprint(await authSnapshot(fixture.email, fixture.inviteId, fixture.challengeId), "LIFECYCLE_DELETE");
+  expectAnyError(await signIn(server!, fixture.email, PASSWORD_OLD, new Map()), "DELETED_ACCOUNT_LOGIN_ALLOWED");
+  const [residual] = await query<{ tickets: number; events: number }>("SELECT (SELECT count(*)::int FROM support_requests WHERE id=$1) tickets, (SELECT count(*)::int FROM support_events WHERE ticket_id=$1) events", [ticketId]);
+  assert.deepEqual(residual, { tickets: 0, events: 0 });
+  writeCase("password_login_logout_stale_cookie_wrong_password_delete_cascade_no_reset");
+}
+
 async function testPasswordResetLogoutAndDeletion(fixture: Fixture, jar: CookieJar): Promise<void> {
   const requestReset = await api(server!, new Map(), "/api/auth/request-password-reset", {
     body: { email: fixture.email },
@@ -829,7 +923,10 @@ async function main(): Promise<void> {
     await testPreAuthBaseline();
     stage = "next_server_start";
     server = await startServer();
-    if (scenario === "proofs") {
+    if (scenario === "didit-security") {
+      stage = "didit_security";
+      await testDiditSecurity();
+    } else if (scenario === "proofs") {
       stage = "invalid_proof_matrix";
       await testInvalidProofs(server);
     } else if (scenario === "registration") {
@@ -844,6 +941,10 @@ async function main(): Promise<void> {
       const { fixture, jar } = await testNormalRegistrationAndExistingAccount();
       stage = "profile_and_visibility";
       await testProfileOnboardingAndPrivacy(fixture, jar);
+    } else if (scenario === "support-lifecycle") {
+      const { fixture, jar } = await testNormalRegistrationAndExistingAccount();
+      stage = "support_lifecycle";
+      await testSupportLifecycle(fixture, jar);
     } else if (scenario === "password-reset-delete") {
       stage = "normal_registration";
       const { fixture, jar } = await testNormalRegistrationAndExistingAccount();

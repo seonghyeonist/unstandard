@@ -34,6 +34,7 @@ export const REQUIRED_APPLICATION_TABLES = [
   "app_config",
   "rate_limits",
   "support_requests",
+  "support_events",
   "messages",
   "alpha_activity_days",
   "alpha_profile_exposures",

@@ -1,3 +1,4 @@
+import { EXPECTED_MIGRATION_LEDGER } from "../../../lib/db/migration-manifest";
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import { after, describe, it } from "node:test";
@@ -31,7 +32,7 @@ describe("integration: migrations and seed", () => {
       assert.equal(config.migrationsTable, DRIZZLE_MIGRATIONS_TABLE);
 
       const ledger = await readMigrationLedgerWithSql(sql);
-      assert.equal(ledger.length, 15, "alpha RC expects migrations 0000 through 0014");
+      assert.equal(ledger.length, EXPECTED_MIGRATION_LEDGER.length, "alpha RC expects the checked-in migration ledger");
       const snapshot = await computeApplicationSchemaSnapshotWithSql(sql);
       assert.match(snapshot.schemaContentDigest, /^[a-f0-9]{64}$/u);
       assert.deepEqual(await assertRequiredApplicationTablesWithSql(sql), []);

@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { TextArea, TextInput } from "@/components/ui/form-field";
 import { getCurrentUser } from "@/lib/api/auth";
+import { SupportInbox } from "@/components/alpha/support-inbox";
 
 async function logoutSession(): Promise<void> {
   const response = await fetch("/api/auth/logout", { method: "POST", credentials: "include" });
@@ -67,7 +68,7 @@ export default function SettingsPage() {
 
   const supportMutation = useMutation({
     mutationFn: createSupportRequest,
-    onSuccess: () => setSupportMessage(""),
+    onSuccess: async () => { setSupportMessage(""); await queryClient.invalidateQueries({ queryKey: ["support-tickets"] }); },
   });
 
   const deleteMutation = useMutation({
@@ -152,6 +153,7 @@ export default function SettingsPage() {
           {supportMutation.isError ? (
             <p className="mt-3 text-sm text-danger">{supportMutation.error.message}</p>
           ) : null}
+          <SupportInbox />
         </Card>
 
         <Card className="mt-5 border-danger/30">
