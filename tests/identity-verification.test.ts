@@ -555,6 +555,25 @@ describe("Didit webhook boundary", () => {
 });
 
 describe("identity webhook reconciliation", () => {
+  it("retries a durable completion after a transient canonical failure without duplicate verification or purge", async () => {
+    const f = fixture();
+    let attempts = 0;
+    f.provider.verify = async () => {
+      if (++attempts === 1) throw new Error("synthetic canonical 503");
+      return f.proof;
+    };
+    await f.repo.markCompletionRequested(request, "77777777-7777-4777-8777-777777777777", now);
+    const input = { repository: f.repo, service: identityService(f.deps), limit: 1 };
+    assert.deepEqual(await reconcileIdentityCompletions(input), { selected: 1, verified: 0, retryable: 1, cleared: 0 });
+    assert.equal((await f.repo.listCompletionRequests(1)).length, 1);
+    assert.equal(f.unpurged(), 0);
+    assert.equal(f.purged(), 0);
+    assert.deepEqual(await reconcileIdentityCompletions(input), { selected: 1, verified: 1, retryable: 0, cleared: 0 });
+    await reconcileIdentityCompletions(input);
+    assert.equal(attempts, 2);
+    assert.equal(f.unpurged(), 1);
+    assert.equal(f.purged(), 1);
+  });
   it("processes a bounded durable request sequentially and clears terminal non-approvals", async () => {
     const f = fixture();
     await f.repo.markCompletionRequested(request, "77777777-7777-4777-8777-777777777777", now);

@@ -17,7 +17,9 @@ import { profiles, profilePrivate } from "../../../lib/db/schema/profiles";
 import { identityProviderPurgeQueue, identityVerifications, profileBasics } from "../../../lib/db/schema/profile-basics";
 import { IDENTITY_BIOMETRIC_CONSENT_VERSION, IDENTITY_NOTICE_VERSION } from "../../../lib/identity/contracts";
 import { createProfileBasicsRepository } from "../../../lib/db/repositories/profile-basics.repository";
-import { identityRepository } from "../../../lib/db/repositories/identity.repository";
+import { identityRepository, identityProviderPurgeQueueRepository } from "../../../lib/db/repositories/identity.repository";
+import { identityService } from "../../../lib/identity/service";
+import { reconcileIdentityCompletions } from "../../../lib/identity/reconciliation";
 import { IDENTITY_RECONCILIATION_GRACE_MS } from "../../../lib/identity/completion-window";
 import { IdentityInProgressError } from "../../../lib/server/profile/profile-basics.repository.interface";
 import { INTRODUCTION_SCOPE_VERSION, PROFILE_CONSENT_VERSION } from "../../../lib/profile/basics";
@@ -116,6 +118,44 @@ async function insertIdentityProfileFixture(
 }
 
 describe("integration: profile save and identity state", () => {
+  it("persists canonical failure and purge retry states until successful reconciliation", async () => {
+    const db = createIntegrationDb(getIntegrationDatabaseUrl());
+    const member = await insertUserWithProfile(db, `retry-${Date.now()}`);
+    const seeded = await insertIdentityProfileFixture(db, member, {
+      nickname: "Synthetic retry", gender: "male", age: 22, region: "서울", introductionScopeAccepted: true,
+    }, "pending");
+    const request = await identityRepository.find(member.userId, seeded.requestId);
+    assert.ok(request?.providerReference);
+    let canonicalCalls = 0;
+    let purgeCalls = 0;
+    const service = identityService({
+      repository: identityRepository, purgeQueue: identityProviderPurgeQueueRepository, limit: async () => true,
+      provider: {
+        id: "didit-v3", async start() { throw new Error("unused synthetic start"); },
+        async verify() {
+          if (++canonicalCalls === 1) throw new Error("synthetic canonical 503");
+          return { requestId: seeded.requestId, providerReference: request.providerReference!, verifiedAt: new Date(),
+            documentVerified: true, livenessVerified: true, faceMatchVerified: true, deviceIpVerified: true, adultVerified: true };
+        },
+        async purge() { return ++purgeCalls > 1; },
+      },
+    });
+    const input = { repository: identityRepository, service };
+    await reconcileIdentityCompletions(input);
+    const failed = await identityRepository.find(member.userId, seeded.requestId);
+    assert.equal(failed?.status, "pending");
+    assert.ok(failed?.completionRequestedAt);
+    assert.equal(purgeCalls, 0);
+    await reconcileIdentityCompletions(input);
+    assert.equal((await identityRepository.find(member.userId, seeded.requestId))?.status, "verified_unpurged");
+    assert.equal((await createProfileBasicsRepository(() => db).read(member.userId)).eligible, false);
+    await reconcileIdentityCompletions(input);
+    assert.equal((await identityRepository.find(member.userId, seeded.requestId))?.status, "verified");
+    assert.equal((await createProfileBasicsRepository(() => db).read(member.userId)).eligible, true);
+    await reconcileIdentityCompletions(input);
+    assert.equal(canonicalCalls, 2);
+    assert.equal(purgeCalls, 2);
+  });
   for (const scenario of ["timely", "missing", "late", "missing-event", "future", "grace-expired"] as const) {
     it(`enforces the persisted completion window: ${scenario}`, async () => {
       const db = createIntegrationDb(getIntegrationDatabaseUrl());

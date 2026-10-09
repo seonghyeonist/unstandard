@@ -4,6 +4,39 @@ import { createDiditIdentityPurgeProvider } from "../lib/identity/didit";
 import { reconcileIdentityProviderPurges } from "../lib/identity/reconciliation";
 
 describe("identity provider purge outbox reconciliation", () => {
+  it("retains a deletion record across failures and queued replies, then clears it exactly once", async () => {
+    const entry = {
+      requestId: "123e4567-e89b-42d3-a456-426614174010",
+      provider: "didit-v3",
+      providerReference: "123e4567-e89b-42d3-a456-426614174011",
+    };
+    let queued = true;
+    let retries = 0;
+    let deletes = 0;
+    let providerCalls = 0;
+    const responses = [503, 202, 200];
+    const provider = createDiditIdentityPurgeProvider("synthetic-test-api-key", async () => {
+      const status = responses[providerCalls++];
+      return status === 200
+        ? Response.json({ session_id: entry.providerReference, face_retention_outcome: "deleted", biometric_template_uuid: null })
+        : new Response(null, { status });
+    });
+    const repository = {
+      async listProviderPurges() { return queued ? [entry] : []; },
+      async markProviderPurgeRetry() { retries++; },
+      async deleteProviderPurge() { deletes++; queued = false; return true; },
+    };
+    for (let attempt = 0; attempt < 2; attempt++) {
+      assert.deepEqual(await reconcileIdentityProviderPurges({ repository, provider }), { selected: 1, purged: 0, retryable: 1 });
+      assert.equal(queued, true);
+      assert.equal(deletes, 0);
+    }
+    assert.deepEqual(await reconcileIdentityProviderPurges({ repository, provider }), { selected: 1, purged: 1, retryable: 0 });
+    assert.deepEqual(await reconcileIdentityProviderPurges({ repository, provider }), { selected: 0, purged: 0, retryable: 0 });
+    assert.equal(retries, 2);
+    assert.equal(deletes, 1);
+    assert.equal(providerCalls, 3);
+  });
   it("uses a deletion-only Didit client without enabling collection", async () => {
     let requestUrl = "";
     let requestMethod = "";
