@@ -86,7 +86,7 @@ export UNSTANDARD_READINESS_EVIDENCE_PATH=./tmp/readiness-proof.json
 npm run readiness:alpha
 ```
 
-## Required deployed HTTP cases (37; must all PASS)
+## Required deployed HTTP cases (39; must all PASS)
 
 The executable source of truth is `REQUIRED_HTTP_SMOKE_CASES`. The cases are
 listed explicitly so a shortened narrative cannot hide a missing proof:
@@ -117,11 +117,19 @@ listed explicitly so a shortened narrative cannot hide a missing proof:
   `b_to_a_private_after_unlock_ok`
 - final privacy/isolation: `bidirectional_viewer_isolation`,
   `private_response_no_store`
+- block boundary: `block_create_idempotent`, `post_block_message_denied`
 
 The waitlist case uses a unique synthetic address, verifies join and same-browser
 capability deletion, and must leave the final state unjoined. The messaging
 cases prove database persistence, recipient visibility, and private/no-store
 HTTP caching; they do not claim notifications or a full inbox product.
+
+The block cases run after the bidirectional unlock/messaging proofs. They require
+the first `POST /api/blocks` to return `201`, `blocked=true`, `inserted=true`,
+and the repeat to return `200`, `blocked=true`, `inserted=false`. Both responses
+must be private/no-store. After blocking, conversation GET and message POST must
+both return `403` with `code=BLOCKED` and private/no-store headers. Operator
+fixture cleanup must remove the synthetic block before another smoke run.
 
 ## Hostname restrictions
 
@@ -155,3 +163,45 @@ Output redacts emails, passwords, cookies, tokens, and full IDs.
 Artifacts never store credentials, cookies, bypass secrets, or database URLs.
 
 Exit codes: `0` PASS · `1` FAIL · `2` BLOCKED_EXTERNAL
+
+## Existing issued session mode (named Sandbox RC only)
+
+When controlled members have already signed in but their passwords are unavailable,
+set SMOKE_SESSION_INPUT_FILE to an absolute private 0600 JSON file containing
+baseUrl, profileAId, profileBId, tokensA (at least one existing session),
+tokensB (at least one distinct existing session), and operatorToken. Never commit or log it.
+Use only server-issued, unexpired sessions of the authorized test members read
+from the verified non-default RC DB. Do not INSERT sessions or reconstruct
+identity eligibility. Member A/B labels may be assigned to the existing members
+according to available sessions; account roles/balance/profile ownership do not change.
+
+The operator signs in normally, then the named RC session-import endpoint validates
+each existing token through Better Auth and proves expected profile ownership.
+After parent validation it uses Better Auth's normal session adapter to issue a
+child credential expiring at the earlier of parent expiry and 15 minutes. The
+parent remains unchanged. Named RC sessions disable automatic refresh so the
+child cannot expand to the default seven days. It returns a Secure HttpOnly cookie. The normal deployed member
+API validates it again. Operator cookies are not included in member requests.
+The endpoint is restricted to Preview/database/test-or-staging/Sandbox and the
+named RC DB, and stops working at its Oct12 expiration. It never accepts a caller-supplied user ID or inserts auth/identity rows with SQL.
+Wrong environment, anonymous operator, different origin, invalid/revoked/expired
+token, or wrong profile is denied. No general bearer plugin is enabled.
+
+Artifacts record authenticationMode=delegated_issued_sessions. In this mode the
+user_a_login/user_b_login cases prove validated-parent/short-lived-child admission plus ordinary
+member session validation; they do NOT prove a fresh email/password sign-in.
+Password endpoint/Auth regression evidence must retain its original provenance.
+All 39 authorization assertions, genuine ownership, initial pair cleanliness,
+bidirectional unlock, persistence, report/block and session revocation are unchanged.
+After evidence, remove local input files and use supported logout/delete cleanup.
+Do not label this mode as a new password-login test.
+
+Existing-session revocation uses separate local-clear and stale-pre-logout jars.
+The normal logout and stale replay share a real server logout, while each result
+is independently asserted. This avoids requiring three extra password logins.
+Console output includes every actual case result on both PASS and FAIL.
+
+Child sessions use the auth adapter's normal cryptographic token generation and
+DB persistence after real parent authentication. This is credential delegation,
+not mock authentication or password-login proof. Revocation tests act on child
+credentials only, preserving the original member sessions for remaining UX.

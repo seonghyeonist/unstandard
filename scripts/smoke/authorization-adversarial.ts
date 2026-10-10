@@ -1,3 +1,4 @@
+import { readFileSync, statSync } from "node:fs";
 /**
  * Deployed Preview adversarial authorization smoke (HTTP boundary).
  * Required HTTP Alpha surface only — DB-only proofs belong in test:integration.
@@ -44,6 +45,13 @@ const deploymentGitSha = process.env.SMOKE_DEPLOYMENT_GIT_SHA?.trim();
 const deploymentId = process.env.SMOKE_DEPLOYMENT_ID?.trim();
 const databaseFingerprintSha = process.env.SMOKE_DATABASE_FINGERPRINT_SHA256?.trim();
 const protectionJar = new CookieJar();
+const sessionFilePath = process.env.SMOKE_SESSION_INPUT_FILE;
+const sessionInput: { baseUrl: string; profileAId: string; profileBId: string; tokensA: string[]; tokensB: string[]; operatorToken: string } | null = sessionFilePath ? (() => {
+  if ((statSync(sessionFilePath).mode & 0o077) !== 0) throw new Error("Session input must be private (0600)");
+  return JSON.parse(readFileSync(sessionFilePath, "utf8"));
+})() : null;
+const operatorJar = new CookieJar();
+let usedA = 0, usedB = 0;
 
 type FutureCase = {
   name: string;
@@ -85,7 +93,7 @@ async function fetchJson(
   if (previewBypass) {
     headers.set("x-vercel-protection-bypass", previewBypass);
   }
-  const cookieHeader = [protectionJar.header(), jar?.header()].filter(Boolean).join("; ");
+  const cookieHeader = [headers.get("cookie"), protectionJar.header(), jar?.header()].filter(Boolean).join("; ");
   if (cookieHeader) {
     headers.set("cookie", cookieHeader);
   }
@@ -118,10 +126,20 @@ function isPrivateNoStore(headers: Headers): boolean {
 }
 
 async function signIn(
-  email: string,
-  password: string,
+  email: string | undefined,
+  password: string | undefined,
   jar: CookieJar,
+  member: "A" | "B" = "A",
 ): Promise<{ ok: boolean; status: number }> {
+  if (sessionInput) {
+    const token = member === "A" ? sessionInput.tokensA[usedA++] : sessionInput.tokensB[usedB++];
+    if (!token) return { ok: false, status: 401 };
+    const response = await fetchJson("/api/alpha/operator/session-import", {
+      method: "POST", headers: { "content-type": "application/json", cookie: operatorJar.header() ?? "" },
+      body: JSON.stringify({ sessionToken: token, profileId: member === "A" ? profileAId : profileBId }),
+    }, jar);
+    return { ok: response.status === 200 && (response.body as { ok?: boolean })?.ok === true, status: response.status };
+  }
   const response = await fetchJson(
     "/api/auth/sign-in/email",
     {
@@ -143,10 +161,6 @@ async function main(): Promise<void> {
   const cases: ProofCase[] = [];
   const futureNotApplicable: FutureCase[] = [
     {
-      name: "duplicate_block_rejected",
-      reason: "No HTTP block endpoint in alpha rebuild",
-    },
-    {
       name: "user_a_cannot_modify_user_b_profile",
       reason: "No profile mutation HTTP endpoint in alpha rebuild",
     },
@@ -160,7 +174,7 @@ async function main(): Promise<void> {
     blocked("SMOKE_BASE_URL missing");
   }
 
-  if (!userAEmail || !userAPassword || !userBEmail || !userBPassword) {
+  if (!sessionInput && (!userAEmail || !userAPassword || !userBEmail || !userBPassword)) {
     blocked("SMOKE_USER_A_* and SMOKE_USER_B_* credentials are required");
   }
 
@@ -185,6 +199,13 @@ async function main(): Promise<void> {
     blocked("SMOKE_DATABASE_FINGERPRINT_SHA256 must hash the matched safe fingerprint");
   }
 
+  if (sessionInput) {
+    if (sessionInput.baseUrl !== baseUrl || sessionInput.profileAId !== profileAId || sessionInput.profileBId !== profileBId || sessionInput.tokensA.length < 1 || sessionInput.tokensB.length < 1 || new Set([...sessionInput.tokensA, ...sessionInput.tokensB]).size !== sessionInput.tokensA.length + sessionInput.tokensB.length) {
+      blocked("Session input target/binding/distinct-session preflight failed");
+    }
+    const operatorLogin = await fetchJson("/api/alpha/operator/login", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ token: sessionInput.operatorToken }) }, operatorJar);
+    if (operatorLogin.status !== 200) blocked("Preview operator session admission failed");
+  }
   const previewHostname = extractHostname(baseUrl);
   if (!previewHostname) {
     blocked("SMOKE_BASE_URL must yield a Preview hostname");
@@ -295,7 +316,7 @@ async function main(): Promise<void> {
   pushCase(cases, "user_a_session", sessionA.status === 200);
 
   const jarB = new CookieJar();
-  const loginB = await signIn(userBEmail, userBPassword, jarB);
+  const loginB = await signIn(userBEmail, userBPassword, jarB, "B");
   pushCase(cases, "user_b_login", loginB.ok);
   if (!loginB.ok) {
     console.error(redact("FAIL: user B login failed — aborting later session proofs"));
@@ -622,6 +643,46 @@ async function main(): Promise<void> {
       isPrivateNoStore(bAfterPrivate.headers),
   );
 
+  // Block only after the bidirectional unlock/messaging proofs: blocking is
+  // persistent pair state and must not invalidate the earlier preconditions.
+  const blockRequest = {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ profileId: profileBId }),
+  };
+  const firstBlock = await fetchJson("/api/blocks", blockRequest, jarA);
+  const repeatBlock = await fetchJson("/api/blocks", blockRequest, jarA);
+  const firstBlockBody = firstBlock.body as { blocked?: boolean; inserted?: boolean };
+  const repeatBlockBody = repeatBlock.body as { blocked?: boolean; inserted?: boolean };
+  pushCase(
+    cases,
+    "block_create_idempotent",
+    firstBlock.status === 201 && firstBlockBody?.blocked === true &&
+      firstBlockBody.inserted === true && repeatBlock.status === 200 &&
+      repeatBlockBody?.blocked === true && repeatBlockBody.inserted === false &&
+      isPrivateNoStore(firstBlock.headers) && isPrivateNoStore(repeatBlock.headers),
+  );
+
+  const blockedConversation = await fetchJson(`/api/messages/${profileBId}`, {}, jarA);
+  const blockedMessage = await fetchJson(
+    `/api/messages/${profileBId}`,
+    {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ body: "차단 후 전송되어서는 안 되는 합성 테스트 메시지입니다." }),
+    },
+    jarA,
+  );
+  pushCase(
+    cases,
+    "post_block_message_denied",
+    blockedConversation.status === 403 &&
+      (blockedConversation.body as { code?: string })?.code === "BLOCKED" &&
+      blockedMessage.status === 403 &&
+      (blockedMessage.body as { code?: string })?.code === "BLOCKED" &&
+      isPrivateNoStore(blockedConversation.headers) && isPrivateNoStore(blockedMessage.headers),
+  );
+
   const getSession = async (jar: CookieJar) => {
     const result = await fetchJson("/api/auth/session", {}, jar);
     return { status: result.status };
@@ -631,6 +692,20 @@ async function main(): Promise<void> {
     return { status: result.status };
   };
 
+  if (sessionInput) {
+    // Local clear and server logout/replay are separate observed assertions.
+    // One delegated session suffices; the original login is preserved.
+    const clearedPass = await proveClearedCookieDenied({ jar: jarA.clone(), getSession });
+    const stalePreLogout = jarA.clone();
+    const replayHadCookie = stalePreLogout.size() > 0;
+    const logoutPass = await proveLogoutInvalidatesSession({ jar: jarA, getSession, logout });
+    const staleReplay = await getSession(stalePreLogout);
+    pushCase(cases, "cleared_cookie_denied", clearedPass);
+    pushCase(cases, "logout_invalidates_session", logoutPass);
+    // A rejected replay can clear cookies in its response. Prove the request
+    // carried the stale cookie before allowing response ingestion to erase it.
+    pushCase(cases, "revoked_session_rejected", logoutPass && replayHadCookie && staleReplay.status === 401);
+  } else {
   const logoutPass = await proveLogoutInvalidatesSession({ jar: jarA, getSession, logout });
   pushCase(cases, "logout_invalidates_session", logoutPass);
 
@@ -652,6 +727,8 @@ async function main(): Promise<void> {
   } else {
     const revoked = await proveRevokedSessionRejected({ jar: revokedJar, getSession, logout });
     pushCase(cases, "revoked_session_rejected", revoked.pass && revoked.usedStaleClone);
+  }
+
   }
 
   const requiredSet = new Set<string>(REQUIRED_HTTP_SMOKE_CASES);
@@ -677,6 +754,7 @@ async function main(): Promise<void> {
     deploymentGitSha,
     deploymentId,
     databaseFingerprintSha,
+    authenticationMode: sessionInput ? "delegated_issued_sessions" : "password",
     migrationChecksum: migrationSetChecksum(),
     previewHostname,
     cases: activeRequired,
@@ -692,6 +770,7 @@ async function main(): Promise<void> {
     JSON.stringify(
       {
         verdict,
+        authenticationMode: sessionInput ? "delegated_issued_sessions" : "password",
         kind: "smoke",
         matrix: "deployed_http_alpha_surface",
         previewHostname,
@@ -700,6 +779,7 @@ async function main(): Promise<void> {
         deploymentGitSha,
         deploymentId,
         caseNames: activeRequired.map((item) => item.name),
+        caseResults: activeRequired,
         futureNotApplicable: futureNotApplicable.map((item) => item.name),
         timestamp: built.artifact.timestamp,
       },

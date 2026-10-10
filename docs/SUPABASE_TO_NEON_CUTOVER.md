@@ -1,5 +1,10 @@
 # Supabase → Neon Cutover Record (P0.3A)
 
+> **HISTORICAL AUTHORITY POINTER — 2026-09-28.** This retained audit is not a
+> Supabase runtime/setup instruction. Neon + Drizzle + Better Auth is the
+> current application path. See
+> [CURRENT_ALPHA_AUTHORITY_20260928.md](./CURRENT_ALPHA_AUTHORITY_20260928.md).
+
 status: HISTORICAL_AUDIT_NOT_EXECUTABLE
 
 Honest historical and operational migration record for PR #55.

@@ -4,7 +4,9 @@ import { and, eq } from "drizzle-orm";
 import { getDb } from "@/lib/db/client";
 import { lockConversationPair } from "@/lib/db/repositories/conversation-lock";
 import { blocks } from "@/lib/db/schema/blocks";
+import { profiles } from "@/lib/db/schema/profiles";
 import { translateDatabaseError } from "@/lib/db/errors";
+import { isUuid } from "@/lib/server/unlock/uuid";
 
 export type CreateBlockInput = {
   blockerUserId: string;
@@ -13,7 +15,11 @@ export type CreateBlockInput = {
 
 export type CreateBlockResult =
   | { ok: true; blockId: string; inserted: boolean }
-  | { ok: false; code: "SELF_BLOCK" | "DUPLICATE" | "DB_ERROR" };
+  | { ok: false; code: "SELF_BLOCK" | "DB_ERROR" };
+
+export type CreateBlockForProfileResult =
+  | { ok: true; inserted: boolean }
+  | { ok: false; code: "INVALID_PROFILE_ID" | "PROFILE_NOT_FOUND" | "SELF_BLOCK" | "DB_ERROR" };
 
 export async function createBlock(input: CreateBlockInput): Promise<CreateBlockResult> {
   if (input.blockerUserId === input.blockedUserId) {
@@ -51,8 +57,32 @@ export async function createBlock(input: CreateBlockInput): Promise<CreateBlockR
       if (existing) {
         return { ok: true, blockId: existing.id, inserted: false };
       }
-      return { ok: false, code: "DUPLICATE" };
     }
     return { ok: false, code: "DB_ERROR" };
   }
+}
+
+export async function createBlockForProfile(input: {
+  blockerUserId: string;
+  targetProfileId: string;
+}): Promise<CreateBlockForProfileResult> {
+  if (!isUuid(input.targetProfileId)) return { ok: false, code: "INVALID_PROFILE_ID" };
+
+  let target: { userId: string } | undefined;
+  try {
+    [target] = await getDb()
+      .select({ userId: profiles.userId })
+      .from(profiles)
+      .where(eq(profiles.id, input.targetProfileId))
+      .limit(1);
+  } catch {
+    return { ok: false, code: "DB_ERROR" };
+  }
+  if (!target) return { ok: false, code: "PROFILE_NOT_FOUND" };
+
+  const result = await createBlock({
+    blockerUserId: input.blockerUserId,
+    blockedUserId: target.userId,
+  });
+  return result.ok ? { ok: true, inserted: result.inserted } : result;
 }

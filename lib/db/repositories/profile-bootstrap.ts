@@ -3,7 +3,7 @@ import "server-only";
 import { eq } from "drizzle-orm";
 import { getDb } from "@/lib/db/client";
 import type { DbExecutor } from "@/lib/db/types";
-import { profiles } from "@/lib/db/schema/profiles";
+import { profiles, profilePrivate } from "@/lib/db/schema/profiles";
 import type { AuthenticatedUser } from "@/lib/auth/server";
 import { resolveReporterNickname } from "@/lib/server/profile/reporter-nickname";
 
@@ -28,6 +28,7 @@ export async function ensureProfileForUser(
     .limit(1);
 
   if (existing[0]) {
+    await db.insert(profilePrivate).values({ profileId: existing[0].id }).onConflictDoNothing({ target: profilePrivate.profileId });
     return {
       profileId: existing[0].id,
       nickname: existing[0].nickname,
@@ -49,6 +50,7 @@ export async function ensureProfileForUser(
     });
 
   if (inserted[0]) {
+    await db.insert(profilePrivate).values({ profileId: inserted[0].id }).onConflictDoNothing({ target: profilePrivate.profileId });
     return {
       profileId: inserted[0].id,
       nickname: inserted[0].nickname,
@@ -70,6 +72,7 @@ export async function ensureProfileForUser(
     throw new Error("Profile bootstrap failed");
   }
 
+  await db.insert(profilePrivate).values({ profileId: reconciled[0].id }).onConflictDoNothing({ target: profilePrivate.profileId });
   return {
     profileId: reconciled[0].id,
     nickname: reconciled[0].nickname,
