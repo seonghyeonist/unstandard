@@ -69,7 +69,10 @@ describe("profile save state", () => {
     assert.equal(hasProfileBasicsDraftChanges(null, draft), true);
     assert.equal(hasProfileBasicsDraftChanges(current, { ...draft, nickname: "겨울" }), true);
     assert.equal(hasProfileBasicsDraftChanges(current, draft), false);
-    assert.equal(canSaveProfileBasics({ busy: false, consent: true, actualProfileDirty: false, identityInProgress: false }), false);
+    assert.equal(canSaveProfileBasics({ busy: false, consent: true, actualProfileDirty: false, identityInProgress: false }), true);
+    assert.equal(canSaveProfileBasics({ busy: false, consent: true, actualProfileDirty: false, identityInProgress: true }), true);
+    assert.equal(canSaveProfileBasics({ busy: false, consent: false, actualProfileDirty: false, identityInProgress: false }), false);
+    assert.equal(canSaveProfileBasics({ busy: true, consent: true, actualProfileDirty: false, identityInProgress: false }), false);
     assert.equal(canSaveProfileBasics({ busy: false, consent: true, actualProfileDirty: true, identityInProgress: false }), true);
     assert.equal(canSaveProfileBasics({ busy: false, consent: true, actualProfileDirty: true, identityInProgress: true }), false);
   });
@@ -105,6 +108,9 @@ describe("basic profile server-rendered form", () => {
         region: "서울", introductionScopeAccepted: true, updatedAt: now.toISOString() },
         eligible: true, verification: "verified", verificationAvailable: true } })));
     assert.match(html, /<button[^>]*disabled=""[^>]*>기본 프로필 저장/);
+    assert.doesNotMatch(html, /신원·성인 인증 시작/);
+    assert.match(html, /소개 준비가 완료됐어요/);
+    assert.match(html, /같은 내용을 다시 저장하면 인증은 유지돼요/);
   });
   it("offers result recovery from the authenticated pending request without rendering its ID or personal input fields", () => {
     const pendingIdentityRequestId = "11111111-1111-4111-8111-111111111111";

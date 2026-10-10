@@ -99,8 +99,9 @@ export function ProfileBasicsForm({ setup }: { setup: ProfileSetupView }) {
         <label className="block text-sm font-semibold">활동 지역<select className="mt-2 w-full rounded-2xl border border-line bg-white px-4 py-3" required value={region} onChange={(e) => { setRegion(e.target.value); markDirty(); }}><option value="">시도 선택</option>{ACTIVITY_REGIONS.map((item) => <option key={item}>{item}</option>)}</select></label>
         <label className="flex gap-3 text-sm leading-6"><input type="checkbox" checked={scope} onChange={(e) => { setScope(e.target.checked); markDirty(); }} className="mt-1" /><span>이번 알파는 남성과 여성 간 소개만 제공함을 확인했고, 이 범위의 소개를 원해요. 성적 지향을 확인하거나 인증하는 절차는 아니에요. 선택하지 않으면 상대 노출·조회·대화가 중단돼요.</span></label>
         <label className="flex gap-3 text-sm leading-6"><input type="checkbox" required checked={consent} onChange={(e) => { setConsent(e.target.checked); markDirty(); }} className="mt-1" /><span>프로필 표시·소개 대상 제한·운영 집계를 위해 위 항목과 동의 버전·시각을 탈퇴 또는 프로필 정보 삭제까지 보관하는 데 동의해요. 거부할 수 있으며, 거부하면 소개 기능은 이용할 수 없어요. <Link className="underline" href="/privacy">개인정보 안내</Link></span></label>
-        <p className="text-xs leading-5 text-foreground/65">수정·저장하면 이전 인증이 해제되고 재인증 전까지 상대에게 보이지 않아요. 만 나이는 입력 시점 기준이며, 1년이 지나면 다시 입력·인증해야 해요.</p>
-        <Button className="w-full" disabled={!canSave}>{save.isPending ? "저장 중…" : "기본 프로필 저장"}</Button>
+        <p className="text-xs leading-5 text-foreground/65">프로필 내용을 변경해 저장하면 이전 인증이 해제되고 재인증 전까지 상대에게 보이지 않아요. 같은 내용을 다시 저장하면 인증은 유지돼요. 만 나이는 입력 시점 기준이며, 1년이 지나면 다시 입력·인증해야 해요.</p>
+        <Button type="submit" className="w-full" disabled={!canSave}>{save.isPending ? "저장 중…" : "기본 프로필 저장"}</Button>
+        {!consent ? <p className="text-sm" role="status">저장하려면 위 개인정보 보관 동의를 확인해 주세요.</p> : null}
         {identityCleanupRequired ? <p role="status" aria-live="polite" className="text-sm">{setup.verification === "expired"
           ? "인증 요청이 만료됐어요. 새 인증을 시작해 이전 요청을 정리해 주세요."
           : "인증 결과와 인증사 세션 삭제를 확인하고 있어요. 완료되면 상태가 갱신돼요. 오래 걸리면 아래 ‘인증 결과 확인’을 눌러 주세요."}</p> : null}
@@ -115,9 +116,9 @@ export function ProfileBasicsForm({ setup }: { setup: ProfileSetupView }) {
       <p className="mt-3 text-sm leading-6">{setup.verificationAvailable ? "Didit의 보안 인증 화면에서 신분증·수동적 생체활성·얼굴 일치·기기/IP 위험 신호를 확인해요. 완료 후 인증사 세션 삭제 확인까지 진행해요." : setup.verificationAvailabilityReason === "temporarily_unavailable" ? "인증 서비스를 잠시 사용할 수 없어요. 신분증·생체정보를 입력하거나 제출할 수 없어요." : "인증 서비스 준비 중이에요. 지금은 신분증·생체정보를 입력하거나 제출할 수 없어요."}</p>
       <p className="mt-3 text-sm leading-6 text-foreground/70">신원 확인은 Didit Identity Spain, S.L.의 호스팅 화면에서 진행돼요. 신분증 정보, 셀피·영상 기반의 수동적 생체활성, 얼굴 일치용 생체정보, 성인 여부와 필요한 기기·IP 분석이 처리될 수 있어요. 계약상 주된 처리 인프라는 EEA이며 기본 보유기간은 무제한이에요. 2026-10-01 확인한 Sandbox는 보유기간 1개월·세션과 함께 얼굴 템플릿 삭제 설정이에요. 인증 후 앱이 세션 삭제를 요청하고, 공급자 삭제 확인 전에는 소개를 열지 않아요. 즉시 물리 삭제를 보장하지 않아요. 앱 DB·로그에는 원문을 저장하지 않고 최소 인증 상태만 기록해요. 자세한 내용은 <Link className="underline" href="/privacy">개인정보 안내</Link>를 확인해 주세요.</p>
       <p className="mt-3 text-sm">인증 상태: {({ not_started: "미인증", pending: "확인 대기", purge_pending: "삭제 확인 대기", verified: "확인 완료", expired: "요청 만료" })[setup.verification]}</p>
-      <label className="mt-4 flex gap-3 text-sm"><input type="checkbox" disabled={!setup.verificationAvailable} checked={identityConsent} onChange={(e) => setIdentityConsent(e.target.checked)} /><span>신분증·수동적 생체활성·얼굴 일치·성인 여부와 필요한 기기/IP 분석 처리, 인증 결과 기록 및 인증 세션 삭제 확인에 동의해요. 거부하면 소개 기능을 이용할 수 없어요.</span></label>
+      {setup.verification !== "verified" ? <label className="mt-4 flex gap-3 text-sm"><input type="checkbox" disabled={!setup.verificationAvailable} checked={identityConsent} onChange={(e) => setIdentityConsent(e.target.checked)} /><span>신분증·수동적 생체활성·얼굴 일치·성인 여부와 필요한 기기/IP 분석 처리, 인증 결과 기록 및 인증 세션 삭제 확인에 동의해요. 거부하면 소개 기능을 이용할 수 없어요.</span></label> : null}
       {identityRequest ? <Button className={identityInProgress ? "mt-3 w-full font-bold ring-2 ring-accent" : "mt-3 w-full"} disabled={busy || !setup.verificationAvailable} onClick={() => verify.mutate("complete")}>인증 결과 확인</Button> : null}
-      <Button className="mt-4 w-full" disabled={busy || identityInProgress || !setup.verificationAvailable || !setup.basics?.introductionScopeAccepted || !identityConsent} onClick={() => verify.mutate("start")}>신원·성인 인증 시작</Button>
+      {setup.verification !== "verified" ? <Button className="mt-4 w-full" disabled={busy || identityInProgress || !setup.verificationAvailable || !setup.basics?.introductionScopeAccepted || !identityConsent} onClick={() => verify.mutate("start")}>신원·성인 인증 시작</Button> : null}
       {verify.isError ? <p role="alert" className="mt-3 text-sm text-danger">{verify.error.message}</p> : null}
     </Card>
     <Card>

@@ -70,7 +70,9 @@ export function assessProfileBasicsMutation(
 export function canSaveProfileBasics(state: {
   busy: boolean; consent: boolean; actualProfileDirty: boolean; identityInProgress: boolean;
 }): boolean {
-  return !state.busy && state.consent && state.actualProfileDirty && !state.identityInProgress;
+  // Re-submitting an unchanged profile is safe: the repository preserves its
+  // revision and identity proof. Only material edits wait for identity cleanup.
+  return !state.busy && state.consent && (!state.actualProfileDirty || !state.identityInProgress);
 }
 
 export type ProfileSetupView = {
