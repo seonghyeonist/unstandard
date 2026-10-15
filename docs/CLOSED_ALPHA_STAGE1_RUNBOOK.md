@@ -1,5 +1,8 @@
 # UNSTANDARD Closed Alpha Stage 1 runbook
 
+> **2026-10-15 superseding operational snapshot (documentation branch, NOT deployed):** August `STAGE1_NOT_READY` and Free/unprotected DB entries below are historical only. Current Production `dpl_8yLrAn6sy2WccABGQxhZDCF12frU` / `4cf4338c95a390b956cddd3ca1817fe8fb5327d9` is READY, Neon is Launch and protected=true; technical readiness 10/10 PASS. Official recruitment gate 10/11 NOT_READY due to genuine missing trademark/social-handle/real-human spelling evidence. See [CLOSED_ALPHA_AUTONOMOUS_HANDOFF_20261015.md](./CLOSED_ALPHA_AUTONOMOUS_HANDOFF_20261015.md) and [Issue #93 latest](https://github.com/seonghyeonist/unstandard/issues/93#issuecomment-6183313437). Never confuse Production release with PUBLIC_RECRUITMENT (not executed).
+
+
 **Version:** founder-resolution-v0.1 / operations-v4
 **Effective:** 2026-08-12
 **Current verdict:** `STAGE1_NOT_READY`
