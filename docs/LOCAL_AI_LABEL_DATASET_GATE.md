@@ -1,5 +1,13 @@
 # Local AI Label Dataset — Integrity & Human-Label Readiness Gate
 
+> **HISTORICAL / NON-BLOCKING FOR CLOSED ALPHA — 2026-09-28.** This document
+> governs a possible future offline Local AI calibration effort only. The
+> founder waived alpha human-label review: `HUMAN_LABEL_REVIEW =
+> WAIVED_BY_FOUNDER / NOT_PERFORMED`. Do not treat `HUMAN_LABEL_GATE` or
+> `CALIBRATION_READINESS` here as Closed Alpha release blockers, and do not
+> describe the waiver as accuracy, calibration, agreement, or ground truth.
+> Current decisions: [CURRENT_ALPHA_AUTHORITY_20260928.md](./CURRENT_ALPHA_AUTHORITY_20260928.md).
+
 ## Verdict summary
 
 | Gate | Verdict |

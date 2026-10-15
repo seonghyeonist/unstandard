@@ -39,13 +39,28 @@ describe("integration runner-core termination and serial execution", () => {
     }
   });
 
-  it("defaultSuiteExecutor and runner-core use shell:false, concurrency 1, no wildcards, no process.exit", () => {
-    const result = defaultSuiteExecutor({
-      files: ["tests/integration/suite/migrations.test.ts"],
-      env: { ...process.env, TEST_DATABASE_URL: "" },
-      cwd: process.cwd(),
-    });
-    assert.ok(result.status !== undefined);
+  it("defaultSuiteExecutor runs a real child test and keeps the runner bounded", () => {
+    const smokeSuite = join(
+      tmpdir(),
+      "unstandard-runner-smoke-" + process.pid + "-" + Date.now() + ".test.cjs",
+    );
+    writeFileSync(
+      smokeSuite,
+      "const test = require('node:test'); test('child suite executed', () => {});\n",
+      "utf8",
+    );
+    try {
+      const result = defaultSuiteExecutor({
+        files: [smokeSuite],
+        env: { ...process.env, TEST_DATABASE_URL: "" },
+        cwd: process.cwd(),
+        timeoutMs: 5_000,
+      });
+      assert.equal(result.status, 0);
+    } finally {
+      rmSync(smokeSuite, { force: true });
+    }
+
     const source = readFileSync(
       join(process.cwd(), "lib/readiness/integration-runner-core.ts"),
       "utf8",
@@ -65,10 +80,42 @@ describe("integration runner-core termination and serial execution", () => {
     assert.doesNotMatch(cli, /process\.exit\(/);
   });
 
-  it("failure after log creation deletes the observation log (DI)", async () => {
+  it("kills a suite child at its hard timeout and records the signal", () => {
+    const hangingSuite = join(
+      tmpdir(),
+      "unstandard-hanging-suite-" + process.pid + "-" + Date.now() + ".test.js",
+    );
+    writeFileSync(hangingSuite, "setInterval(() => {}, 1000);\n", "utf8");
+    try {
+      const result = defaultSuiteExecutor({
+        files: [hangingSuite],
+        env: { ...process.env, TEST_DATABASE_URL: "test-db-url" },
+        cwd: process.cwd(),
+        timeoutMs: 500,
+      });
+      assert.equal(result.timedOut, true);
+      assert.equal(result.errorCode, "SUITE_TIMEOUT");
+      assert.equal(result.signal, "SIGKILL");
+      assert.equal(result.status, null);
+    } finally {
+      rmSync(hangingSuite, { force: true });
+    }
+
+    const supervisor = readFileSync(
+      join(process.cwd(), "scripts/test/integration-supervisor.ts"),
+      "utf8",
+    );
+    assert.match(supervisor, /SUPERVISOR_TIMEOUT_MS/);
+    assert.match(supervisor, /killSignal:\s*"SIGKILL"/);
+    assert.match(supervisor, /integration\.process_exit/);
+  });
+
+  it("failure after log creation verifies fixture restoration and deletes the observation log (DI)", async () => {
     const caseLogPath = createUniqueObservationLogPath();
     writeFileSync(caseLogPath, "", "utf8");
     assert.equal(existsSync(caseLogPath), true);
+    let restorationChecks = 0;
+    let artifactWritten = false;
 
     await assert.rejects(
       () =>
@@ -76,10 +123,16 @@ describe("integration runner-core termination and serial execution", () => {
           caseLogPath,
           env: {
             ...process.env,
-            TEST_DATABASE_URL: "postgresql://example.invalid/db",
+            TEST_DATABASE_URL: "test-db-url",
+            UNSTANDARD_INTEGRATION_EVIDENCE_OUT: join(tmpdir(), "must-not-write-after-suite-failure.json"),
           },
           skipPrerequisiteGuards: true,
+          readFixtureBaseline: async () => ({ users: 0, profiles: 0, alpha_invites: 0 }),
+          proveFixtureRestored: async () => {
+            restorationChecks += 1;
+          },
           suiteExecutor: ({ env }) => {
+            assert.equal(env.UNSTANDARD_TEST_POSTGRES_WEBSOCKET, "yes");
             const path = env.UNSTANDARD_INTEGRATION_CASE_LOG;
             assert.ok(path);
             writeFileSync(
@@ -90,11 +143,16 @@ describe("integration runner-core termination and serial execution", () => {
             assert.equal(existsSync(path), true);
             return { status: 1 };
           },
+          writeArtifact: () => {
+            artifactWritten = true;
+          },
         }),
       (error: unknown) =>
         error instanceof IntegrationExecutionError && /suite failed/i.test(error.message),
     );
 
+    assert.equal(restorationChecks, 1);
+    assert.equal(artifactWritten, false);
     assert.equal(existsSync(caseLogPath), false);
   });
 
@@ -106,7 +164,7 @@ describe("integration runner-core termination and serial execution", () => {
           caseLogPath,
           env: {
             ...process.env,
-            TEST_DATABASE_URL: "postgresql://example.invalid/db",
+            TEST_DATABASE_URL: "test-db-url",
           },
           skipPrerequisiteGuards: true,
           suiteExecutor: ({ env }) => {
@@ -136,7 +194,7 @@ describe("integration runner-core termination and serial execution", () => {
           caseLogPath,
           env: {
             ...process.env,
-            TEST_DATABASE_URL: "postgresql://example.invalid/db",
+            TEST_DATABASE_URL: "test-db-url",
             UNSTANDARD_INTEGRATION_EVIDENCE_OUT: join(tmpdir(), "must-not-exist.json"),
           },
           skipPrerequisiteGuards: true,
@@ -176,7 +234,7 @@ describe("integration runner-core termination and serial execution", () => {
           caseLogPath,
           env: {
             ...process.env,
-            TEST_DATABASE_URL: "postgresql://example.invalid/db",
+            TEST_DATABASE_URL: "test-db-url",
           },
           skipPrerequisiteGuards: true,
           suiteExecutor: ({ env }) => {
@@ -206,7 +264,7 @@ describe("integration runner-core termination and serial execution", () => {
           caseLogPath,
           env: {
             ...process.env,
-            TEST_DATABASE_URL: "postgresql://example.invalid/db",
+            TEST_DATABASE_URL: "test-db-url",
             UNSTANDARD_INTEGRATION_EVIDENCE_OUT: join(tmpdir(), "should-fail.json"),
           },
           skipPrerequisiteGuards: true,
@@ -236,7 +294,7 @@ describe("integration runner-core termination and serial execution", () => {
       caseLogPath,
       env: {
         ...process.env,
-        TEST_DATABASE_URL: "postgresql://example.invalid/db",
+        TEST_DATABASE_URL: "test-db-url",
       },
       skipPrerequisiteGuards: true,
       suiteExecutor: ({ env }) => {

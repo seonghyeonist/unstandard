@@ -22,6 +22,10 @@ async function main(): Promise<void> {
 }
 
 main().catch((error) => {
-  console.error(error instanceof Error ? error.message : "migrate failed");
+  const code = (error as { code?: unknown } | null)?.code;
+  const safeCode = typeof code === "string" && /^[A-Za-z0-9_-]{2,48}$/u.test(code)
+    ? code
+    : "MIGRATE_FAILED";
+  console.error("db:migrate failed (" + safeCode + ")");
   process.exit(1);
 });

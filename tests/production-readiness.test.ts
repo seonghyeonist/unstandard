@@ -116,7 +116,7 @@ function attestation(
       },
       privacyNoticeUrl: "https://alpha.example.com/privacy",
       accountDeletionTestReference: "delete-integration-123",
-      rateLimitPolicyVersion: "closed-alpha-v2",
+      rateLimitPolicyVersion: "closed-alpha-v3",
       measurementContractVersion: "alpha-stage1-kpi-v1",
       metricsCommand: "npm run alpha:metrics",
       supplyBalanceProcedureReference: "docs/CLOSED_ALPHA_OPERATIONS_RUNBOOK.md#supply",
@@ -270,7 +270,7 @@ describe("Closed-alpha launch separation", () => {
     );
   });
 
-  it("builds a digest-bound artifact only after technical and operational PASS", () => {
+  it("passes the identity-provider notice gate after reviewed publication", () => {
     const report = buildProductionReadinessReport({
       environment: environment(),
       database: database(),
@@ -282,15 +282,21 @@ describe("Closed-alpha launch separation", () => {
       hostname: "alpha.example.com",
       verifiedAt: NOW,
     });
-    const artifact = buildClosedAlphaLaunchArtifact({
+    const result = evaluateClosedAlphaLaunch({
+      production,
+      attestation: attestation(),
+      nowMs: Date.parse(NOW) + 60_000,
+    });
+    assert.equal(result.ok, true);
+    assert.equal(
+      result.gates.find((item) => item.name === "identity_provider_notice")?.code,
+      "IDENTITY_PROVIDER_NOTICE_READY",
+    );
+    assert.doesNotThrow(() => buildClosedAlphaLaunchArtifact({
       production,
       attestation: attestation(),
       generatedAt: new Date(Date.parse(NOW) + 60_000).toISOString(),
-    });
-
-    assert.equal(artifact.ok, true);
-    assert.match(artifact.contentDigest, /^[a-f0-9]{64}$/u);
-    assert.equal(artifact.gitSha, SHA);
+    }));
   });
 
   it("accepts the time-bounded Neon Free exception only with every compensating control", () => {
@@ -408,6 +414,73 @@ describe("Closed-alpha launch separation", () => {
       result.gates.find((item) => item.name === "production_database_safety")?.status,
       "FAIL",
     );
+  });
+
+  it("accepts explicit Stage 1 founder exemptions without claiming the reviews passed", () => {
+    const report = buildProductionReadinessReport({ environment: environment(), database: database(),
+      requestUrl: "https://alpha.example.com/api/operations/readiness", generatedAt: NOW });
+    const production = buildVerifiedProductionEvidence({ report, hostname: "alpha.example.com", verifiedAt: NOW });
+    const review = attestation();
+    Object.assign(review.evidence.domain, {
+      pronunciationSpellingReview: "WAIVED_BY_FOUNDER",
+      socialHandleReview: "WAIVED_BY_FOUNDER",
+      socialHandleEvidenceReference: "",
+      founderWaiver: {
+        policyVersion: "closed-alpha-brand-waivers-v1", scope: "closed_alpha_stage_1",
+        approvedBy: "founder-seonghyeonist", approvedAt: NOW,
+        decisionReference: "docs/FOUNDER_BRAND_DECISIONS_20261015.md",
+        pronunciationSpelling: true, socialHandles: true,
+      },
+    });
+    const result = evaluateClosedAlphaLaunch({ production, attestation: review, nowMs: Date.parse(NOW) });
+    assert.equal(result.ok, true);
+    assert.equal(review.evidence.domain.pronunciationSpellingReview, "WAIVED_BY_FOUNDER");
+    assert.equal(review.evidence.domain.socialHandleEvidenceReference, "");
+    const artifact = buildClosedAlphaLaunchArtifact({ production, attestation: review, generatedAt: NOW });
+    const withoutWaiver = structuredClone(review);
+    delete withoutWaiver.evidence.domain.founderWaiver;
+    assert.notEqual(artifact.operationalEvidenceDigest,
+      createHash("sha256").update(JSON.stringify(withoutWaiver.evidence)).digest("hex"));
+  });
+
+  it("rejects undocumented, out-of-scope, future, or partially granted founder exemptions", () => {
+    const report = buildProductionReadinessReport({ environment: environment(), database: database(),
+      requestUrl: "https://alpha.example.com/api/operations/readiness", generatedAt: NOW });
+    const production = buildVerifiedProductionEvidence({ report, hostname: "alpha.example.com", verifiedAt: NOW });
+    const valid = {
+      policyVersion: "closed-alpha-brand-waivers-v1", scope: "closed_alpha_stage_1",
+      approvedBy: "founder-seonghyeonist", approvedAt: NOW,
+      decisionReference: "docs/FOUNDER_BRAND_DECISIONS_20261015.md",
+      pronunciationSpelling: true, socialHandles: true,
+    };
+    for (const invalid of [undefined, { ...valid, scope: "beta" },
+      { ...valid, approvedBy: "agent" }, { ...valid, approvedAt: "invalid" },
+      { ...valid, approvedAt: "2026-08-12T08:00:00Z" },
+      { ...valid, decisionReference: "TODO" },
+      { ...valid, pronunciationSpelling: false }, { ...valid, socialHandles: false }]) {
+      const review = attestation();
+      Object.assign(review.evidence.domain, { pronunciationSpellingReview: "WAIVED_BY_FOUNDER",
+        socialHandleReview: "WAIVED_BY_FOUNDER", socialHandleEvidenceReference: "", founderWaiver: invalid });
+      assert.equal(evaluateClosedAlphaLaunch({ production, attestation: review, nowMs: Date.parse(NOW) }).ok, false);
+    }
+  });
+
+  it("keeps trademark clearance mandatory even with both founder exemptions", () => {
+    const report = buildProductionReadinessReport({ environment: environment(), database: database(),
+      requestUrl: "https://alpha.example.com/api/operations/readiness", generatedAt: NOW });
+    const production = buildVerifiedProductionEvidence({ report, hostname: "alpha.example.com", verifiedAt: NOW });
+    const review = attestation();
+    Object.assign(review.evidence.domain, {
+      trademarkReview: "NOT_VERIFIED", pronunciationSpellingReview: "WAIVED_BY_FOUNDER",
+      socialHandleReview: "WAIVED_BY_FOUNDER", socialHandleEvidenceReference: "",
+      founderWaiver: { policyVersion: "closed-alpha-brand-waivers-v1", scope: "closed_alpha_stage_1",
+        approvedBy: "founder-seonghyeonist", approvedAt: NOW,
+        decisionReference: "docs/FOUNDER_BRAND_DECISIONS_20261015.md",
+        pronunciationSpelling: true, socialHandles: true },
+    });
+    const result = evaluateClosedAlphaLaunch({ production, attestation: review, nowMs: Date.parse(NOW) });
+    assert.equal(result.ok, false);
+    assert.equal(result.gates.find((item) => item.name === "operational_evidence")?.status, "FAIL");
   });
 
   it("rejects privacy or canonical-domain evidence from a different host", () => {

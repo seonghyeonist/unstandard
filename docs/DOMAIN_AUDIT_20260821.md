@@ -1,3 +1,9 @@
+> 2026-10-15 update: domain ownership is confirmed by the Vercel registrar.
+> The founder explicitly waived the human pronunciation/spelling pilot and agent
+> social-handle review for Stage 1; see [decision record](FOUNDER_BRAND_DECISIONS_20261015.md).
+> Trademark clearance is still unresolved; see [current screening](TRADEMARK_SCREENING_20261015.md).
+> All observations below retain their original historical dates.
+
 # UNSTANDARD canonical-domain audit — 2026-08-21
 
 **Decision state:** `BLOCKED`

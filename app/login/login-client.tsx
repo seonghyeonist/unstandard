@@ -3,32 +3,33 @@
 import Link from "next/link";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { AppShell } from "@/components/layout/app-shell";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { signInWithEmailPassword, startMockSession } from "@/app/login/actions";
+import { canonicalBrowserLocation } from "@/lib/auth/canonical-origin";
 
 type LoginClientProps = {
+  canonicalOrigin: string;
   mockAllowed: boolean;
   databaseAuthEnabled: boolean;
   errorCode?: string;
 };
 
 function resolveLoginError(errorCode?: string): string | null {
-  if (errorCode === "auth_not_configured") {
-    return "Auth is not configured for this environment.";
-  }
-  if (errorCode === "auth_callback_failed") {
-    return "Sign-in callback failed. Request a new link and open it in this browser.";
-  }
-  if (errorCode === "service_unavailable") {
-    return "Authentication is temporarily unavailable. Try again shortly.";
-  }
+  if (errorCode === "auth_not_configured") return "Auth is not configured for this environment.";
+  if (errorCode === "service_unavailable") return "Authentication is temporarily unavailable. Try again shortly.";
   return null;
 }
 
+function resolveSignInError(errorCode: "invalid_credentials" | "service_unavailable"): string {
+  if (errorCode === "invalid_credentials") return "Email or password is incorrect.";
+  return "Authentication is temporarily unavailable. Try again shortly.";
+}
+
 export default function LoginClient({
+  canonicalOrigin,
   mockAllowed,
   databaseAuthEnabled,
   errorCode,
@@ -37,7 +38,13 @@ export default function LoginClient({
   const queryClient = useQueryClient();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [signInError, setSignInError] = useState<string | null>(null);
   const loginError = resolveLoginError(errorCode);
+
+  useEffect(() => {
+    if (window.location.origin === canonicalOrigin) return;
+    window.location.replace(canonicalBrowserLocation(canonicalOrigin, window.location));
+  }, [canonicalOrigin]);
 
   const mockMutation = useMutation({
     mutationFn: async () => startMockSession(),
@@ -49,7 +56,13 @@ export default function LoginClient({
 
   const signInMutation = useMutation({
     mutationFn: async () => signInWithEmailPassword(email, password),
-    onSuccess: async () => {
+    onSuccess: async (result) => {
+      if (!result.ok) {
+        setSignInError(resolveSignInError(result.errorCode));
+        return;
+      }
+
+      setSignInError(null);
       await queryClient.invalidateQueries({ queryKey: ["current-user"] });
       router.push("/onboarding");
     },
@@ -61,50 +74,28 @@ export default function LoginClient({
         {databaseAuthEnabled ? (
           <>
             <p className="text-sm text-foreground/60">
-              Closed alpha — invite-only registration. Existing members sign in with email and password.
+              Closed Alpha — 개인 초대 링크를 받은 신규 회원은 이메일과 비밀번호로 가입합니다. 기존 회원도 같은 방식으로 로그인해요.
             </p>
             <form
               className="mt-6 space-y-3"
               onSubmit={(event) => {
                 event.preventDefault();
+                setSignInError(null);
                 signInMutation.mutate();
               }}
             >
-              <label className="block text-sm text-foreground/70" htmlFor="login-email">
-                Email
-              </label>
-              <input
-                id="login-email"
-                type="email"
-                autoComplete="email"
-                className="w-full rounded-xl border border-foreground/15 bg-background px-4 py-3 text-sm"
-                value={email}
-                onChange={(event) => setEmail(event.target.value)}
-                disabled={signInMutation.isPending}
-              />
-              <label className="block text-sm text-foreground/70" htmlFor="login-password">
-                Password
-              </label>
-              <input
-                id="login-password"
-                type="password"
-                autoComplete="current-password"
-                className="w-full rounded-xl border border-foreground/15 bg-background px-4 py-3 text-sm"
-                value={password}
-                onChange={(event) => setPassword(event.target.value)}
-                disabled={signInMutation.isPending}
-              />
-              <Button
-                className="w-full"
-                type="submit"
-                disabled={signInMutation.isPending || !email.trim() || password.length < 10}
-              >
+              <label className="block text-sm text-foreground/70" htmlFor="login-email">Email</label>
+              <input id="login-email" type="email" autoComplete="email" className="w-full rounded-xl border border-foreground/15 bg-background px-4 py-3 text-sm" value={email} onChange={(event) => setEmail(event.target.value)} disabled={signInMutation.isPending} />
+              <label className="block text-sm text-foreground/70" htmlFor="login-password">Password</label>
+              <input id="login-password" type="password" autoComplete="current-password" className="w-full rounded-xl border border-foreground/15 bg-background px-4 py-3 text-sm" value={password} onChange={(event) => setPassword(event.target.value)} disabled={signInMutation.isPending} />
+              <Button className="w-full" type="submit" disabled={signInMutation.isPending || !email.trim() || password.length < 10}>
                 {signInMutation.isPending ? "Signing in…" : "Sign in"}
               </Button>
             </form>
-            <Link className="mt-4 inline-block text-sm text-foreground/70 underline" href="/register">
-              Have an invite? Create your account
-            </Link>
+            <div className="mt-4 flex justify-between gap-4 text-sm">
+              <Link className="text-foreground/70 underline" href="/reset-password">비밀번호 재설정</Link>
+              <Link className="text-foreground/70 underline" href="/register">초대 링크로 가입</Link>
+            </div>
           </>
         ) : (
           <p className="text-lg leading-8 text-foreground/75">
@@ -113,30 +104,17 @@ export default function LoginClient({
         )}
 
         {mockAllowed ? (
-          <Button
-            className={`mt-6 w-full ${databaseAuthEnabled ? "bg-foreground/10 text-foreground hover:bg-foreground/15" : ""}`}
-            onClick={() => mockMutation.mutate()}
-            disabled={mockMutation.isPending}
-          >
+          <Button className={`mt-6 w-full ${databaseAuthEnabled ? "bg-foreground/10 text-foreground hover:bg-foreground/15" : ""}`} onClick={() => mockMutation.mutate()} disabled={mockMutation.isPending}>
             {mockMutation.isPending ? "문 여는 중" : "Dev mock session"}
           </Button>
         ) : null}
 
-        {!mockAllowed && !databaseAuthEnabled ? (
-          <p className="mt-4 text-sm text-danger">Database auth is required in this environment.</p>
-        ) : null}
-
+        {!mockAllowed && !databaseAuthEnabled ? <p className="mt-4 text-sm text-danger">Database auth is required in this environment.</p> : null}
         {loginError ? <p className="mt-3 text-sm text-danger">{loginError}</p> : null}
-        {mockMutation.isError ? (
-          <p className="mt-3 text-sm text-danger">{(mockMutation.error as Error).message}</p>
-        ) : null}
-        {signInMutation.isError ? (
-          <p className="mt-3 text-sm text-danger">{(signInMutation.error as Error).message}</p>
-        ) : null}
-
-        <Link className="mt-6 inline-block text-sm text-foreground/60 underline" href="/">
-          Back to home
-        </Link>
+        {mockMutation.isError ? <p className="mt-3 text-sm text-danger">{(mockMutation.error as Error).message}</p> : null}
+        {signInError ? <p className="mt-3 text-sm text-danger" role="alert">{signInError}</p> : null}
+        {signInMutation.isError ? <p className="mt-3 text-sm text-danger" role="alert">Authentication is temporarily unavailable. Try again shortly.</p> : null}
+        <Link className="mt-6 inline-block text-sm text-foreground/60 underline" href="/">Back to home</Link>
       </Card>
     </AppShell>
   );

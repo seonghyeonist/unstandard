@@ -1,0 +1,131 @@
+"use client";
+import Link from "next/link";
+import { useState } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { Card } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { TextInput } from "@/components/ui/form-field";
+import { ACTIVITY_REGIONS, PROFILE_CONSENT_VERSION, INTRODUCTION_SCOPE_VERSION, canSaveProfileBasics, hasProfileBasicsDraftChanges, type ProfileSetupView } from "@/lib/profile/basics";
+import { completeBrowserIdentity, startBrowserIdentity } from "@/lib/identity/browser-flow";
+
+async function readSetup(): Promise<ProfileSetupView> {
+  const response = await fetch("/api/profile/basics", { cache: "no-store" });
+  if (!response.ok) throw new Error("프로필을 불러오지 못했어요. 잠시 뒤 다시 시도해 주세요.");
+  return response.json();
+}
+export function ProfileSetup() {
+  const query = useQuery({ queryKey: ["profile-setup"], queryFn: readSetup,
+    refetchInterval: (current) => ["pending", "purge_pending"].includes(current.state.data?.verification ?? "") ? 2000 : false,
+  });
+  if (query.isLoading) return <p role="status">프로필을 불러오는 중이에요.</p>;
+  if (!query.data || query.isError) return <Card><p role="alert">프로필을 불러오지 못했어요.</p><Button onClick={() => query.refetch()}>다시 시도</Button></Card>;
+  return <ProfileBasicsForm setup={query.data} />;
+}
+export function ProfileBasicsForm({ setup }: { setup: ProfileSetupView }) {
+  const client = useQueryClient();
+  const [nickname, setNickname] = useState(setup.basics?.nickname ?? "");
+  const [gender, setGender] = useState(setup.basics?.gender ?? "");
+  const [age, setAge] = useState(String(setup.basics?.age ?? ""));
+  const [region, setRegion] = useState(setup.basics?.region ?? "");
+  const [scope, setScope] = useState(setup.basics?.introductionScopeAccepted ?? false);
+  const [consent, setConsent] = useState(false);
+  const [saveFeedback, setSaveFeedback] = useState<"idle" | "dirty" | "saved">("idle");
+  const [identityConsent, setIdentityConsent] = useState(false);
+  const [startedRequestId, setStartedRequestId] = useState<string>();
+  const identityRequest = startedRequestId ?? setup.pendingIdentityRequestId;
+  function markDirty() {
+    setSaveFeedback("dirty");
+  }
+  async function refresh() {
+    await client.invalidateQueries({ queryKey: ["profile-setup"] });
+    await client.invalidateQueries({ queryKey: ["current-user"] });
+    // Previously viewed profiles/conversations must not survive a privacy or eligibility change.
+    client.removeQueries({ predicate: (q) => !["profile-setup", "current-user"].includes(String(q.queryKey[0])) });
+  }
+  const save = useMutation({ mutationFn: async () => {
+    const response = await fetch("/api/profile/basics", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({
+      nickname, gender, age: Number(age), region, introductionScopeAccepted: scope, profileConsentAccepted: consent,
+      profileConsentVersion: PROFILE_CONSENT_VERSION, introductionScopeVersion: INTRODUCTION_SCOPE_VERSION,
+    }) });
+    if (!response.ok) {
+      const failure = await response.json().catch(() => null) as { message?: unknown } | null;
+      throw new Error(typeof failure?.message === "string" ? failure.message :
+        response.status === 429 ? "저장 요청이 많아요. 잠시 뒤 다시 시도해 주세요." : "입력 항목과 동의를 확인해 주세요. 저장되지 않았어요.");
+    }
+  }, onMutate: () => setSaveFeedback("idle"), onSuccess: async () => {
+    await refresh();
+    // The legal consent is intentionally re-affirmed for the next mutation.
+    setConsent(false);
+    setSaveFeedback("saved");
+  }, onError: () => setSaveFeedback("dirty") });
+  const withdraw = useMutation({ mutationFn: async () => {
+    const response = await fetch("/api/profile/basics", { method: "DELETE" });
+    if (!response.ok) throw new Error("철회를 완료하지 못했어요. 다시 시도해 주세요.");
+  }, onSuccess: refresh });
+  const verify = useMutation({ mutationFn: async (action: "start" | "complete") => {
+    if (action === "complete") {
+      await completeBrowserIdentity(identityRequest ?? "");
+    } else {
+      if (!setup.verificationAvailable || !identityConsent) throw new Error("인증 안내를 확인해 주세요.");
+      await startBrowserIdentity({ consentAccepted: identityConsent, origin: window.location.origin,
+        onStarted: setStartedRequestId });
+    }
+    setStartedRequestId(undefined);
+  }, onSettled: refresh });
+  const busy = save.isPending || withdraw.isPending || verify.isPending;
+  const actualProfileDirty = hasProfileBasicsDraftChanges(setup.basics, {
+    nickname, gender, age, region, introductionScopeAccepted: scope,
+  });
+  const identityInProgress = setup.verification === "pending" || setup.verification === "purge_pending";
+  const identityCleanupRequired = identityInProgress || setup.verification === "expired";
+  const canSave = canSaveProfileBasics({ busy, consent, actualProfileDirty, identityInProgress: identityCleanupRequired });
+  return <div className="space-y-5">
+    {setup.verification === "verified" ? <Card>
+      <h2 className="text-xl font-black">{setup.eligible ? "소개 준비가 완료됐어요" : "신원·성인 확인이 완료됐어요"}</h2>
+      <p role="status" aria-live="polite" className="mt-3 text-sm leading-6">{setup.eligible
+        ? "이제 상대를 살펴보고 첫 대화를 시작할 수 있어요."
+        : "첫 질문에 답하면 소개 준비가 완료돼요. 아래 버튼으로 이어가 주세요."}</p>
+      <Link className="mt-4 inline-flex min-h-11 w-full items-center justify-center rounded-full bg-accent px-5 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-[#ad392c]" href={setup.eligible ? "/app/home" : "/onboarding"}>
+        {setup.eligible ? "상대 살펴보기" : "첫 질문 작성하고 계속하기"}
+      </Link>
+    </Card> : null}
+    <Card>
+      <h2 className="text-xl font-black">기본 프로필</h2>
+      <p className="mt-3 text-sm leading-6 text-foreground/70">닉네임·성별·입력 시점의 만 나이·시도 단위 활동 지역을 사용해요. 상세 주소·학교·직장은 받지 않아요. 나이와 성별은 본인이 입력한 정보이며 본인인증만으로 검증됐다는 뜻은 아니에요.</p>
+      <form className="mt-5 space-y-4" onSubmit={(e) => { e.preventDefault(); save.mutate(); }}>
+        <label className="block text-sm font-semibold">닉네임<TextInput className="mt-2" required maxLength={16} autoComplete="nickname" value={nickname} onChange={(e) => { setNickname(e.target.value); markDirty(); }} /></label>
+        <label className="block text-sm font-semibold">성별<select className="mt-2 w-full rounded-2xl border border-line bg-white px-4 py-3" required value={gender} onChange={(e) => { setGender(e.target.value); markDirty(); }}><option value="">선택해 주세요</option><option value="male">남성</option><option value="female">여성</option></select></label>
+        <label className="block text-sm font-semibold">만 나이<TextInput className="mt-2" required type="number" min={19} max={120} step={1} value={age} onChange={(e) => { setAge(e.target.value); markDirty(); }} /></label>
+        <label className="block text-sm font-semibold">활동 지역<select className="mt-2 w-full rounded-2xl border border-line bg-white px-4 py-3" required value={region} onChange={(e) => { setRegion(e.target.value); markDirty(); }}><option value="">시도 선택</option>{ACTIVITY_REGIONS.map((item) => <option key={item}>{item}</option>)}</select></label>
+        <label className="flex gap-3 text-sm leading-6"><input type="checkbox" checked={scope} onChange={(e) => { setScope(e.target.checked); markDirty(); }} className="mt-1" /><span>이번 알파는 남성과 여성 간 소개만 제공함을 확인했고, 이 범위의 소개를 원해요. 성적 지향을 확인하거나 인증하는 절차는 아니에요. 선택하지 않으면 상대 노출·조회·대화가 중단돼요.</span></label>
+        <label className="flex gap-3 text-sm leading-6"><input type="checkbox" required checked={consent} onChange={(e) => { setConsent(e.target.checked); markDirty(); }} className="mt-1" /><span>프로필 표시·소개 대상 제한·운영 집계를 위해 위 항목과 동의 버전·시각을 탈퇴 또는 프로필 정보 삭제까지 보관하는 데 동의해요. 거부할 수 있으며, 거부하면 소개 기능은 이용할 수 없어요. <Link className="underline" href="/privacy">개인정보 안내</Link></span></label>
+        <p className="text-xs leading-5 text-foreground/65">프로필 내용을 변경해 저장하면 이전 인증이 해제되고 재인증 전까지 상대에게 보이지 않아요. 같은 내용을 다시 저장하면 인증은 유지돼요. 만 나이는 입력 시점 기준이며, 1년이 지나면 다시 입력·인증해야 해요.</p>
+        <Button type="submit" className="w-full" disabled={!canSave}>{save.isPending ? "저장 중…" : "기본 프로필 저장"}</Button>
+        {!consent ? <p className="text-sm" role="status">저장하려면 위 개인정보 보관 동의를 확인해 주세요.</p> : null}
+        {identityCleanupRequired ? <p role="status" aria-live="polite" className="text-sm">{setup.verification === "expired"
+          ? "인증 요청이 만료됐어요. 새 인증을 시작해 이전 요청을 정리해 주세요."
+          : "인증 결과와 인증사 세션 삭제를 확인하고 있어요. 완료되면 상태가 갱신돼요. 오래 걸리면 아래 ‘인증 결과 확인’을 눌러 주세요."}</p> : null}
+        {save.isPending ? <p role="status" aria-live="polite" className="text-sm">기본 프로필을 저장하는 중이에요.</p> : null}
+        {!save.isPending && saveFeedback === "dirty" && actualProfileDirty && !save.isError ? <p role="status" aria-live="polite" className="text-sm">저장하지 않은 변경사항이 있어요.</p> : null}
+        {!save.isPending && saveFeedback === "saved" ? <p role="status" aria-live="polite" className="text-sm text-accent">저장 완료. 다음 수정 때 현재 동의를 다시 확인해 주세요.</p> : null}
+        {save.isError ? <p role="alert" className="text-sm text-danger">{save.error.message}</p> : null}
+      </form>
+    </Card>
+    <Card>
+      <h2 className="text-xl font-black">신원·성인 확인</h2>
+      <p className="mt-3 text-sm leading-6">{setup.verificationAvailable ? "Didit의 보안 인증 화면에서 신분증·수동적 생체활성·얼굴 일치·기기/IP 위험 신호를 확인해요. 완료 후 인증사 세션 삭제 확인까지 진행해요." : setup.verificationAvailabilityReason === "temporarily_unavailable" ? "인증 서비스를 잠시 사용할 수 없어요. 신분증·생체정보를 입력하거나 제출할 수 없어요." : "인증 서비스 준비 중이에요. 지금은 신분증·생체정보를 입력하거나 제출할 수 없어요."}</p>
+      <p className="mt-3 text-sm leading-6 text-foreground/70">신원 확인은 Didit Identity Spain, S.L.의 호스팅 화면에서 진행돼요. 신분증 정보, 셀피·영상 기반의 수동적 생체활성, 얼굴 일치용 생체정보, 성인 여부와 필요한 기기·IP 분석이 처리될 수 있어요. 계약상 주된 처리 인프라는 EEA이며 기본 보유기간은 무제한이에요. 2026-10-01 확인한 Sandbox는 보유기간 1개월·세션과 함께 얼굴 템플릿 삭제 설정이에요. 인증 후 앱이 세션 삭제를 요청하고, 공급자 삭제 확인 전에는 소개를 열지 않아요. 즉시 물리 삭제를 보장하지 않아요. 앱 DB·로그에는 원문을 저장하지 않고 최소 인증 상태만 기록해요. 자세한 내용은 <Link className="underline" href="/privacy">개인정보 안내</Link>를 확인해 주세요.</p>
+      <p className="mt-3 text-sm">인증 상태: {({ not_started: "미인증", pending: "확인 대기", purge_pending: "삭제 확인 대기", verified: "확인 완료", expired: "요청 만료" })[setup.verification]}</p>
+      {setup.verification !== "verified" ? <label className="mt-4 flex gap-3 text-sm"><input type="checkbox" disabled={!setup.verificationAvailable} checked={identityConsent} onChange={(e) => setIdentityConsent(e.target.checked)} /><span>신분증·수동적 생체활성·얼굴 일치·성인 여부와 필요한 기기/IP 분석 처리, 인증 결과 기록 및 인증 세션 삭제 확인에 동의해요. 거부하면 소개 기능을 이용할 수 없어요.</span></label> : null}
+      {identityRequest ? <Button className={identityInProgress ? "mt-3 w-full font-bold ring-2 ring-accent" : "mt-3 w-full"} disabled={busy || !setup.verificationAvailable} onClick={() => verify.mutate("complete")}>인증 결과 확인</Button> : null}
+      {setup.verification !== "verified" ? <Button className="mt-4 w-full" disabled={busy || identityInProgress || !setup.verificationAvailable || !setup.basics?.introductionScopeAccepted || !identityConsent} onClick={() => verify.mutate("start")}>신원·성인 인증 시작</Button> : null}
+      {verify.isError ? <p role="alert" className="mt-3 text-sm text-danger">{verify.error.message}</p> : null}
+    </Card>
+    <Card>
+      <p className="text-sm leading-6" role="status">{setup.eligible ? "기본 정보·소개 범위 확인·인증·첫 질문 입력이 완료되어 소개 기능을 이용할 수 있어요." : "필수 정보·소개 범위 확인·인증·첫 질문 입력이 모두 완료되기 전에는 상대에게 보이지 않으며, 상대 조회와 대화도 제한돼요."}</p>
+      <div className="mt-4 flex flex-wrap gap-4 text-sm font-semibold">{setup.verification !== "verified" ? <Link className="underline" href="/onboarding">첫 질문 작성</Link> : null}<Link className="underline" href="/app/settings">지원·계정 삭제</Link></div>
+      {setup.basics ? <Button className="mt-5 w-full" disabled={busy} onClick={() => { if (window.confirm("성별·나이·활동 지역과 인증 결과를 삭제하고 상대 노출·대화를 중단할까요? 닉네임과 기존 대화는 계정 삭제 전까지 남아요.")) withdraw.mutate(); }}>기본 정보 삭제·소개 참여 철회</Button> : null}
+      {withdraw.isError ? <p role="alert" className="mt-3 text-sm text-danger">{withdraw.error.message}</p> : null}
+    </Card>
+  </div>;
+}

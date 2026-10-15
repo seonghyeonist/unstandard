@@ -1,7 +1,9 @@
+import { RATE_LIMIT_POLICY_VERSION } from "@/lib/security/rate-limit-policy";
 import { createHash } from "node:crypto";
 import { ALPHA_STAGE_1_CAP } from "@/lib/alpha/stage1-policy";
 import { ALPHA_METRICS_CONTRACT_VERSION } from "@/lib/alpha/metrics";
 import type { VerifiedProductionReadinessEvidence } from "@/lib/operations/production-evidence";
+import { IDENTITY_PROVIDER_NOTICE_READY } from "@/lib/identity/notice";
 
 export const CLOSED_ALPHA_TECHNICAL_MAX_AGE_MS = 6 * 60 * 60 * 1000;
 export const CLOSED_ALPHA_ATTESTATION_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000;
@@ -77,7 +79,7 @@ export type ClosedAlphaOperationalAttestation = {
     };
     privacyNoticeUrl: string;
     accountDeletionTestReference: string;
-    rateLimitPolicyVersion: "closed-alpha-v2";
+    rateLimitPolicyVersion: typeof RATE_LIMIT_POLICY_VERSION;
     measurementContractVersion: typeof ALPHA_METRICS_CONTRACT_VERSION;
     metricsCommand: "npm run alpha:metrics";
     supplyBalanceProcedureReference: string;
@@ -88,7 +90,17 @@ export type ClosedAlphaOperationalAttestation = {
       trademarkReview: "NO_BLOCKING_CONFLICT_FOUND";
       availabilityEvidenceReference: string;
       socialHandleEvidenceReference: string;
-      pronunciationSpellingReview: "PASS";
+      pronunciationSpellingReview: "PASS" | "WAIVED_BY_FOUNDER";
+      socialHandleReview?: "VERIFIED" | "WAIVED_BY_FOUNDER";
+      founderWaiver?: {
+        policyVersion: "closed-alpha-brand-waivers-v1";
+        scope: "closed_alpha_stage_1";
+        approvedBy: "founder-seonghyeonist";
+        approvedAt: string;
+        decisionReference: string;
+        pronunciationSpelling?: true;
+        socialHandles?: true;
+      };
       reviewedAt: string;
     };
   };
@@ -224,14 +236,35 @@ function domainEvidenceIsComplete(
   const domain = attestation.evidence.domain;
   if (!domain) return false;
   const hostname = domain.canonicalDomain.trim().toLowerCase();
+  const waiver = domain.founderWaiver;
+  // Founder policy decisions are evidence of an exemption, never a completed test
+  // or trademark clearance. Preserve the decision date across later reviews.
+  const waiverApprovedAt = Date.parse(waiver?.approvedAt ?? "");
+  const validWaiver = Boolean(
+    waiver &&
+      waiver.policyVersion === "closed-alpha-brand-waivers-v1" &&
+      waiver.scope === "closed_alpha_stage_1" &&
+      waiver.approvedBy === "founder-seonghyeonist" &&
+      Number.isFinite(waiverApprovedAt) &&
+      waiverApprovedAt <= nowMs + 60_000 &&
+      isSubstantive(waiver.decisionReference),
+  );
+  const spellingSatisfied =
+    domain.pronunciationSpellingReview === "PASS" ||
+    (domain.pronunciationSpellingReview === "WAIVED_BY_FOUNDER" &&
+      validWaiver && waiver?.pronunciationSpelling === true);
+  const handlesSatisfied = domain.socialHandleReview === "WAIVED_BY_FOUNDER"
+    ? validWaiver && waiver?.socialHandles === true
+    : (domain.socialHandleReview === undefined || domain.socialHandleReview === "VERIFIED") &&
+      isSubstantive(domain.socialHandleEvidenceReference);
   return (
     /^(?=.{4,253}$)(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}$/u.test(hostname) &&
     !hostname.endsWith(".vercel.app") &&
     domain.acquisitionStatus === "ACQUIRED" &&
     domain.trademarkReview === "NO_BLOCKING_CONFLICT_FOUND" &&
-    domain.pronunciationSpellingReview === "PASS" &&
+    spellingSatisfied &&
     isSubstantive(domain.availabilityEvidenceReference) &&
-    isSubstantive(domain.socialHandleEvidenceReference) &&
+    handlesSatisfied &&
     timestampIsFresh(domain.reviewedAt, CLOSED_ALPHA_ATTESTATION_MAX_AGE_MS, nowMs)
   );
 }
@@ -263,7 +296,7 @@ function operationalEvidenceIsComplete(
     timestampIsFresh(evidence.restoreDrill.completedAt, CLOSED_ALPHA_ATTESTATION_MAX_AGE_MS, nowMs) &&
     evidence.domain.canonicalDomain.trim().toLowerCase() === productionHostname.toLowerCase() &&
     isHttpsPrivacyUrl(evidence.privacyNoticeUrl, evidence.domain.canonicalDomain) &&
-    evidence.rateLimitPolicyVersion === "closed-alpha-v2" &&
+    evidence.rateLimitPolicyVersion === RATE_LIMIT_POLICY_VERSION &&
     evidence.measurementContractVersion === ALPHA_METRICS_CONTRACT_VERSION &&
     evidence.metricsCommand === "npm run alpha:metrics" &&
     evidence.monetizationMode === "disabled" &&
@@ -377,6 +410,12 @@ export function evaluateClosedAlphaLaunch(input: {
         input.attestation.incidentResponseMinutes <= 1_440,
       "INCIDENT_RESPONSE_TARGET_APPROVED",
       "INCIDENT_RESPONSE_TARGET_INVALID",
+    ),
+    gate(
+      "identity_provider_notice",
+      IDENTITY_PROVIDER_NOTICE_READY,
+      "IDENTITY_PROVIDER_NOTICE_READY",
+      "IDENTITY_PROVIDER_NOTICE_NOT_READY",
     ),
   ];
 

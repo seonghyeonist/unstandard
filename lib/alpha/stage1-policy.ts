@@ -107,3 +107,28 @@ export function evaluateBalanceGate(bucketA: number, bucketB: number): {
   if (majorityShare > 0.6) return { gate: "BOOST_MINORITY", majorityShare, minorityBucket };
   return { gate: "OPEN", majorityShare, minorityBucket };
 }
+
+/** Restrict growth of an existing majority, while allowing an empty/tied cohort
+ * to start and allowing minority invitations that improve the current ratio. */
+export function evaluateInviteBalanceGate(
+  bucketA: number,
+  bucketB: number,
+  bucket: AlphaBalanceBucket,
+): {
+  balanceGate: ReturnType<typeof evaluateBalanceGate>;
+  rejection: "BALANCE_SOFT_WAITLIST" | "BALANCE_HARD_GATE" | null;
+} {
+  const currentGate = evaluateBalanceGate(bucketA, bucketB);
+  const balanceGate = evaluateBalanceGate(
+    bucketA + (bucket === "bucket_a" ? 1 : 0),
+    bucketB + (bucket === "bucket_b" ? 1 : 0),
+  );
+  const growsExistingMajority = bucket !== "not_counted" &&
+    currentGate.minorityBucket !== null && bucket !== currentGate.minorityBucket;
+  const rejection = growsExistingMajority && balanceGate.gate === "HARD_GATE"
+    ? "BALANCE_HARD_GATE"
+    : growsExistingMajority && balanceGate.gate === "SOFT_WAITLIST"
+      ? "BALANCE_SOFT_WAITLIST"
+      : null;
+  return { balanceGate, rejection };
+}

@@ -63,7 +63,7 @@
     },
     "privacyNoticeUrl": "https://REPLACE_WITH_PRODUCTION_HOST/privacy",
     "accountDeletionTestReference": "REPLACE_WITH_TEST_REFERENCE",
-    "rateLimitPolicyVersion": "closed-alpha-v2",
+    "rateLimitPolicyVersion": "closed-alpha-v3",
     "measurementContractVersion": "alpha-stage1-kpi-v1",
     "metricsCommand": "npm run alpha:metrics",
     "supplyBalanceProcedureReference": "REPLACE_WITH_APPROVED_PROCEDURE_REFERENCE",

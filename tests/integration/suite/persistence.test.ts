@@ -1,8 +1,9 @@
+import { addSyntheticVerifiedBasics } from "../profile-fixture";
 import assert from "node:assert/strict";
+import { randomUUID } from "node:crypto";
 import { after, describe, it } from "node:test";
 import { inArray, sql } from "drizzle-orm";
-import { createIntegrationDb, getIntegrationDatabaseUrl } from "../helpers";
-import { runDrizzleMigrations } from "../../../lib/db/run-migrations";
+import { closeIntegrationDatabases, createIntegrationDb, getIntegrationDatabaseUrl } from "../helpers";
 import { extractPgErrorCode } from "../../../lib/db/errors";
 import { createBlock } from "../../../lib/db/repositories/blocks.repository";
 import { createUnlock } from "../../../lib/db/repositories/unlocks.repository";
@@ -12,7 +13,18 @@ import { messages } from "../../../lib/db/schema/messages";
 import { alphaActivityDays } from "../../../lib/db/schema/alpha-activity";
 import { alphaProfileExposures } from "../../../lib/db/schema/alpha-exposures";
 import { waitlistEntries, waitlistVisitDays } from "../../../lib/db/schema/waitlist";
-import { profiles } from "../../../lib/db/schema/profiles";
+import { profiles, profilePrivate } from "../../../lib/db/schema/profiles";
+import { identityProviderPurgeQueue, identityVerifications, profileBasics } from "../../../lib/db/schema/profile-basics";
+import { IDENTITY_BIOMETRIC_CONSENT_VERSION, IDENTITY_NOTICE_VERSION } from "../../../lib/identity/contracts";
+import { createProfileBasicsRepository } from "../../../lib/db/repositories/profile-basics.repository";
+import { identityRepository, identityProviderPurgeQueueRepository } from "../../../lib/db/repositories/identity.repository";
+import { identityService } from "../../../lib/identity/service";
+import { reconcileIdentityCompletions } from "../../../lib/identity/reconciliation";
+import { IDENTITY_RECONCILIATION_GRACE_MS } from "../../../lib/identity/completion-window";
+import { IdentityInProgressError } from "../../../lib/server/profile/profile-basics.repository.interface";
+import { INTRODUCTION_SCOPE_VERSION, PROFILE_CONSENT_VERSION } from "../../../lib/profile/basics";
+import { ensureProfileForUser } from "../../../lib/db/repositories/profile-bootstrap";
+import { createDrizzleAnswersRepository } from "../../../lib/db/repositories/answers.repository";
 import { users } from "../../../lib/db/schema/auth";
 import { observeIntegrationCase } from "../../../lib/readiness/integration-case-log";
 import { createMessage, listConversation } from "../../../lib/db/repositories/messages.repository";
@@ -24,6 +36,7 @@ import {
 import { buildAlphaMetricsSnapshot } from "../../../lib/alpha/metrics-snapshot";
 
 const fixtureUserIds = new Set<string>();
+const fixtureIdentityRequestIds = new Set<string>();
 
 async function insertUserWithProfile(db: ReturnType<typeof createIntegrationDb>, suffix: string) {
   const userId = `user-${suffix}`;
@@ -49,25 +62,220 @@ async function insertUserWithProfile(db: ReturnType<typeof createIntegrationDb>,
 }
 
 after(async () => {
-  const db = createIntegrationDb(getIntegrationDatabaseUrl());
   const userIds = [...fixtureUserIds];
-  if (userIds.length === 0) return;
+  try {
+    if (userIds.length > 0) {
+      const db = createIntegrationDb(getIntegrationDatabaseUrl());
+      await db.delete(users).where(inArray(users.id, userIds));
+      const remaining = await db
+        .select({ id: users.id })
+        .from(users)
+        .where(inArray(users.id, userIds));
+      assert.equal(remaining.length, 0, "persistence integration users must be removed");
+      // These IDs were generated locally, never created at the provider. Remove
+      // only their synthetic trigger outbox entries after the cascade check.
+      const requestIds = [...fixtureIdentityRequestIds];
+      if (requestIds.length > 0) {
+        await db.delete(identityProviderPurgeQueue)
+          .where(inArray(identityProviderPurgeQueue.requestId, requestIds));
+        const residual = await db.select({ requestId: identityProviderPurgeQueue.requestId })
+          .from(identityProviderPurgeQueue).where(inArray(identityProviderPurgeQueue.requestId, requestIds));
+        assert.equal(residual.length, 0, "synthetic provider outbox entries must be removed");
+      }
+    }
+  } finally {
+    await closeIntegrationDatabases();
+  }
+});
 
-  await db.delete(users).where(inArray(users.id, userIds));
-  const remaining = await db
-    .select({ id: users.id })
-    .from(users)
-    .where(inArray(users.id, userIds));
-  assert.equal(remaining.length, 0, "persistence integration users must be removed");
+async function insertIdentityProfileFixture(
+  db: ReturnType<typeof createIntegrationDb>,
+  member: { userId: string },
+  input: { nickname: string; gender: "male" | "female"; age: number; region: string; introductionScopeAccepted: boolean },
+  status: "pending" | "verified",
+) {
+  const now = new Date();
+  const revision = randomUUID();
+  const requestId = randomUUID();
+  fixtureIdentityRequestIds.add(requestId);
+  await db.insert(profileBasics).values({
+    userId: member.userId, gender: input.gender, age: input.age, region: input.region,
+    introductionScopeAccepted: input.introductionScopeAccepted,
+    introductionScopeVersion: INTRODUCTION_SCOPE_VERSION, profileConsentVersion: PROFILE_CONSENT_VERSION,
+    consentedAt: now, revision, updatedAt: now,
+  });
+  await db.update(profiles).set({ city: input.region, updatedAt: now })
+    .where(sql`${profiles.userId} = ${member.userId}`);
+  await db.insert(identityVerifications).values({
+    userId: member.userId, requestId, profileRevision: revision, status, provider: "didit-v3",
+    providerReference: randomUUID(), biometricConsentVersion: IDENTITY_BIOMETRIC_CONSENT_VERSION,
+    noticeVersion: IDENTITY_NOTICE_VERSION, requestedAt: now, expiresAt: new Date(now.getTime() + 60 * 60 * 1000),
+    completionRequestedAt: status === "pending" ? now : null,
+    completionEventId: status === "pending" ? randomUUID() : null,
+    verifiedAt: status === "verified" ? now : null, providerPurgedAt: status === "verified" ? now : null,
+  });
+  return { revision, requestId };
+}
+
+describe("integration: profile save and identity state", () => {
+  it("persists canonical failure and purge retry states until successful reconciliation", async () => {
+    const db = createIntegrationDb(getIntegrationDatabaseUrl());
+    const member = await insertUserWithProfile(db, `retry-${Date.now()}`);
+    const seeded = await insertIdentityProfileFixture(db, member, {
+      nickname: "Synthetic retry", gender: "male", age: 22, region: "서울", introductionScopeAccepted: true,
+    }, "pending");
+    const request = await identityRepository.find(member.userId, seeded.requestId);
+    assert.ok(request?.providerReference);
+    let canonicalCalls = 0;
+    let purgeCalls = 0;
+    const service = identityService({
+      repository: identityRepository, purgeQueue: identityProviderPurgeQueueRepository, limit: async () => true,
+      provider: {
+        id: "didit-v3", async start() { throw new Error("unused synthetic start"); },
+        async verify() {
+          if (++canonicalCalls === 1) throw new Error("synthetic canonical 503");
+          return { requestId: seeded.requestId, providerReference: request.providerReference!, verifiedAt: new Date(),
+            documentVerified: true, livenessVerified: true, faceMatchVerified: true, deviceIpVerified: true, adultVerified: true };
+        },
+        async purge() { return ++purgeCalls > 1; },
+      },
+    });
+    const input = { repository: identityRepository, service };
+    await reconcileIdentityCompletions(input);
+    const failed = await identityRepository.find(member.userId, seeded.requestId);
+    assert.equal(failed?.status, "pending");
+    assert.ok(failed?.completionRequestedAt);
+    assert.equal(purgeCalls, 0);
+    await reconcileIdentityCompletions(input);
+    assert.equal((await identityRepository.find(member.userId, seeded.requestId))?.status, "verified_unpurged");
+    assert.equal((await createProfileBasicsRepository(() => db).read(member.userId)).eligible, false);
+    await reconcileIdentityCompletions(input);
+    assert.equal((await identityRepository.find(member.userId, seeded.requestId))?.status, "verified");
+    assert.equal((await createProfileBasicsRepository(() => db).read(member.userId)).eligible, true);
+    await reconcileIdentityCompletions(input);
+    assert.equal(canonicalCalls, 2);
+    assert.equal(purgeCalls, 2);
+  });
+  for (const scenario of ["timely", "missing", "late", "missing-event", "future", "grace-expired"] as const) {
+    it(`enforces the persisted completion window: ${scenario}`, async () => {
+      const db = createIntegrationDb(getIntegrationDatabaseUrl());
+      const member = await insertUserWithProfile(db, `completion-${scenario}-${Date.now()}`);
+      const input = { nickname: `completion-${scenario}`, gender: "male" as const, age: 22,
+        region: "서울", introductionScopeAccepted: true };
+      const seeded = await insertIdentityProfileFixture(db, member, input, "pending");
+      const completedAt = new Date();
+      const expiresAt = new Date(completedAt.getTime() - (scenario === "grace-expired"
+        ? IDENTITY_RECONCILIATION_GRACE_MS + 1_000 : 60_000));
+      const requestedAt = new Date(expiresAt.getTime() - 10 * 60 * 1_000);
+      const timelyAt = new Date(requestedAt.getTime() + 60_000);
+      await db.update(identityVerifications).set({ requestedAt, expiresAt,
+        completionRequestedAt: scenario === "missing" ? null : scenario === "late" ? expiresAt :
+          scenario === "future" ? new Date(completedAt.getTime() + 60_000) : timelyAt,
+        completionEventId: scenario === "missing-event" || scenario === "missing" ? null : randomUUID(),
+      }).where(sql`${identityVerifications.requestId} = ${seeded.requestId}`);
+      const request = await identityRepository.find(member.userId, seeded.requestId);
+      assert.ok(request?.providerReference);
+      const proof = { requestId: seeded.requestId, providerReference: request.providerReference,
+        verifiedAt: completedAt, documentVerified: true, livenessVerified: true,
+        faceMatchVerified: true, deviceIpVerified: true, adultVerified: true };
+      const accepted = await identityRepository.markVerifiedUnpurged(request, proof, completedAt);
+      assert.equal(accepted, scenario === "timely");
+      const repository = createProfileBasicsRepository(() => db);
+      const beforePurge = await repository.read(member.userId);
+      assert.equal(beforePurge.eligible, false);
+      if (accepted) {
+        assert.equal(beforePurge.verification, "purge_pending");
+        assert.equal(await identityRepository.markVerified(request, new Date()), true);
+        assert.equal((await repository.read(member.userId)).eligible, true);
+      } else {
+        assert.equal((await identityRepository.find(member.userId, seeded.requestId))?.status, "pending");
+        assert.equal(beforePurge.verification, "expired");
+      }
+    });
+  }
+
+  it("preserves a webhook-scheduled pending request on a no-op save and blocks real edits", async () => {
+    const db = createIntegrationDb(getIntegrationDatabaseUrl());
+    const suffix = "profile-pending-" + Date.now();
+    const member = await insertUserWithProfile(db, suffix);
+    const input = { nickname: "nick-" + suffix, gender: "male" as const, age: 22, region: "서울",
+      introductionScopeAccepted: true, profileConsentAccepted: true as const,
+      profileConsentVersion: PROFILE_CONSENT_VERSION, introductionScopeVersion: INTRODUCTION_SCOPE_VERSION };
+    const seeded = await insertIdentityProfileFixture(db, member, input, "pending");
+    const repository = createProfileBasicsRepository(() => db);
+    const before = await repository.read(member.userId);
+    assert.equal(before.verification, "pending");
+    assert.equal(before.pendingIdentityRequestId, seeded.requestId);
+    await repository.save(member.userId, input);
+
+    const afterNoop = await repository.read(member.userId);
+    assert.equal(afterNoop.verification, "pending");
+    assert.equal(afterNoop.pendingIdentityRequestId, seeded.requestId);
+    assert.equal(afterNoop.eligible, false);
+    const [basicsAfterNoop] = await db.select({ revision: profileBasics.revision }).from(profileBasics)
+      .where(sql`${profileBasics.userId} = ${member.userId}`);
+    const [verificationAfterNoop] = await db.select({ requestId: identityVerifications.requestId,
+      status: identityVerifications.status, completionRequestedAt: identityVerifications.completionRequestedAt })
+      .from(identityVerifications).where(sql`${identityVerifications.userId} = ${member.userId}`);
+    const queued = await db.select({ requestId: identityProviderPurgeQueue.requestId }).from(identityProviderPurgeQueue)
+      .where(sql`${identityProviderPurgeQueue.requestId} = ${seeded.requestId}`);
+    assert.equal(basicsAfterNoop?.revision, seeded.revision);
+    assert.equal(verificationAfterNoop?.requestId, seeded.requestId);
+    assert.equal(verificationAfterNoop?.status, "pending");
+    assert.ok(verificationAfterNoop?.completionRequestedAt);
+    assert.equal(queued.length, 0);
+
+    await assert.rejects(() => repository.save(member.userId, { ...input, nickname: "material-change" }),
+      (error: unknown) => error instanceof IdentityInProgressError);
+    const afterBlocked = await repository.read(member.userId);
+    assert.equal(afterBlocked.pendingIdentityRequestId, seeded.requestId);
+    assert.equal(afterBlocked.verification, "pending");
+    const [basicsAfterBlocked] = await db.select({ revision: profileBasics.revision }).from(profileBasics)
+      .where(sql`${profileBasics.userId} = ${member.userId}`);
+    const queuedAfterBlocked = await db.select({ requestId: identityProviderPurgeQueue.requestId })
+      .from(identityProviderPurgeQueue).where(sql`${identityProviderPurgeQueue.requestId} = ${seeded.requestId}`);
+    assert.equal(basicsAfterBlocked?.revision, seeded.revision);
+    assert.equal(queuedAfterBlocked.length, 0);
+  });
+
+  it("preserves verified eligibility on a no-op and requires re-verification after a material edit", async () => {
+    const db = createIntegrationDb(getIntegrationDatabaseUrl());
+    const suffix = "profile-verified-" + Date.now();
+    const member = await insertUserWithProfile(db, suffix);
+    const input = { nickname: "nick-" + suffix, gender: "male" as const, age: 22, region: "서울",
+      introductionScopeAccepted: true, profileConsentAccepted: true as const,
+      profileConsentVersion: PROFILE_CONSENT_VERSION, introductionScopeVersion: INTRODUCTION_SCOPE_VERSION };
+    const seeded = await insertIdentityProfileFixture(db, member, input, "verified");
+    const repository = createProfileBasicsRepository(() => db);
+    const before = await repository.read(member.userId);
+    assert.equal(before.verification, "verified");
+    assert.equal(before.eligible, true);
+    await repository.save(member.userId, input);
+    const afterNoop = await repository.read(member.userId);
+    assert.equal(afterNoop.verification, "verified");
+    assert.equal(afterNoop.eligible, true);
+    const [basicsAfterNoop] = await db.select({ revision: profileBasics.revision }).from(profileBasics)
+      .where(sql`${profileBasics.userId} = ${member.userId}`);
+    assert.equal(basicsAfterNoop?.revision, seeded.revision);
+
+    await repository.save(member.userId, { ...input, nickname: "changed-" + suffix });
+    const afterEdit = await repository.read(member.userId);
+    assert.equal(afterEdit.verification, "not_started");
+    assert.equal(afterEdit.eligible, false);
+    const remaining = await db.select({ requestId: identityVerifications.requestId }).from(identityVerifications)
+      .where(sql`${identityVerifications.userId} = ${member.userId}`);
+    assert.equal(remaining.length, 0);
+  });
 });
 
 describe("integration: persistence invariants", () => {
   it("message_unlock_block_authorization + message_deletion_residuals", async () => {
     const url = getIntegrationDatabaseUrl();
-    await runDrizzleMigrations(url);
     const db = createIntegrationDb(url);
     const sender = await insertUserWithProfile(db, `message-sender-${Date.now()}`);
     const recipient = await insertUserWithProfile(db, `message-recipient-${Date.now()}`);
+    await addSyntheticVerifiedBasics(db, sender.userId, "male");
+    await addSyntheticVerifiedBasics(db, recipient.userId, "female");
     const unlocked = await createUnlock({
       viewerUserId: sender.userId,
       profileId: recipient.profileId,
@@ -141,7 +349,6 @@ describe("integration: persistence invariants", () => {
   it("waitlist_revisit_and_delete + alpha_metrics_fail_closed_maturity", async () => {
     process.env.WAITLIST_TOKEN_PEPPER = "integration-waitlist-pepper";
     const url = getIntegrationDatabaseUrl();
-    await runDrizzleMigrations(url);
     const db = createIntegrationDb(url);
     const joinedAt = new Date("2026-08-01T12:00:00.000Z");
     const email = `waitlist-${Date.now()}@example.com`;
@@ -188,7 +395,6 @@ describe("integration: persistence invariants", () => {
 
   it("report_user_fk + duplicate_report_idempotency + no_duplicate_report_row", async () => {
     const url = getIntegrationDatabaseUrl();
-    await runDrizzleMigrations(url);
     const db = createIntegrationDb(url);
 
     const reporter = await insertUserWithProfile(db, `reporter-${Date.now()}`);
@@ -307,5 +513,32 @@ describe("integration: persistence invariants", () => {
         assert.equal(duplicateUnlock.inserted, false);
       }
     });
+  });
+});
+
+
+describe("integration: private profile container lifecycle", () => {
+  it("normal profile bootstrap repairs an omitted private container without overwriting content", async () => {
+    const db = createIntegrationDb(getIntegrationDatabaseUrl());
+    const member = await insertUserWithProfile(db, `private-repair-${Date.now()}`);
+    await ensureProfileForUser({ id: member.userId, nickname: "private fixture" }, db);
+    const [first] = await db.select().from(profilePrivate).where(sql`${profilePrivate.profileId} = ${member.profileId}`);
+    assert.ok(first); assert.equal(first.letter, null);
+    await db.update(profilePrivate).set({ letter: "Existing private fixture content", smallJoys: ["fixture joy"] }).where(sql`${profilePrivate.profileId} = ${member.profileId}`);
+    await ensureProfileForUser({ id: member.userId, nickname: "different" }, db);
+    const rows = await db.select().from(profilePrivate).where(sql`${profilePrivate.profileId} = ${member.profileId}`);
+    assert.equal(rows.length, 1); assert.equal(rows[0].letter, "Existing private fixture content"); assert.deepEqual(rows[0].smallJoys, ["fixture joy"]);
+  });
+  it("onboarding finalization persists the private container and duplicate submission remains idempotent", async () => {
+    const db = createIntegrationDb(getIntegrationDatabaseUrl());
+    const member = await insertUserWithProfile(db, `private-finalize-${Date.now()}`);
+    const q = await db.execute(sql`SELECT id FROM questions WHERE active=true LIMIT 1`);
+    assert.ok(q.rows[0]?.id);
+    const input = { userId: member.userId, nickname: "private fixture", questionId: String(q.rows[0].id), answerText: "Synthetic onboarding fixture with a concrete reflective answer.", evaluation: { verdict: "PASS" as const, score: 0.6, path: "integration-fixture", reasonCodes: [], modelVersion: "fixture" } };
+    const repository = createDrizzleAnswersRepository();
+    assert.equal((await repository.saveOnboardingAnswer(input)).ok, true);
+    assert.equal((await repository.saveOnboardingAnswer(input)).ok, true);
+    const containers = await db.select().from(profilePrivate).where(sql`${profilePrivate.profileId} = ${member.profileId}`);
+    assert.equal(containers.length, 1); assert.equal(containers[0].letter, null);
   });
 });

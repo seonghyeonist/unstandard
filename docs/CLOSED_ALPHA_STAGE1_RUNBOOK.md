@@ -1,3 +1,9 @@
+> 2026-10-15 precedence: preserve historical observations below. Domain ownership
+> is now confirmed and Production is deployed. Apply current provider evidence
+> and [founder Stage 1 decisions](FOUNDER_BRAND_DECISIONS_20261015.md).
+> Human spelling and agent social-account checks are exempted, not completed.
+> Trademark clearance remains unresolved.
+
 # UNSTANDARD Closed Alpha Stage 1 runbook
 
 **Version:** founder-resolution-v0.1 / operations-v4

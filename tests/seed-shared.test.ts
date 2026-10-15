@@ -28,7 +28,7 @@ describe("shared seed implementation", () => {
       join(process.cwd(), "tests/integration/suite/migrations.test.ts"),
       "utf8",
     );
-    assert.match(source, /seedClosedAlphaData\(url, dataset\)/);
+    assert.match(source, /seedClosedAlphaDataWithSql\(sql, dataset\)/);
     assert.match(source, /questionChanged/);
     assert.match(source, /appConfigChanged/);
     assert.match(source, /finally/);

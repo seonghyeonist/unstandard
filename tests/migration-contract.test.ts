@@ -10,12 +10,20 @@ import {
   normalizeMigrationLedger,
 } from "../lib/db/migration-contract";
 import { getDrizzleMigrationConfig as getConfigFromRunner } from "../lib/db/run-migrations";
+import { listMigrationSqlFiles } from "../lib/db/migration-guards";
+import { EXPECTED_MIGRATION_LEDGER } from "../lib/db/migration-manifest";
 import {
   canonicalizeSchemaSnapshot,
   schemaContentDigest,
 } from "../lib/db/schema-snapshot";
 
 describe("migration ledger contract", () => {
+  it("covers every checked-in SQL migration in the readiness manifest", () => {
+    assert.deepEqual(
+      EXPECTED_MIGRATION_LEDGER.map((migration) => migration.file),
+      listMigrationSqlFiles(),
+    );
+  });
   it("shares ledger schema/table with migrator configuration", () => {
     const config = getDrizzleMigrationConfig();
     assert.equal(config.migrationsSchema, DRIZZLE_MIGRATIONS_SCHEMA);

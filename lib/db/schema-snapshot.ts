@@ -28,7 +28,7 @@ export type CanonicalSchemaSnapshot = {
   triggers: Array<Record<string, SchemaScalar>>;
 };
 
-type SqlClient = {
+export type SchemaSnapshotSqlClient = {
   (strings: TemplateStringsArray, ...values: unknown[]): Promise<Record<string, unknown>[]>;
 };
 
@@ -251,7 +251,7 @@ export function schemaContentDigest(snapshot: CanonicalSchemaSnapshot): string {
   return createHash("sha256").update(schemaSnapshotJson(snapshot), "utf8").digest("hex");
 }
 
-async function gatherSchemaSnapshot(sql: SqlClient, schema: string): Promise<CanonicalSchemaSnapshot> {
+async function gatherSchemaSnapshot(sql: SchemaSnapshotSqlClient, schema: string): Promise<CanonicalSchemaSnapshot> {
   const tables = await sql`
     SELECT table_name
     FROM information_schema.tables
@@ -475,7 +475,18 @@ export async function computeApplicationSchemaSnapshot(databaseUrl: string): Pro
   schemaContentDigest: string;
   canonicalJson: string;
 }> {
-  const sql = neon(databaseUrl) as unknown as SqlClient;
+  const sql = neon(databaseUrl) as unknown as SchemaSnapshotSqlClient;
+  return computeApplicationSchemaSnapshotWithSql(sql);
+}
+
+/** Compute the canonical snapshot through a caller-owned SQL connection. */
+export async function computeApplicationSchemaSnapshotWithSql(
+  sql: SchemaSnapshotSqlClient,
+): Promise<{
+  snapshot: CanonicalSchemaSnapshot;
+  schemaContentDigest: string;
+  canonicalJson: string;
+}> {
   const gathered = await gatherSchemaSnapshot(sql, APPLICATION_SCHEMA);
   const snapshot = canonicalizeSchemaSnapshot(gathered);
   const canonicalJson = schemaSnapshotJson(snapshot);

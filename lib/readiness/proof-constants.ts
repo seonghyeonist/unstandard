@@ -29,7 +29,8 @@ export const REQUIRED_INTEGRATION_CASES = [
   "legacy_invite_excluded_from_stage1",
   "invite_finalization_success",
   "invite_finalization_rollback",
-  "migration_second_run_noop",
+  "migration_schema_inventory_read_only",
+  "identity_provider_purge_queue_account_deletion",
   "seed_idempotency",
   "db_unlock_reject_no_row",
   "pass_transaction_commits_attempt_and_unlock",
@@ -86,6 +87,8 @@ export const REQUIRED_HTTP_SMOKE_CASES = [
   "b_to_a_private_after_unlock_ok",
   "bidirectional_viewer_isolation",
   "private_response_no_store",
+  "block_create_idempotent",
+  "post_block_message_denied",
 ] as const;
 
 export type RequiredHttpSmokeCase = (typeof REQUIRED_HTTP_SMOKE_CASES)[number];

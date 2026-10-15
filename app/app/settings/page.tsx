@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { TextArea, TextInput } from "@/components/ui/form-field";
 import { getCurrentUser } from "@/lib/api/auth";
+import { SupportInbox } from "@/components/alpha/support-inbox";
 
 async function logoutSession(): Promise<void> {
   const response = await fetch("/api/auth/logout", { method: "POST", credentials: "include" });
@@ -67,7 +68,7 @@ export default function SettingsPage() {
 
   const supportMutation = useMutation({
     mutationFn: createSupportRequest,
-    onSuccess: () => setSupportMessage(""),
+    onSuccess: async () => { setSupportMessage(""); await queryClient.invalidateQueries({ queryKey: ["support-tickets"] }); },
   });
 
   const deleteMutation = useMutation({
@@ -83,6 +84,7 @@ export default function SettingsPage() {
   return (
     <AppShell title="설정" eyebrow="alpha">
       <AuthGuard requireOnboarded={false}>
+        <Card className="mb-5"><Link href="/profile-setup" className="font-semibold underline">기본 프로필 수정·인증·소개 참여 철회</Link></Card>
         <Card>
           <p className="text-sm leading-6 text-foreground/70">
             Closed alpha staging session. User id prefix: <span className="font-mono">{idPrefix}</span>
@@ -151,6 +153,7 @@ export default function SettingsPage() {
           {supportMutation.isError ? (
             <p className="mt-3 text-sm text-danger">{supportMutation.error.message}</p>
           ) : null}
+          <SupportInbox />
         </Card>
 
         <Card className="mt-5 border-danger/30">
@@ -179,6 +182,9 @@ export default function SettingsPage() {
             value={deleteConfirmation}
             onChange={(event) => setDeleteConfirmation(event.target.value)}
           />
+          <p className="mt-4 text-sm leading-6 text-foreground/70">
+            계정을 삭제하면 연결된 Didit 인증 세션 정리도 요청됩니다. 외부 제공자의 삭제 확인 전까지 정리 대기열에 최소 참조가 남을 수 있습니다.
+          </p>
           <Button
             className="mt-4 w-full bg-danger hover:bg-danger/90"
             disabled={

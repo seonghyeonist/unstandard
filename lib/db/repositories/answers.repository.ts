@@ -3,7 +3,7 @@ import "server-only";
 import { and, eq } from "drizzle-orm";
 import { getDb } from "@/lib/db/client";
 import { answers, depthEvaluations } from "@/lib/db/schema/answers";
-import { profiles } from "@/lib/db/schema/profiles";
+import { profiles, profilePrivate } from "@/lib/db/schema/profiles";
 import { canMarkProfileOnboarded } from "@/lib/server/persistence/onboarding-finalize";
 import type { AnswersRepository } from "@/lib/server/persistence/answers.repository.interface";
 import type { SaveOnboardingAnswerInput } from "@/lib/server/persistence/answers.types";
@@ -102,13 +102,16 @@ async function insertDepthEvaluation(
 
 async function markProfileOnboarded(userId: string, nickname: string): Promise<"ok" | "setup_required"> {
   const db = getDb();
-  const now = new Date();
-  const updated = await db
-    .update(profiles)
-    .set({ nickname, onboardedAt: now, updatedAt: now })
-    .where(eq(profiles.userId, userId))
-    .returning({ id: profiles.id });
-  return updated.length > 0 ? "ok" : "setup_required";
+  return db.transaction(async (tx) => {
+    const [profile] = await tx.select({ id: profiles.id }).from(profiles).where(eq(profiles.userId, userId)).limit(1);
+    if (!profile) return "setup_required";
+    // An empty private container is real profile state, not invented member text.
+    // Never overwrite existing private fields. Finalization and container are atomic.
+    await tx.insert(profilePrivate).values({ profileId: profile.id }).onConflictDoNothing({ target: profilePrivate.profileId });
+    const now = new Date();
+    await tx.update(profiles).set({ nickname, onboardedAt: now, updatedAt: now }).where(eq(profiles.id, profile.id));
+    return "ok";
+  });
 }
 
 async function finalizeOnboardingProfile(
