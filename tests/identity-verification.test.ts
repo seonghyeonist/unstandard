@@ -481,6 +481,17 @@ describe("browser identity flow (hosted Didit redirect)", () => {
 
 describe("Didit webhook boundary", () => {
   const webhook = { event_id: "66666666-6666-4666-8666-666666666666", webhook_type: "status.updated", timestamp: 1_777_000_000, session_id: providerReference, session_kind: "user", workflow_id: workflowId, vendor_data: requestId, status: "Approved", environment: "sandbox", decision: { raw: "untrusted" }, name: "Unicode 이름" };
+  it("accepts Didit's opaque tester reference without weakening signed request binding", () => {
+    const sample = { ...webhook, environment: "live", vendor_data: "test-vendor-data-123" };
+    assert.equal(diditSessionWebhookSchema.safeParse(sample).success, true);
+    const signature = createHmac("sha256", env.DIDIT_WEBHOOK_SECRET)
+      .update(canonicalizeDiditWebhook(sample), "utf8").digest("hex");
+    assert.equal(verifyDiditWebhookSignature({ payload: sample, signature, timestamp: String(sample.timestamp), secret: env.DIDIT_WEBHOOK_SECRET, nowSeconds: sample.timestamp }), true);
+    assert.equal(verifyDiditWebhookSignature({ payload: { ...sample, vendor_data: requestId }, signature, timestamp: String(sample.timestamp), secret: env.DIDIT_WEBHOOK_SECRET, nowSeconds: sample.timestamp }), false);
+    assert.equal(sample.vendor_data === String(requestId), false);
+    assert.equal(diditSessionWebhookSchema.safeParse({ ...sample, vendor_data: "" }).success, false);
+    assert.equal(diditSessionWebhookSchema.safeParse({ ...sample, vendor_data: "x".repeat(257) }).success, false);
+  });
   it("accepts a signed Sandbox webhook and rejects a Live or missing environment before scheduling", () => {
     const signatureFor = (payload: unknown) => createHmac("sha256", env.DIDIT_WEBHOOK_SECRET)
       .update(canonicalizeDiditWebhook(payload), "utf8").digest("hex");

@@ -11,7 +11,9 @@ export const diditSessionWebhookSchema = z.object({
   environment: diditEnvironmentSchema,
   session_kind: z.literal("user").optional(),
   workflow_id: z.string().uuid().optional(),
-  vendor_data: z.string().uuid(),
+  // Didit echoes an opaque vendor reference (including its non-UUID tester
+  // value). Authorization still requires an exact match to our stored requestId.
+  vendor_data: z.string().min(1).max(256),
 }).passthrough();
 
 /** Sandbox must use a signature that authenticates the environment field itself. */
