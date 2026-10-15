@@ -1,5 +1,8 @@
 # AGENTS.md
 
+> **2026-10-15 release-evidence supersession (documentation branch only).** Historical release state below is NOT the current provider state. Production is already READY at SHA `4cf4338c95a390b956cddd3ca1817fe8fb5327d9` (`dpl_8yLrAn6sy2WccABGQxhZDCF12frU`); Neon production main is Launch/primary/default/protected=true. Operational formal gate is 10/11 with brand evidence outstanding; public recruitment is NOT_EXECUTED. Current full procedure: [CLOSED_ALPHA_AUTONOMOUS_HANDOFF_20261015.md](./docs/CLOSED_ALPHA_AUTONOMOUS_HANDOFF_20261015.md). This branch is not the release HEAD; do not claim this doc edit was deployed.
+
+
 > AI 코딩 에이전트 운영 가이드. 사람용 기여 규칙은 [`CONTRIBUTING.md`](./CONTRIBUTING.md)가 우선합니다.
 
 ## 핵심 규칙
