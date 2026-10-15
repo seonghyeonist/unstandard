@@ -90,7 +90,17 @@ export type ClosedAlphaOperationalAttestation = {
       trademarkReview: "NO_BLOCKING_CONFLICT_FOUND";
       availabilityEvidenceReference: string;
       socialHandleEvidenceReference: string;
-      pronunciationSpellingReview: "PASS";
+      pronunciationSpellingReview: "PASS" | "WAIVED_BY_FOUNDER";
+      socialHandleReview?: "VERIFIED" | "WAIVED_BY_FOUNDER";
+      founderWaiver?: {
+        policyVersion: "closed-alpha-brand-waivers-v1";
+        scope: "closed_alpha_stage_1";
+        approvedBy: "founder-seonghyeonist";
+        approvedAt: string;
+        decisionReference: string;
+        pronunciationSpelling?: true;
+        socialHandles?: true;
+      };
       reviewedAt: string;
     };
   };
@@ -226,14 +236,35 @@ function domainEvidenceIsComplete(
   const domain = attestation.evidence.domain;
   if (!domain) return false;
   const hostname = domain.canonicalDomain.trim().toLowerCase();
+  const waiver = domain.founderWaiver;
+  // Founder policy decisions are evidence of an exemption, never a completed test
+  // or trademark clearance. Preserve the decision date across later reviews.
+  const waiverApprovedAt = Date.parse(waiver?.approvedAt ?? "");
+  const validWaiver = Boolean(
+    waiver &&
+      waiver.policyVersion === "closed-alpha-brand-waivers-v1" &&
+      waiver.scope === "closed_alpha_stage_1" &&
+      waiver.approvedBy === "founder-seonghyeonist" &&
+      Number.isFinite(waiverApprovedAt) &&
+      waiverApprovedAt <= nowMs + 60_000 &&
+      isSubstantive(waiver.decisionReference),
+  );
+  const spellingSatisfied =
+    domain.pronunciationSpellingReview === "PASS" ||
+    (domain.pronunciationSpellingReview === "WAIVED_BY_FOUNDER" &&
+      validWaiver && waiver?.pronunciationSpelling === true);
+  const handlesSatisfied = domain.socialHandleReview === "WAIVED_BY_FOUNDER"
+    ? validWaiver && waiver?.socialHandles === true
+    : (domain.socialHandleReview === undefined || domain.socialHandleReview === "VERIFIED") &&
+      isSubstantive(domain.socialHandleEvidenceReference);
   return (
     /^(?=.{4,253}$)(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}$/u.test(hostname) &&
     !hostname.endsWith(".vercel.app") &&
     domain.acquisitionStatus === "ACQUIRED" &&
     domain.trademarkReview === "NO_BLOCKING_CONFLICT_FOUND" &&
-    domain.pronunciationSpellingReview === "PASS" &&
+    spellingSatisfied &&
     isSubstantive(domain.availabilityEvidenceReference) &&
-    isSubstantive(domain.socialHandleEvidenceReference) &&
+    handlesSatisfied &&
     timestampIsFresh(domain.reviewedAt, CLOSED_ALPHA_ATTESTATION_MAX_AGE_MS, nowMs)
   );
 }

@@ -1,3 +1,13 @@
+> 2026-10-15 precedence: the alpha-state paragraph below is an August historical
+> baseline. Re-read current Issue #93 and provider state. Production is deployed;
+> do not infer that it is undeployed or on Neon Free from this file.
+> For current Stage 1 brand policy read
+> [FOUNDER_BRAND_DECISIONS_20261015.md](docs/FOUNDER_BRAND_DECISIONS_20261015.md).
+> Human spelling tests and agent social-account checks were explicitly waived;
+> do not restore those as release blockers. Trademark review is being handled
+> separately by the founder; do not repeat it in the technical workstream or
+> invent a clearance result.
+
 # AGENTS.md
 
 > AI 코딩 에이전트 운영 가이드. 사람용 기여 규칙은 [`CONTRIBUTING.md`](./CONTRIBUTING.md)가 우선합니다.
