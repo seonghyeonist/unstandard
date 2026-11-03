@@ -12,12 +12,14 @@ import {
   recordWaitlistVisit,
 } from "@/lib/waitlist/waitlist.repository";
 import {
+  isWaitlistReceipt,
   WAITLIST_COOKIE_MAX_AGE_SECONDS,
   WAITLIST_COOKIE_NAME,
 } from "@/lib/waitlist/waitlist-token";
 import { validateWaitlistJoin } from "@/lib/waitlist/waitlist-validation";
 
 function unavailable() {
+  console.warn(JSON.stringify({ event: "waitlist_unavailable", status: 503 }));
   return privateJson({ error: "Waitlist temporarily unavailable" }, { status: 503 });
 }
 
@@ -28,7 +30,8 @@ export async function GET() {
   if (!rawToken) return privateJson({ joined: false });
 
   try {
-    const joined = await recordWaitlistVisit(rawToken);
+    const recorded = await recordWaitlistVisit(rawToken);
+    const joined = recorded || isWaitlistReceipt(rawToken);
     if (!joined) cookieStore.delete(WAITLIST_COOKIE_NAME);
     return privateJson({ joined });
   } catch {
@@ -62,17 +65,16 @@ export async function POST(request: Request) {
   }
 
   try {
-    const result = await joinWaitlist(input);
-    if (result.created) {
-      const cookieStore = await cookies();
-      cookieStore.set(WAITLIST_COOKIE_NAME, result.rawToken, {
+    const cookieStore = await cookies();
+    const result = await joinWaitlist({ ...input, existingToken: cookieStore.get(WAITLIST_COOKIE_NAME)?.value });
+    // Issue an indistinguishable browser receipt for both new and duplicate requests.
+    cookieStore.set(WAITLIST_COOKIE_NAME, result.rawToken, {
         httpOnly: true,
         secure: process.env.NODE_ENV === "production",
         sameSite: "lax",
         path: "/",
         maxAge: WAITLIST_COOKIE_MAX_AGE_SECONDS,
       });
-    }
     // Deliberately does not reveal whether an email was already registered.
     return privateJson({ accepted: true }, { status: 202 });
   } catch {
@@ -87,8 +89,9 @@ export async function DELETE() {
   if (!rawToken) return privateJson({ deleted: false });
   try {
     const deleted = await deleteWaitlistEntry(rawToken);
+    const acceptedReceipt = isWaitlistReceipt(rawToken);
     cookieStore.delete(WAITLIST_COOKIE_NAME);
-    return privateJson({ deleted });
+    return privateJson({ deleted: deleted || acceptedReceipt });
   } catch {
     return unavailable();
   }

@@ -1,11 +1,13 @@
 import "server-only";
 
-import { eq } from "drizzle-orm";
+import { incrementFunnel } from "@/lib/acquisition/acquisition.repository";
+import { attributionFrom, type Attribution } from "@/lib/acquisition/policy";
+import { and, eq } from "drizzle-orm";
 import type { AlphaAcquisitionChannel } from "@/lib/alpha/stage1-policy";
 import { getDb } from "@/lib/db/client";
 import { waitlistEntries, waitlistVisitDays } from "@/lib/db/schema/waitlist";
 import {
-  generateWaitlistToken,
+  generateWaitlistReceipt,
   hashWaitlistToken,
   requireWaitlistPepper,
 } from "@/lib/waitlist/waitlist-token";
@@ -18,9 +20,11 @@ export async function joinWaitlist(input: {
   email: string;
   acquisitionChannel: AlphaAcquisitionChannel;
   now?: Date;
-}): Promise<{ created: true; rawToken: string } | { created: false }> {
+  attribution?: Attribution;
+  existingToken?: string;
+}): Promise<{ created: boolean; rawToken: string }> {
   const now = input.now ?? new Date();
-  const rawToken = generateWaitlistToken();
+  const rawToken = generateWaitlistReceipt();
   const accessTokenHash = hashWaitlistToken(rawToken, requireWaitlistPepper());
   const db = getDb();
 
@@ -36,7 +40,17 @@ export async function joinWaitlist(input: {
       })
       .onConflictDoNothing({ target: waitlistEntries.emailNormalized })
       .returning({ id: waitlistEntries.id });
-    if (!entry) return { created: false };
+    await incrementFunnel("waitlist_submit_accepted", input.attribution ?? attributionFrom({}), tx);
+    if (!entry) {
+      // Keep an already-authorized browser's deletion capability on resubmission.
+      if (input.existingToken) {
+        const [owned] = await tx.select({ id: waitlistEntries.id }).from(waitlistEntries)
+          .where(and(eq(waitlistEntries.emailNormalized, input.email), eq(waitlistEntries.accessTokenHash, hashWaitlistToken(input.existingToken, requireWaitlistPepper())))).limit(1);
+        if (owned) return { created: false, rawToken: input.existingToken };
+      }
+      return { created: false, rawToken };
+    }
+    await incrementFunnel("waitlist_created", input.attribution ?? attributionFrom({}), tx);
 
     await tx.insert(waitlistVisitDays).values({
       waitlistEntryId: entry.id,

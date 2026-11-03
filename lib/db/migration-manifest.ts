@@ -49,6 +49,7 @@ export const EXPECTED_MIGRATION_LEDGER = [
   { file: "0013_identity_webhook_reconciliation.sql", hash: "3b8889a0addf091a48573f3a4782be96f0015247c4797af2b4d78cdf4039f4b6" },
   { file: "0014_identity_provider_purge_queue.sql", hash: "d82cbfdf48d64c76b85256b01bc853c92d35b2b55865d62921617a202291da8b" },
   { file: "0015_previous_colonel_america.sql", hash: "24f47c81ee445afad0f5350c4989a37d2ef2dd424892ca6a2b57306a0205679e" },
+  { file: "0016_acquisition_daily.sql", hash: "46e86f1873b30c580f84cdfc500ec21bc3264c90b44a43bfe10bd48adb2a0efa" },
 ] as const;
 
 export const EXPECTED_MIGRATION_HASHES = EXPECTED_MIGRATION_LEDGER.map(
