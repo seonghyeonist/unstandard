@@ -17,6 +17,7 @@ export const RATE_LIMIT_POLICIES = {
   reportCreate: { limit: 5, windowMs: 60 * 60 * 1_000 },
   supportCreate: { limit: 3, windowMs: 24 * 60 * 60 * 1_000 },
   messageSend: { limit: 20, windowMs: 10 * 60 * 1_000 },
+  acquisition: { limit: 120, windowMs: 60 * 60 * 1_000 },
   waitlistJoin: { limit: 5, windowMs: 24 * 60 * 60 * 1_000 },
 } as const;
 

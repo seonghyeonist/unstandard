@@ -1,8 +1,10 @@
+import { attributionFrom, type Attribution } from "@/lib/acquisition/policy";
 import { z } from "zod";
 import type { AlphaAcquisitionChannel } from "@/lib/alpha/stage1-policy";
 import { normalizeEmail } from "@/lib/auth/invite-crypto";
 
 export type WaitlistJoinInput = {
+  attribution: Attribution;
   email: string;
   acquisitionChannel: AlphaAcquisitionChannel;
 };
@@ -17,5 +19,5 @@ export function validateWaitlistJoin(value: unknown): WaitlistJoinInput {
   if (input.acquisitionChannel !== undefined && input.acquisitionChannel !== "organic") {
     throw new Error("UNTRUSTED_ACQUISITION_CHANNEL");
   }
-  return { email, acquisitionChannel: "organic" };
+  return { email, acquisitionChannel: "organic", attribution: attributionFrom(input.utm) };
 }
