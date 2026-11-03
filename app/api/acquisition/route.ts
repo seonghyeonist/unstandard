@@ -1,11 +1,11 @@
 import { isDatabaseRuntime } from "@/lib/config/runtime-mode";
 import { privateJson } from "@/lib/http/private-json";
 import { consumeRateLimit, requestIpAddress } from "@/lib/security/rate-limit";
-import { validateClientEvent } from "@/lib/acquisition/policy";
+import { isSameOrigin, validateClientEvent } from "@/lib/acquisition/policy";
 import { incrementFunnel } from "@/lib/acquisition/acquisition.repository";
 export async function POST(request: Request) {
   // Cross-site writes are not accepted; event counts remain untrusted/browser reported.
-  if (request.headers.get("origin") !== new URL(request.url).origin) return privateJson({ error: "Invalid origin" }, { status: 403 });
+  if (!isSameOrigin(request.headers.get("origin"), request.headers.get("host"))) return privateJson({ error: "Invalid origin" }, { status: 403 });
   if (!isDatabaseRuntime()) return privateJson({ error: "Unavailable" }, { status: 503 });
   if (Number(request.headers.get("content-length")) > 1024) return privateJson({ error: "Too large" }, { status: 413 });
   let input;

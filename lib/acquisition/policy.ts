@@ -31,3 +31,10 @@ export function validateClientEvent(value: unknown): { event: ClientEvent; attri
   if (!(CLIENT_EVENTS as readonly unknown[]).includes(input.event)) throw new Error("INVALID_EVENT");
   return { event: input.event as ClientEvent, attribution: attributionFrom(input.utm) };
 }
+
+// Next may construct request.url with an internal host; Host is the browser-facing
+// authority. This check blocks browser cross-origin writes, not nonbrowser spoofing.
+export function isSameOrigin(origin: string | null, host: string | null): boolean {
+  if (!origin || !host) return false;
+  return origin === `https://${host}` || origin === `http://${host}`;
+}

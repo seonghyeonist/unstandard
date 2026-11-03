@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { attributionFrom, sanitizeUtm, validateClientEvent } from "../lib/acquisition/policy";
+import { attributionFrom, sanitizeUtm, validateClientEvent, isSameOrigin } from "../lib/acquisition/policy";
 import { validateWaitlistJoin } from "../lib/waitlist/waitlist-validation";
 describe("acquisition privacy boundary", () => {
   it("distinguishes paid, organic, Everytime and unattributed declared sources", () => {
@@ -48,4 +48,12 @@ it("acceptance receipts cannot be forged and do not reveal email identity", () =
   } finally {
     if (old === undefined) delete process.env.WAITLIST_TOKEN_PEPPER; else process.env.WAITLIST_TOKEN_PEPPER = old;
   }
+});
+
+it("checks browser origin against the external host rather than an internal Next URL", () => {
+  assert.equal(isSameOrigin("https://preview.vercel.app", "preview.vercel.app"), true);
+  assert.equal(isSameOrigin("http://127.0.0.1:3013", "127.0.0.1:3013"), true);
+  assert.equal(isSameOrigin("https://evil.example", "preview.vercel.app"), false);
+  assert.equal(isSameOrigin(null, "preview.vercel.app"), false);
+  assert.equal(isSameOrigin("https://preview.vercel.app.evil.example", "preview.vercel.app"), false);
 });

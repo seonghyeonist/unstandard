@@ -21,7 +21,7 @@ export function LandingMeasurement() {
   return null;
 }
 export function AlphaCta() {
-  return <a href="#alpha-apply" className="mt-5 inline-flex min-h-11 w-full items-center justify-center rounded-full bg-accent px-5 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-[#ad392c]" onClick={event => {
+  return <a href="#alpha-apply" style={{ color: "#fff" }} className="mt-5 inline-flex min-h-11 w-full items-center justify-center rounded-full bg-accent px-5 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-[#ad392c]" onClick={event => {
     trackFunnel("alpha_cta_click");
     const form = document.getElementById("alpha-apply");
     if (form) {
