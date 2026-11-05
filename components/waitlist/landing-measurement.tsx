@@ -21,7 +21,7 @@ export function LandingMeasurement() {
   return null;
 }
 export function AlphaCta() {
-  return <a href="#alpha-apply" style={{ color: "#fff" }} className="mt-5 inline-flex min-h-11 w-full items-center justify-center rounded-full bg-accent px-5 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-[#ad392c]" onClick={event => {
+  return <a href="#alpha-apply" style={{ color: "#fff" }} className="recruitment-cta" onClick={event => {
     trackFunnel("alpha_cta_click");
     const form = document.getElementById("alpha-apply");
     if (form) {
@@ -30,5 +30,5 @@ export function AlphaCta() {
       form.focus({ preventScroll: true });
       form.scrollIntoView({ behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "instant" : "smooth", block: "start" });
     }
-  }}>비공개 알파 참여 신청하기</a>;
+  }}>알파 초대 신청 <span aria-hidden="true">↗</span></a>;
 }

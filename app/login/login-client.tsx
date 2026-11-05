@@ -18,14 +18,14 @@ type LoginClientProps = {
 };
 
 function resolveLoginError(errorCode?: string): string | null {
-  if (errorCode === "auth_not_configured") return "Auth is not configured for this environment.";
-  if (errorCode === "service_unavailable") return "Authentication is temporarily unavailable. Try again shortly.";
+  if (errorCode === "auth_not_configured") return "현재 로그인 서비스를 사용할 수 없어요. 잠시 뒤 다시 시도해 주세요.";
+  if (errorCode === "service_unavailable") return "로그인 서비스에 잠시 연결할 수 없어요. 잠시 뒤 다시 시도해 주세요.";
   return null;
 }
 
 function resolveSignInError(errorCode: "invalid_credentials" | "service_unavailable"): string {
-  if (errorCode === "invalid_credentials") return "Email or password is incorrect.";
-  return "Authentication is temporarily unavailable. Try again shortly.";
+  if (errorCode === "invalid_credentials") return "이메일 또는 비밀번호를 확인해 주세요.";
+  return "로그인 서비스에 잠시 연결할 수 없어요. 잠시 뒤 다시 시도해 주세요.";
 }
 
 export default function LoginClient({
@@ -69,12 +69,12 @@ export default function LoginClient({
   });
 
   return (
-    <AppShell title="닫힌 문 앞에서" eyebrow="login">
-      <Card>
+    <div className="entry-page"><AppShell title="기존 회원 로그인" eyebrow="로그인">
+      <Card className="auth-entry">
         {databaseAuthEnabled ? (
           <>
             <p className="text-sm text-foreground/60">
-              Closed Alpha — 개인 초대 링크를 받은 신규 회원은 이메일과 비밀번호로 가입합니다. 기존 회원도 같은 방식으로 로그인해요.
+              가입한 이메일과 비밀번호로 로그인해 주세요. 처음이라면 이메일로 받은 개인 초대 링크에서 가입을 시작할 수 있어요.
             </p>
             <form
               className="mt-6 space-y-3"
@@ -84,15 +84,15 @@ export default function LoginClient({
                 signInMutation.mutate();
               }}
             >
-              <label className="block text-sm text-foreground/70" htmlFor="login-email">Email</label>
+              <label className="block text-sm text-foreground/70" htmlFor="login-email">이메일</label>
               <input id="login-email" type="email" autoComplete="email" className="w-full rounded-xl border border-foreground/15 bg-background px-4 py-3 text-sm" value={email} onChange={(event) => setEmail(event.target.value)} disabled={signInMutation.isPending} />
-              <label className="block text-sm text-foreground/70" htmlFor="login-password">Password</label>
+              <label className="block text-sm text-foreground/70" htmlFor="login-password">비밀번호</label>
               <input id="login-password" type="password" autoComplete="current-password" className="w-full rounded-xl border border-foreground/15 bg-background px-4 py-3 text-sm" value={password} onChange={(event) => setPassword(event.target.value)} disabled={signInMutation.isPending} />
               <Button className="w-full" type="submit" disabled={signInMutation.isPending || !email.trim() || password.length < 10}>
-                {signInMutation.isPending ? "Signing in…" : "Sign in"}
+                {signInMutation.isPending ? "로그인 중…" : "로그인하기"}
               </Button>
             </form>
-            <div className="mt-4 flex justify-between gap-4 text-sm">
+            <div className="mt-4 flex flex-wrap justify-between gap-4 text-sm">
               <Link className="text-foreground/70 underline" href="/reset-password">비밀번호 재설정</Link>
               <Link className="text-foreground/70 underline" href="/register">초대 링크로 가입</Link>
             </div>
@@ -105,17 +105,17 @@ export default function LoginClient({
 
         {mockAllowed ? (
           <Button className={`mt-6 w-full ${databaseAuthEnabled ? "bg-foreground/10 text-foreground hover:bg-foreground/15" : ""}`} onClick={() => mockMutation.mutate()} disabled={mockMutation.isPending}>
-            {mockMutation.isPending ? "문 여는 중" : "Dev mock session"}
+            {mockMutation.isPending ? "문 여는 중" : "개발용 세션 시작"}
           </Button>
         ) : null}
 
-        {!mockAllowed && !databaseAuthEnabled ? <p className="mt-4 text-sm text-danger">Database auth is required in this environment.</p> : null}
+        {!mockAllowed && !databaseAuthEnabled ? <p className="mt-4 text-sm text-danger">현재 로그인 서비스를 사용할 수 없어요.</p> : null}
         {loginError ? <p className="mt-3 text-sm text-danger">{loginError}</p> : null}
         {mockMutation.isError ? <p className="mt-3 text-sm text-danger">{(mockMutation.error as Error).message}</p> : null}
         {signInError ? <p className="mt-3 text-sm text-danger" role="alert">{signInError}</p> : null}
-        {signInMutation.isError ? <p className="mt-3 text-sm text-danger" role="alert">Authentication is temporarily unavailable. Try again shortly.</p> : null}
-        <Link className="mt-6 inline-block text-sm text-foreground/60 underline" href="/">Back to home</Link>
+        {signInMutation.isError ? <p className="mt-3 text-sm text-danger" role="alert">로그인 서비스에 잠시 연결할 수 없어요. 잠시 뒤 다시 시도해 주세요.</p> : null}
+        <Link className="mt-6 inline-block text-sm text-foreground/60 underline" href="/">홈으로 돌아가기</Link>
       </Card>
-    </AppShell>
+    </AppShell></div>
   );
 }

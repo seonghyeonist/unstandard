@@ -164,10 +164,10 @@ export default function RegisterForm({
   const error = sendCodeMutation.error || verifyCodeMutation.error || claimMutation.error || signupMutation.error;
 
   return (
-    <AppShell title="초대 확인" eyebrow="register">
-      <Card>
+    <div className="entry-page"><AppShell title="초대 확인" eyebrow="register">
+      <Card className="auth-entry">
         {inviteState === "checking" ? <p className="text-sm text-foreground/60">초대 링크를 안전하게 확인하는 중이에요.</p> : null}
-        {inviteState === "missing" ? <p className="text-sm leading-6 text-foreground/60">가입은 이메일로 받은 개인 초대 링크에서 시작해요. 링크를 다시 열어 주세요.</p> : null}
+        {inviteState === "missing" ? <div className="text-sm leading-6 text-foreground/75"><p>가입은 이메일로 받은 개인 초대 링크에서 시작해요. 이메일에서 초대 링크를 다시 열어 주세요.</p><Link className="mt-3 underline underline-offset-4" href="/#alpha-apply">초대가 없다면 알파 초대 신청</Link></div> : null}
         {inviteState === "invalid" ? <p className="text-sm leading-6 text-danger">이 초대 링크는 유효하지 않거나 만료됐어요. 발급자에게 새 링크를 요청해 주세요.</p> : null}
 
         {inviteState !== "checking" && inviteState !== "missing" && inviteState !== "invalid" ? (
@@ -235,6 +235,6 @@ export default function RegisterForm({
         {error ? <p className="mt-3 text-sm text-danger">{(error as Error).message}</p> : null}
         <Link className="mt-6 inline-block text-sm text-foreground/60 underline" href="/login">기존 계정으로 로그인</Link>
       </Card>
-    </AppShell>
+    </AppShell></div>
   );
 }
