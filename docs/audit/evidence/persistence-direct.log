@@ -1,0 +1,68 @@
+{"event":"integration.transaction","boundary":"BEGIN","phase":"statement","transport":"pool_client"}
+{"event":"integration.transaction","boundary":"COMMIT","phase":"statement","transport":"pool_client"}
+{"event":"integration.transaction","boundary":"BEGIN","phase":"statement","transport":"pool_client"}
+{"event":"integration.transaction","boundary":"COMMIT","phase":"statement","transport":"pool_client"}
+▶ integration: profile save and identity state
+  ✔ persists canonical failure and purge retry states until successful reconciliation (18791.095549ms)
+{"event":"integration.transaction","boundary":"BEGIN","phase":"statement","transport":"pool_client"}
+{"event":"integration.transaction","boundary":"COMMIT","phase":"statement","transport":"pool_client"}
+{"event":"integration.transaction","boundary":"BEGIN","phase":"statement","transport":"pool_client"}
+{"event":"integration.transaction","boundary":"COMMIT","phase":"statement","transport":"pool_client"}
+  ✔ enforces the persisted completion window: timely (4303.443352ms)
+{"event":"integration.transaction","boundary":"BEGIN","phase":"statement","transport":"pool_client"}
+{"event":"integration.transaction","boundary":"COMMIT","phase":"statement","transport":"pool_client"}
+  ✔ enforces the persisted completion window: missing (2977.737951ms)
+{"event":"integration.transaction","boundary":"BEGIN","phase":"statement","transport":"pool_client"}
+{"event":"integration.transaction","boundary":"COMMIT","phase":"statement","transport":"pool_client"}
+  ✔ enforces the persisted completion window: late (2923.926297ms)
+{"event":"integration.transaction","boundary":"BEGIN","phase":"statement","transport":"pool_client"}
+{"event":"integration.transaction","boundary":"COMMIT","phase":"statement","transport":"pool_client"}
+  ✔ enforces the persisted completion window: missing-event (2926.80473ms)
+{"event":"integration.transaction","boundary":"BEGIN","phase":"statement","transport":"pool_client"}
+{"event":"integration.transaction","boundary":"COMMIT","phase":"statement","transport":"pool_client"}
+  ✔ enforces the persisted completion window: future (2938.610898ms)
+{"event":"integration.transaction","boundary":"BEGIN","phase":"statement","transport":"pool_client"}
+{"event":"integration.transaction","boundary":"COMMIT","phase":"statement","transport":"pool_client"}
+  ✔ enforces the persisted completion window: grace-expired (2918.471988ms)
+  ✔ preserves a webhook-scheduled pending request on a no-op save and blocks real edits (4551.630698ms)
+  ✔ preserves verified eligibility on a no-op and requires re-verification after a material edit (4590.050192ms)
+✔ integration: profile save and identity state (46925.084208ms)
+{"event":"integration.transaction","boundary":"BEGIN","phase":"statement","transport":"pool_client"}
+{"event":"integration.transaction","boundary":"COMMIT","phase":"statement","transport":"pool_client"}
+{"event":"integration.transaction","boundary":"BEGIN","phase":"statement","transport":"pool_client"}
+{"event":"integration.transaction","boundary":"COMMIT","phase":"statement","transport":"pool_client"}
+{"event":"integration.transaction","boundary":"BEGIN","phase":"statement","transport":"pool_client"}
+{"event":"integration.transaction","boundary":"COMMIT","phase":"statement","transport":"pool_client"}
+▶ integration: persistence invariants
+  ✔ message_unlock_block_authorization + message_deletion_residuals (28166.567047ms)
+{"event":"integration.transaction","boundary":"BEGIN","phase":"statement","transport":"pool_client"}
+{"event":"integration.transaction","boundary":"COMMIT","phase":"statement","transport":"pool_client"}
+  ✔ waitlist_revisit_and_delete + alpha_metrics_fail_closed_maturity (18921.762065ms)
+  ✔ report_user_fk + duplicate_report_idempotency + no_duplicate_report_row (1893.632703ms)
+  ✔ lowercase_report_target_type (1141.773709ms)
+{"event":"integration.transaction","boundary":"BEGIN","phase":"statement","transport":"pool_client"}
+{"event":"integration.transaction","boundary":"COMMIT","phase":"statement","transport":"pool_client"}
+{"event":"integration.transaction","boundary":"BEGIN","phase":"statement","transport":"pool_client"}
+{"event":"integration.transaction","boundary":"ROLLBACK","phase":"statement","transport":"pool_client"}
+  ✔ block_uniqueness + unlock_uniqueness (9514.78064ms)
+✔ integration: persistence invariants (59639.829328ms)
+▶ integration: private profile container lifecycle
+  ✔ normal profile bootstrap repairs an omitted private container without overwriting content (1899.183188ms)
+{"event":"integration.transaction","boundary":"BEGIN","phase":"statement","transport":"pool_client"}
+{"event":"integration.transaction","boundary":"COMMIT","phase":"statement","transport":"pool_client"}
+{"event":"integration.transaction","boundary":"BEGIN","phase":"statement","transport":"pool_client"}
+{"event":"integration.transaction","boundary":"COMMIT","phase":"statement","transport":"pool_client"}
+  ✔ onboarding finalization persists the private container and duplicate submission remains idempotent (4623.622851ms)
+✔ integration: private profile container lifecycle (6523.225284ms)
+{"event":"integration.pool_cleanup","phase":"start","open_pool_count":1}
+{"event":"integration.pool_cleanup","phase":"end","outcome":"PASS","closed_pool_count":1,"failed_pool_count":0}
+{"event":"integration.shared_pool_cleanup","phase":"start","open_pool":true}
+{"event":"integration.shared_pool_cleanup","phase":"end","outcome":"PASS","closed_pool":true}
+ℹ tests 16
+ℹ suites 3
+ℹ pass 16
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 114818.714512

@@ -1,3 +1,4 @@
+import { isSameOriginMutation, readSmallJson } from "@/lib/http/profile-request";
 import { getAuthenticatedUser, ServiceUnavailableError } from "@/lib/auth/server";
 import { privateJson } from "@/lib/http/private-json";
 import { isReportsPersistenceEnabled } from "@/lib/config/persistence-mode";
@@ -22,6 +23,8 @@ export async function POST(request: Request) {
     return privateJson({ error: "Unauthorized" }, { status: 401 });
   }
 
+  if (!isSameOriginMutation(request)) return privateJson({ error: "Forbidden" }, { status: 403 });
+
   try {
     const decision = await consumeRateLimit({ scope: "reportCreate", subject: user.id });
     if (!decision.allowed) {
@@ -39,7 +42,7 @@ export async function POST(request: Request) {
 
   let body: unknown;
   try {
-    body = await request.json();
+    body = await readSmallJson(request, 16 * 1024);
   } catch {
     return privateJson({ error: "Invalid JSON" }, { status: 400 });
   }

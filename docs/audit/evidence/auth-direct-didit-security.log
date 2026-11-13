@@ -1,0 +1,12 @@
+{"event":"auth.postgres.e2e","case":"fresh_pre_auth_zero_counts","outcome":"PASS"}
+{"event":"auth.postgres.e2e","case":"didit_missing_signature_denied","outcome":"PASS"}
+{"event":"auth.postgres.e2e","case":"didit_invalid_signature_denied","outcome":"PASS"}
+{"event":"auth.postgres.e2e","case":"didit_tampered_body_denied","outcome":"PASS"}
+{"event":"auth.postgres.e2e","case":"didit_stale_signed_body_denied","outcome":"PASS"}
+{"event":"auth.postgres.e2e","case":"didit_fresh_header_cannot_revive_stale_body","outcome":"PASS"}
+{"event":"auth.postgres.e2e","case":"didit_signed_environment_mismatch_denied","outcome":"PASS"}
+{"event":"auth.postgres.e2e","case":"didit_signed_workflow_mismatch_denied","outcome":"PASS"}
+{"event":"auth.postgres.e2e","case":"didit_unknown_request_ignored","outcome":"PASS"}
+{"event":"auth.postgres.e2e","case":"didit_unknown_request_replay_ignored","outcome":"PASS"}
+{"event":"auth.postgres.e2e","case":"didit_negative_matrix_has_no_identity_or_provider_purge_side_effect","outcome":"PASS"}
+{"event":"auth.postgres.e2e","outcome":"PASS","evidence":"sanitized_count_only"}

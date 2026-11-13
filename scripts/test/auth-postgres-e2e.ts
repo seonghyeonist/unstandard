@@ -223,8 +223,9 @@ async function reserveFreePort(): Promise<number> {
 
 async function startServer(injection?: "consume" | "finalize" | "profile"): Promise<RunningServer> {
   const port = await reserveFreePort();
-  const origin = `http://localhost:${port}`;
-  const target = `http://127.0.0.1:${port}`;
+  // Fetch and canonical browser authority must agree; native fetch ignores Host overrides.
+  const origin = `http://127.0.0.1:${port}`;
+  const target = origin;
   const env = { ...process.env };
   env.NODE_ENV = "production";
   env.PORT = String(port);

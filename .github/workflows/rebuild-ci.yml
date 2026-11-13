@@ -7,6 +7,7 @@ on:
       - agent/p0-integrated-execution-20260804
   pull_request:
     branches:
+      - feat/mobile-editorial-20261105
       - main
       - cursor/neon-drizzle-better-auth-rebuild-909d
       - cursor/p0-4g-readiness-closure-909d

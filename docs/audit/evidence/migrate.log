@@ -1,0 +1,3 @@
+{"event":"db.migrate","boundary":"migration_batch","phase":"end","outcome":"PASS","http_requests":4}
+{"event":"db.migrate","boundary":"pool_close","phase":"end","outcome":"PASS"}
+db:migrate complete

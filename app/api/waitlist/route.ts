@@ -1,3 +1,4 @@
+import { readSmallJson } from "@/lib/http/profile-request";
 import { cookies } from "next/headers";
 import { isDatabaseRuntime } from "@/lib/config/runtime-mode";
 import { privateJson } from "@/lib/http/private-json";
@@ -59,7 +60,7 @@ export async function POST(request: Request) {
 
   let input;
   try {
-    input = validateWaitlistJoin(await request.json());
+    input = validateWaitlistJoin(await readSmallJson(request, 16 * 1024));
   } catch {
     return privateJson({ error: "Invalid waitlist request" }, { status: 400 });
   }

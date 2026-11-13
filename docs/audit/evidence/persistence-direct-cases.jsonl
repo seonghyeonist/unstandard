@@ -1,0 +1,10 @@
+{"name":"message_unlock_block_authorization","status":"PASS"}
+{"name":"message_deletion_residuals","status":"PASS"}
+{"name":"waitlist_revisit_and_delete","status":"PASS"}
+{"name":"alpha_metrics_fail_closed_maturity","status":"PASS"}
+{"name":"report_user_fk","status":"PASS"}
+{"name":"duplicate_report_idempotency","status":"PASS"}
+{"name":"no_duplicate_report_row","status":"PASS"}
+{"name":"lowercase_report_target_type","status":"PASS"}
+{"name":"block_uniqueness","status":"PASS"}
+{"name":"unlock_uniqueness","status":"PASS"}

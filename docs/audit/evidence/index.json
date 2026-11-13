@@ -1,0 +1,67 @@
+[
+  {
+    "file": "docs/audit/evidence/auth-direct-didit-security.log",
+    "lines": 12,
+    "scope": "synthetic test results only; original failed whole-run retained separately"
+  },
+  {
+    "file": "docs/audit/evidence/auth-direct-profile-visibility.log",
+    "lines": 7,
+    "scope": "synthetic test results only; original failed whole-run retained separately"
+  },
+  {
+    "file": "docs/audit/evidence/auth-direct-support-lifecycle.log",
+    "lines": 10,
+    "scope": "synthetic test results only; original failed whole-run retained separately"
+  },
+  {
+    "file": "docs/audit/evidence/auth-final-password-reset-delete.log",
+    "lines": 7,
+    "scope": "synthetic test results only; original failed whole-run retained separately"
+  },
+  {
+    "file": "docs/audit/evidence/auth-final-proofs.log",
+    "lines": 7,
+    "scope": "synthetic test results only; original failed whole-run retained separately"
+  },
+  {
+    "file": "docs/audit/evidence/final-cleanup.log",
+    "lines": 1,
+    "scope": "synthetic test results only; original failed whole-run retained separately"
+  },
+  {
+    "file": "docs/audit/evidence/integration.log",
+    "lines": 423,
+    "scope": "synthetic test results only; original failed whole-run retained separately"
+  },
+  {
+    "file": "docs/audit/evidence/migrate.log",
+    "lines": 3,
+    "scope": "synthetic test results only; original failed whole-run retained separately"
+  },
+  {
+    "file": "docs/audit/evidence/persistence-after.log",
+    "lines": 1,
+    "scope": "synthetic test results only; original failed whole-run retained separately"
+  },
+  {
+    "file": "docs/audit/evidence/persistence-before.log",
+    "lines": 1,
+    "scope": "synthetic test results only; original failed whole-run retained separately"
+  },
+  {
+    "file": "docs/audit/evidence/persistence-direct-cases.jsonl",
+    "lines": 10,
+    "scope": "synthetic test results only; original failed whole-run retained separately"
+  },
+  {
+    "file": "docs/audit/evidence/persistence-direct.log",
+    "lines": 68,
+    "scope": "synthetic test results only; original failed whole-run retained separately"
+  },
+  {
+    "file": "docs/audit/evidence/rate-concurrency.log",
+    "lines": 2,
+    "scope": "synthetic test results only; original failed whole-run retained separately"
+  }
+]
