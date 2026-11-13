@@ -1,3 +1,4 @@
+import { isSameOriginMutation, readSmallJson } from "@/lib/http/profile-request";
 import { AuthError, requireAuthenticatedUser, ServiceUnavailableError } from "@/lib/auth/server";
 import { isDatabaseAuthConfigured } from "@/lib/config/runtime-mode";
 import { onboardingQuestion } from "@/lib/data/mock-public";
@@ -29,6 +30,8 @@ export async function POST(request: Request) {
     return privateJson({ error: "Unauthorized" }, { status: 401 });
   }
 
+  if (!isSameOriginMutation(request)) return privateJson({ error: "Forbidden" }, { status: 403 });
+
   try {
     const decision = await consumeRateLimit({ scope: "onboardingAnswer", subject: user.id });
     if (!decision.allowed) {
@@ -46,7 +49,7 @@ export async function POST(request: Request) {
 
   let body: unknown;
   try {
-    body = await request.json();
+    body = await readSmallJson(request, 16 * 1024);
   } catch {
     return privateJson({ error: "Invalid JSON" }, { status: 400 });
   }

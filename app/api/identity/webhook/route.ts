@@ -2,7 +2,7 @@ import "server-only";
 import { after } from "next/server";
 
 import { privateJson } from "@/lib/http/private-json";
-import { readSmallJson } from "@/lib/http/profile-request";
+import { readBoundedBody } from "@/lib/http/profile-request";
 import { parseDiditIdentityConfig } from "@/lib/identity/didit";
 import { matchesExpectedDiditEnvironment } from "@/lib/identity/didit-environment";
 import {
@@ -35,10 +35,9 @@ export async function POST(request: Request) {
   let body: unknown;
   let rawBody: Uint8Array | null = null;
   try {
-    const raw = await request.clone().arrayBuffer();
-    if (raw.byteLength > 256 * 1024) throw new Error("Invalid body");
-    rawBody = new Uint8Array(raw);
-    body = await readSmallJson(request, 256 * 1024);
+    if (request.headers.get("content-type")?.split(";", 1)[0]?.trim().toLowerCase() !== "application/json") throw new Error("Invalid body");
+    rawBody = await readBoundedBody(request, 256 * 1024);
+    body = JSON.parse(new TextDecoder("utf-8", { fatal: true }).decode(rawBody));
   } catch {
     logIdentityEvent({ event: "identity.webhook.invalid_body", stage: "webhook", status: "error", code: "INVALID_BODY" });
     return privateJson({ error: "Invalid webhook" }, { status: 400 });

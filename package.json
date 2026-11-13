@@ -46,14 +46,14 @@
     "drizzle-orm": "^0.45.3",
     "https-proxy-agent": "7.0.6",
     "lucide-react": "^0.511.0",
-    "next": "^16.3.8",
+    "next": "^16.4.2",
     "react": "^19.3.0",
     "react-dom": "^19.3.0",
     "react-hook-form": "^7.89.0",
     "server-only": "^0.0.1",
     "tailwind-merge": "^3.7.0",
     "ws": "^8.22.0",
-    "zod": "^3.25.28"
+    "zod": "^4.6.7"
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3.3.1",
@@ -66,7 +66,7 @@
     "dotenv": "^17.4.2",
     "drizzle-kit": "^0.31.10",
     "eslint": "^9.27.0",
-    "eslint-config-next": "^16.3.8",
+    "eslint-config-next": "^16.4.2",
     "tailwindcss": "^4.1.7",
     "tsx": "^4.22.4",
     "typescript": "^5.8.3"

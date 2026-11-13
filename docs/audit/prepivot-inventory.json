@@ -1,0 +1,1595 @@
+{
+  "scope": "static TypeScript literal import graph only; dynamic/computed imports and Next routing require separate review",
+  "routes": [
+    "app/api/acquisition/route.ts",
+    "app/api/alpha/invite/claim/route.ts",
+    "app/api/alpha/invite/email/send/route.ts",
+    "app/api/alpha/invite/email/verify/route.ts",
+    "app/api/alpha/invite/prepare/route.ts",
+    "app/api/alpha/invite/status/route.ts",
+    "app/api/alpha/operator/identity-purges/route.ts",
+    "app/api/alpha/operator/invites/[inviteId]/reissue/route.ts",
+    "app/api/alpha/operator/invites/[inviteId]/revoke/route.ts",
+    "app/api/alpha/operator/invites/route.ts",
+    "app/api/alpha/operator/login/route.ts",
+    "app/api/alpha/operator/logout/route.ts",
+    "app/api/alpha/operator/session-import/route.ts",
+    "app/api/alpha/operator/session/route.ts",
+    "app/api/alpha/operator/support/route.ts",
+    "app/api/answers/unlock/route.ts",
+    "app/api/auth/[...all]/route.ts",
+    "app/api/auth/logout/route.ts",
+    "app/api/auth/session/route.ts",
+    "app/api/blocks/route.ts",
+    "app/api/candidates/route.ts",
+    "app/api/debug/auth-env/route.ts",
+    "app/api/debug/db-fingerprint/route.ts",
+    "app/api/identity/complete/route.ts",
+    "app/api/identity/return/route.ts",
+    "app/api/identity/start/route.ts",
+    "app/api/identity/webhook/route.ts",
+    "app/api/messages/[profileId]/route.ts",
+    "app/api/onboarding/answer/route.ts",
+    "app/api/operations/readiness/route.ts",
+    "app/api/profile/[id]/private/route.ts",
+    "app/api/profile/[id]/route.ts",
+    "app/api/profile/basics/route.ts",
+    "app/api/reports/route.ts",
+    "app/api/support/route.ts",
+    "app/api/unlock/[profileId]/route.ts",
+    "app/api/waitlist/route.ts"
+  ],
+  "imports": {
+    "next-env.d.ts": [],
+    "tsconfig.tsbuildinfo": [],
+    "next.config.ts": [],
+    "proxy.ts": [
+      "lib/config/auth-production.ts",
+      "lib/config/runtime-mode.ts"
+    ],
+    "drizzle.config.ts": [],
+    "types/user.ts": [],
+    "types/api.ts": [],
+    "types/profile.ts": [],
+    "types/match.ts": [],
+    "app/layout.tsx": [
+      "components/layout/query-provider.tsx"
+    ],
+    "app/page.tsx": [
+      "components/layout/landing-hero.tsx"
+    ],
+    "tests/no-legacy-backend-guard.test.ts": [
+      "lib/guard/no-legacy-backend-audit.ts"
+    ],
+    "tests/local-ai-containment.test.ts": [
+      "lib/depth/evaluate-depth-answer.ts"
+    ],
+    "tests/identity-operator-purge-policy.test.ts": [
+      "lib/identity/operator-purge-policy.ts"
+    ],
+    "tests/protected-route-boundaries.test.ts": [],
+    "tests/canonical-origin.test.ts": [],
+    "tests/audit-request-boundary.test.ts": [
+      "lib/http/profile-request.ts",
+      "lib/identity/didit-webhook.ts"
+    ],
+    "tests/migration-guards.test.ts": [
+      "lib/db/migration-guards.ts",
+      "lib/config/database-env.ts"
+    ],
+    "tests/private-json.test.ts": [
+      "lib/http/private-json.ts"
+    ],
+    "tests/invite-reservation.test.ts": [
+      "lib/auth/invite-crypto.ts"
+    ],
+    "tests/schema-snapshot.test.ts": [
+      "lib/db/schema-snapshot.ts"
+    ],
+    "tests/report-actor-identity.test.ts": [],
+    "tests/session-private-cache.test.ts": [
+      "lib/http/private-json.ts"
+    ],
+    "tests/seed-mutation.test.ts": [
+      "lib/db/seed-data.ts"
+    ],
+    "tests/preview-session-import.test.ts": [
+      "lib/auth/preview-session-import.ts"
+    ],
+    "tests/seed-shared.test.ts": [
+      "lib/db/seed-data.ts"
+    ],
+    "tests/reports-persistence.test.ts": [],
+    "tests/integration-fixture-baseline.test.ts": [
+      "lib/readiness/integration-fixture-baseline.ts"
+    ],
+    "tests/identity-provider-purge.test.ts": [
+      "lib/identity/didit.ts",
+      "lib/identity/reconciliation.ts"
+    ],
+    "tests/db-unlock-client-semantics.test.ts": [
+      "lib/api/candidates.ts",
+      "lib/api/profiles.ts"
+    ],
+    "tests/operator-token.test.ts": [],
+    "tests/production-readiness.test.ts": [],
+    "tests/operator-invite-boundary.test.ts": [],
+    "tests/reporter-profile-bootstrap.test.ts": [],
+    "tests/identity-verification.test.ts": [
+      "lib/identity/didit.ts",
+      "lib/identity/didit-environment.ts",
+      "lib/identity/reconciliation.ts",
+      "lib/identity/service.ts",
+      "lib/identity/readiness.ts",
+      "lib/identity/contracts.ts",
+      "lib/identity/notice.ts",
+      "lib/identity/browser-flow.ts",
+      "lib/identity/didit-webhook.ts",
+      "app/api/identity/return/route.ts"
+    ],
+    "tests/direct-auth-boundary.test.ts": [],
+    "tests/integration-runner-core.test.ts": [
+      "lib/readiness/proof-constants.ts",
+      "lib/readiness/integration-runner-core.ts"
+    ],
+    "tests/db-unlock-units.test.ts": [],
+    "tests/smoke-response-redaction.test.ts": [],
+    "tests/canonical-timestamp.test.ts": [
+      "lib/readiness/canonical-timestamp.ts",
+      "lib/readiness/proof-artifact.ts",
+      "lib/readiness/proof-constants.ts"
+    ],
+    "tests/migration-contract.test.ts": [
+      "lib/db/migration-contract.ts",
+      "lib/db/run-migrations.ts",
+      "lib/db/migration-guards.ts",
+      "lib/db/migration-manifest.ts",
+      "lib/db/schema-snapshot.ts"
+    ],
+    "tests/callback-diagnostics.test.ts": [],
+    "tests/acquisition-policy.test.ts": [
+      "lib/acquisition/policy.ts",
+      "lib/waitlist/waitlist-validation.ts",
+      "lib/waitlist/waitlist-token.ts"
+    ],
+    "tests/waitlist-contract.test.ts": [
+      "lib/waitlist/waitlist-token.ts",
+      "lib/waitlist/waitlist-validation.ts"
+    ],
+    "tests/answers-persistence.test.ts": [],
+    "tests/profile-basics.test.ts": [
+      "components/profile/profile-basics-form.tsx",
+      "lib/profile/basics.ts",
+      "lib/identity/contracts.ts",
+      "lib/http/profile-request.ts"
+    ],
+    "tests/founder-scope-guard.test.ts": [],
+    "tests/alpha-metrics.test.ts": [
+      "lib/alpha/metrics.ts"
+    ],
+    "tests/db-errors.test.ts": [
+      "lib/db/errors.ts"
+    ],
+    "tests/braces-depth-guard.test.ts": [],
+    "tests/integration-observation-log.test.ts": [
+      "lib/readiness/integration-case-log.ts"
+    ],
+    "tests/message-validation.test.ts": [
+      "lib/security/message-validation.ts"
+    ],
+    "tests/auth-env-diagnostics.test.ts": [],
+    "tests/alpha-stage1-policy.test.ts": [
+      "lib/alpha/stage1-policy.ts"
+    ],
+    "tests/runtime-mode-unlock-policy.test.ts": [],
+    "tests/auth-boundary.test.ts": [],
+    "tests/support-update.test.ts": [
+      "lib/server/support/contracts.ts"
+    ],
+    "tests/invite-link-registration.test.ts": [
+      "lib/auth/invite-ticket.ts"
+    ],
+    "lib/utils.ts": [],
+    "scripts/identity/reconcile.ts": [
+      "lib/db/repositories/identity.repository.ts",
+      "lib/identity/reconciliation.ts",
+      "lib/server/identity/provider.ts",
+      "lib/server/identity/service.ts"
+    ],
+    "scripts/smoke/authorization-adversarial.ts": [
+      "lib/db/migration-guards.ts",
+      "lib/readiness/evidence.ts",
+      "lib/readiness/proof-constants.ts",
+      "lib/readiness/proof-artifact.ts",
+      "lib/readiness/hostnames.ts",
+      "lib/smoke/cookie-jar.ts",
+      "lib/smoke/authorization-preflight.ts",
+      "lib/smoke/session-revocation.ts",
+      "lib/smoke/response-redaction.ts"
+    ],
+    "scripts/readiness/alpha.ts": [
+      "lib/readiness/evidence.ts",
+      "lib/db/migration-guards.ts",
+      "lib/readiness/hostnames.ts"
+    ],
+    "scripts/readiness/build-evidence.ts": [
+      "lib/readiness/hostnames.ts",
+      "lib/readiness/evidence.ts",
+      "lib/readiness/proof-artifact.ts",
+      "lib/readiness/proof-artifact.ts"
+    ],
+    "scripts/guard/boundaries.ts": [],
+    "scripts/guard/no-legacy-backend.ts": [
+      "lib/guard/no-legacy-backend-audit.ts"
+    ],
+    "scripts/operations/closed-alpha-gate.ts": [
+      "lib/operations/closed-alpha-gate.ts",
+      "lib/operations/production-evidence.ts"
+    ],
+    "scripts/operations/verify-production-readiness.ts": [
+      "lib/operations/production-evidence.ts"
+    ],
+    "scripts/test/integration.ts": [
+      "lib/readiness/integration-runner-core.ts"
+    ],
+    "scripts/test/auth-postgres-e2e.ts": [
+      "lib/auth/email-verification-crypto.ts",
+      "lib/identity/didit-webhook.ts",
+      "lib/auth/invite-crypto.ts",
+      "lib/legal/acceptance.ts"
+    ],
+    "scripts/test/integration-supervisor.ts": [],
+    "scripts/alpha/invite.ts": [
+      "lib/alpha/stage1-policy.ts",
+      "lib/alpha/invite-admin.ts",
+      "lib/alpha/invite-link.ts",
+      "lib/db/client.ts",
+      "lib/db/schema/invites.ts",
+      "lib/auth/invite-crypto.ts"
+    ],
+    "scripts/alpha/metrics.ts": [
+      "lib/alpha/metrics-snapshot.ts"
+    ],
+    "scripts/db/check.ts": [
+      "lib/db/client.ts"
+    ],
+    "scripts/db/migrate.ts": [
+      "lib/db/migration-guards.ts",
+      "lib/db/run-migrations.ts"
+    ],
+    "scripts/db/seed.ts": [
+      "lib/db/seed-data.ts"
+    ],
+    "app/privacy/page.tsx": [],
+    "app/profile-setup/page.tsx": [
+      "components/layout/app-shell.tsx",
+      "components/profile/profile-basics-form.tsx",
+      "lib/auth/page-guard.ts"
+    ],
+    "app/login/actions.ts": [
+      "lib/config/auth-mode.ts",
+      "lib/auth/auth.ts",
+      "lib/auth/password-policy.ts",
+      "lib/auth/invite-ticket.ts",
+      "lib/auth/mock-session.server.ts"
+    ],
+    "app/login/page.tsx": [
+      "lib/config/auth-mode.ts",
+      "app/login/login-client.tsx",
+      "lib/auth/canonical-origin.ts"
+    ],
+    "app/login/login-client.tsx": [
+      "components/layout/app-shell.tsx",
+      "components/ui/button.tsx",
+      "components/ui/card.tsx",
+      "app/login/actions.ts",
+      "lib/auth/canonical-origin.ts"
+    ],
+    "app/terms/page.tsx": [],
+    "app/safety/page.tsx": [],
+    "app/reset-password/page.tsx": [
+      "components/auth/reset-password-form.tsx",
+      "lib/auth/canonical-origin.ts"
+    ],
+    "app/onboarding/actions.ts": [
+      "app/login/actions.ts",
+      "lib/auth/server.ts",
+      "lib/config/auth-mode.ts",
+      "lib/config/answers-persistence-mode.ts",
+      "lib/data/mock-public.ts",
+      "lib/api/onboarding-store.ts",
+      "lib/depth/evaluate-depth-answer.ts",
+      "lib/server/persistence/answers.repository.factory.ts",
+      "lib/security/onboarding-validation.ts",
+      "lib/security/rate-limit.ts",
+      "types/user.ts"
+    ],
+    "app/onboarding/layout.tsx": [
+      "lib/auth/page-guard.ts"
+    ],
+    "app/onboarding/page.tsx": [
+      "components/layout/auth-guard.tsx",
+      "components/layout/app-shell.tsx",
+      "components/onboarding/onboarding-question-form.tsx"
+    ],
+    "app/register/page.tsx": [
+      "components/auth/register-form.tsx",
+      "lib/auth/invite-ticket.ts",
+      "lib/auth/canonical-origin.ts"
+    ],
+    "app/app/layout.tsx": [
+      "lib/auth/page-guard.ts"
+    ],
+    "app/operator/support/page.tsx": [
+      "components/alpha/operator-support-console.tsx",
+      "components/layout/app-shell.tsx",
+      "components/ui/card.tsx"
+    ],
+    "app/operator/invites/page.tsx": [
+      "components/alpha/operator-invite-console.tsx",
+      "components/layout/app-shell.tsx",
+      "components/ui/card.tsx"
+    ],
+    "app/api/reports/route.ts": [
+      "lib/http/profile-request.ts",
+      "lib/auth/server.ts",
+      "lib/http/private-json.ts",
+      "lib/config/persistence-mode.ts",
+      "lib/security/report-validation.ts",
+      "lib/server/profile/profile-bootstrap.ts",
+      "lib/server/profile/profile-bootstrap.http-mapper.ts",
+      "lib/server/persistence/reports.http.ts",
+      "lib/server/persistence/reports.repository.factory.ts",
+      "lib/security/rate-limit.ts"
+    ],
+    "app/api/waitlist/route.ts": [
+      "lib/config/runtime-mode.ts",
+      "lib/http/private-json.ts",
+      "lib/security/rate-limit.ts",
+      "lib/waitlist/waitlist.repository.ts",
+      "lib/waitlist/waitlist-token.ts",
+      "lib/waitlist/waitlist-validation.ts"
+    ],
+    "app/api/support/route.ts": [
+      "lib/auth/server.ts",
+      "lib/db/repositories/support.repository.ts",
+      "lib/http/profile-request.ts",
+      "lib/http/private-json.ts",
+      "lib/security/rate-limit.ts"
+    ],
+    "app/api/acquisition/route.ts": [
+      "lib/config/runtime-mode.ts",
+      "lib/http/private-json.ts",
+      "lib/security/rate-limit.ts",
+      "lib/acquisition/policy.ts",
+      "lib/acquisition/acquisition.repository.ts"
+    ],
+    "app/api/candidates/route.ts": [
+      "lib/auth/server.ts",
+      "lib/config/runtime-mode.ts",
+      "lib/data/mock-public.ts",
+      "lib/db/repositories/candidates.repository.ts",
+      "lib/http/private-json.ts",
+      "lib/server/unlock/unlock-logger.ts"
+    ],
+    "app/api/blocks/route.ts": [
+      "lib/auth/server.ts",
+      "lib/config/runtime-mode.ts",
+      "lib/http/private-json.ts",
+      "lib/http/profile-request.ts",
+      "lib/server/persistence/blocks.repository.factory.ts"
+    ],
+    "app/api/identity/webhook/route.ts": [
+      "lib/http/private-json.ts",
+      "lib/http/profile-request.ts",
+      "lib/identity/didit.ts",
+      "lib/identity/didit-environment.ts",
+      "lib/identity/didit-webhook.ts",
+      "lib/db/repositories/identity.repository.ts",
+      "lib/server/identity/provider.ts",
+      "lib/server/identity/identity-logger.ts",
+      "lib/server/identity/service.ts"
+    ],
+    "app/api/identity/return/route.ts": [],
+    "app/api/identity/complete/route.ts": [
+      "lib/server/identity/http.ts"
+    ],
+    "app/api/identity/start/route.ts": [
+      "lib/server/identity/http.ts"
+    ],
+    "app/api/messages/[profileId]/route.ts": [
+      "lib/http/profile-request.ts",
+      "lib/auth/server.ts",
+      "lib/config/runtime-mode.ts",
+      "lib/db/repositories/messages.repository.ts",
+      "lib/http/private-json.ts",
+      "lib/security/rate-limit.ts",
+      "lib/security/message-validation.ts"
+    ],
+    "app/api/debug/auth-env/route.ts": [
+      "lib/debug/auth-env-diagnostics.ts",
+      "lib/security/operator-token.ts"
+    ],
+    "app/api/debug/db-fingerprint/route.ts": [
+      "app/api/debug/auth-env/route.ts",
+      "lib/debug/db-fingerprint.ts",
+      "lib/server/unlock/unlock-logger.ts"
+    ],
+    "app/api/operations/readiness/route.ts": [
+      "lib/operations/production-readiness.ts",
+      "lib/security/operator-token.ts"
+    ],
+    "app/api/onboarding/answer/route.ts": [
+      "lib/http/profile-request.ts",
+      "lib/auth/server.ts",
+      "lib/config/runtime-mode.ts",
+      "lib/data/mock-public.ts",
+      "lib/depth/evaluate-depth-answer.ts",
+      "lib/server/persistence/answers.http-mapper.ts",
+      "lib/server/persistence/answers.repository.factory.ts",
+      "lib/security/onboarding-validation.ts",
+      "lib/http/private-json.ts",
+      "lib/security/rate-limit.ts"
+    ],
+    "app/api/answers/unlock/route.ts": [
+      "lib/http/profile-request.ts",
+      "lib/auth/server.ts",
+      "lib/config/runtime-mode.ts",
+      "lib/data/mock-public.ts",
+      "lib/depth/evaluate-depth-answer.ts",
+      "lib/http/private-json.ts",
+      "lib/server/unlock-cookies.ts",
+      "lib/server/unlock/db-unlock.service.ts",
+      "lib/unlock/unlock-codes.ts",
+      "lib/server/unlock/unlock-logger.ts",
+      "lib/security/rate-limit.ts"
+    ],
+    "app/api/alpha/invite/claim/route.ts": [
+      "lib/config/runtime-mode.ts",
+      "lib/auth/email-verification.ts",
+      "lib/auth/invite-gate.ts",
+      "lib/auth/invite-ticket.ts",
+      "lib/legal/acceptance.ts",
+      "lib/http/private-json.ts",
+      "lib/http/profile-request.ts",
+      "lib/security/rate-limit.ts"
+    ],
+    "app/api/alpha/invite/status/route.ts": [
+      "lib/config/runtime-mode.ts",
+      "lib/auth/email-verification.ts",
+      "lib/auth/invite-gate.ts",
+      "lib/auth/invite-ticket.ts",
+      "lib/auth/canonical-origin.ts",
+      "lib/http/private-json.ts"
+    ],
+    "app/api/alpha/invite/prepare/route.ts": [
+      "lib/auth/invite-gate.ts",
+      "lib/auth/invite-ticket.ts",
+      "lib/config/runtime-mode.ts",
+      "lib/http/private-json.ts",
+      "lib/http/profile-request.ts",
+      "lib/security/rate-limit.ts"
+    ],
+    "app/api/alpha/invite/email/verify/route.ts": [
+      "lib/config/runtime-mode.ts",
+      "lib/auth/email-verification.ts",
+      "lib/auth/invite-gate.ts",
+      "lib/auth/invite-ticket.ts",
+      "lib/http/private-json.ts",
+      "lib/http/profile-request.ts",
+      "lib/security/rate-limit.ts"
+    ],
+    "app/api/alpha/invite/email/send/route.ts": [
+      "lib/config/runtime-mode.ts",
+      "lib/auth/email-verification.ts",
+      "lib/auth/invite-ticket.ts",
+      "lib/auth/invite-gate.ts",
+      "lib/email/transactional.ts",
+      "lib/http/private-json.ts",
+      "lib/http/profile-request.ts",
+      "lib/security/rate-limit.ts"
+    ],
+    "app/api/alpha/operator/login/route.ts": [
+      "lib/alpha/operator-auth.ts",
+      "lib/http/private-json.ts",
+      "lib/http/profile-request.ts",
+      "lib/security/rate-limit.ts"
+    ],
+    "app/api/alpha/operator/session/route.ts": [
+      "lib/alpha/operator-auth.ts",
+      "lib/http/private-json.ts"
+    ],
+    "app/api/alpha/operator/identity-purges/route.ts": [
+      "lib/alpha/operator-auth.ts",
+      "lib/db/repositories/identity.repository.ts",
+      "lib/identity/operator-purge-policy.ts",
+      "lib/identity/reconciliation.ts",
+      "lib/http/private-json.ts",
+      "lib/http/profile-request.ts",
+      "lib/server/identity/provider.ts"
+    ],
+    "app/api/alpha/operator/support/route.ts": [
+      "lib/alpha/operator-auth.ts",
+      "lib/db/repositories/support.repository.ts",
+      "lib/http/private-json.ts",
+      "lib/http/profile-request.ts",
+      "lib/server/support/contracts.ts",
+      "lib/server/unlock/uuid.ts"
+    ],
+    "app/api/alpha/operator/logout/route.ts": [
+      "lib/alpha/operator-auth.ts",
+      "lib/http/private-json.ts",
+      "lib/http/profile-request.ts"
+    ],
+    "app/api/alpha/operator/session-import/route.ts": [
+      "lib/alpha/operator-auth.ts",
+      "lib/auth/auth.ts",
+      "lib/auth/invite-finalization.ts",
+      "lib/auth/preview-session-import.ts",
+      "lib/db/client.ts",
+      "lib/db/schema/profiles.ts",
+      "lib/http/private-json.ts",
+      "lib/http/profile-request.ts",
+      "lib/server/unlock/uuid.ts"
+    ],
+    "app/api/alpha/operator/invites/route.ts": [
+      "lib/alpha/invite-admin.ts",
+      "lib/alpha/invite-link.ts",
+      "lib/alpha/operator-auth.ts",
+      "lib/alpha/stage1-policy.ts",
+      "lib/http/private-json.ts",
+      "lib/http/profile-request.ts"
+    ],
+    "app/api/alpha/operator/invites/[inviteId]/revoke/route.ts": [
+      "lib/alpha/invite-admin.ts",
+      "lib/alpha/operator-auth.ts",
+      "lib/http/private-json.ts",
+      "lib/http/profile-request.ts"
+    ],
+    "app/api/alpha/operator/invites/[inviteId]/reissue/route.ts": [
+      "lib/alpha/invite-admin.ts",
+      "lib/alpha/invite-link.ts",
+      "lib/alpha/operator-auth.ts",
+      "lib/http/private-json.ts",
+      "lib/http/profile-request.ts"
+    ],
+    "app/api/profile/basics/route.ts": [
+      "lib/auth/server.ts",
+      "lib/config/runtime-mode.ts",
+      "lib/http/private-json.ts",
+      "lib/http/profile-request.ts",
+      "lib/profile/basics.ts",
+      "lib/security/rate-limit.ts",
+      "lib/server/profile/profile-basics.service.ts",
+      "lib/server/profile/profile-basics.repository.interface.ts"
+    ],
+    "app/api/profile/[id]/route.ts": [
+      "lib/auth/server.ts",
+      "lib/config/runtime-mode.ts",
+      "lib/data/mock-public.ts",
+      "lib/db/repositories/candidates.repository.ts",
+      "lib/db/repositories/alpha-exposures.repository.ts",
+      "lib/http/private-json.ts",
+      "lib/server/unlock/unlock-logger.ts"
+    ],
+    "app/api/profile/[id]/private/route.ts": [
+      "lib/auth/server.ts",
+      "lib/config/runtime-mode.ts",
+      "lib/data/mock-private.server.ts",
+      "lib/data/mock-public.ts",
+      "lib/db/repositories/profile-private.repository.ts",
+      "lib/http/private-json.ts",
+      "lib/server/unlock-cookies.ts",
+      "lib/unlock/unlock-codes.ts",
+      "lib/server/unlock/unlock-logger.ts"
+    ],
+    "app/api/auth/session/route.ts": [
+      "lib/auth/server.ts",
+      "lib/auth/session-view.ts",
+      "lib/http/private-json.ts"
+    ],
+    "app/api/auth/[...all]/route.ts": [
+      "lib/auth/auth.ts",
+      "lib/http/private-json.ts"
+    ],
+    "app/api/auth/logout/route.ts": [
+      "lib/auth/server.ts",
+      "lib/http/private-json.ts"
+    ],
+    "app/api/unlock/[profileId]/route.ts": [
+      "lib/auth/server.ts",
+      "lib/config/runtime-mode.ts",
+      "lib/http/private-json.ts",
+      "lib/server/unlock-cookies.ts",
+      "lib/server/unlock/db-unlock.service.ts",
+      "lib/unlock/unlock-codes.ts",
+      "lib/server/unlock/unlock-logger.ts"
+    ],
+    "app/app/home/layout.tsx": [
+      "lib/auth/page-guard.ts"
+    ],
+    "app/app/home/page.tsx": [
+      "components/layout/auth-guard.tsx",
+      "components/layout/app-shell.tsx",
+      "components/profile/candidate-card.tsx",
+      "components/ui/states.tsx",
+      "lib/api/candidates.ts"
+    ],
+    "app/app/settings/page.tsx": [
+      "components/layout/app-shell.tsx",
+      "components/layout/auth-guard.tsx",
+      "components/ui/button.tsx",
+      "components/ui/card.tsx",
+      "components/ui/form-field.tsx",
+      "lib/api/auth.ts",
+      "components/alpha/support-inbox.tsx"
+    ],
+    "app/app/chat/[matchId]/layout.tsx": [
+      "lib/auth/page-guard.ts"
+    ],
+    "app/app/chat/[matchId]/page.tsx": [
+      "components/chat/message-composer.tsx",
+      "components/layout/app-shell.tsx",
+      "components/layout/auth-guard.tsx",
+      "components/ui/card.tsx",
+      "components/ui/states.tsx",
+      "lib/api/matches.ts"
+    ],
+    "app/app/answer/[profileId]/layout.tsx": [
+      "lib/auth/page-guard.ts"
+    ],
+    "app/app/answer/[profileId]/page.tsx": [
+      "components/layout/auth-guard.tsx",
+      "components/layout/app-shell.tsx",
+      "components/question/answer-form.tsx",
+      "components/ui/states.tsx",
+      "lib/api/answers.ts",
+      "lib/api/profiles.ts"
+    ],
+    "app/app/profile/[id]/layout.tsx": [
+      "lib/auth/page-guard.ts"
+    ],
+    "app/app/profile/[id]/page.tsx": [
+      "components/layout/auth-guard.tsx",
+      "components/layout/app-shell.tsx",
+      "components/profile/profile-header.tsx",
+      "components/profile/blurred-profile-section.tsx",
+      "components/safety/block-button.tsx",
+      "components/safety/report-button.tsx",
+      "components/ui/states.tsx",
+      "lib/api/answers.ts",
+      "lib/api/profiles.ts"
+    ],
+    "components/question/answer-form.tsx": [
+      "components/ui/button.tsx",
+      "components/ui/card.tsx",
+      "components/ui/form-field.tsx",
+      "lib/api/answers.ts",
+      "components/question/verdict-message.tsx",
+      "components/question/unlock-animation.tsx"
+    ],
+    "components/question/verdict-message.tsx": [
+      "types/api.ts",
+      "lib/depth/verdict-copy.ts",
+      "lib/unlock/unlock-codes.ts"
+    ],
+    "components/question/unlock-animation.tsx": [],
+    "components/chat/message-composer.tsx": [
+      "components/ui/button.tsx",
+      "components/ui/form-field.tsx",
+      "lib/api/matches.ts"
+    ],
+    "components/ui/states.tsx": [
+      "components/ui/card.tsx",
+      "components/ui/button.tsx"
+    ],
+    "components/ui/button.tsx": [
+      "lib/utils.ts"
+    ],
+    "components/ui/card.tsx": [
+      "lib/utils.ts"
+    ],
+    "components/ui/form-field.tsx": [
+      "lib/utils.ts"
+    ],
+    "components/waitlist/landing-measurement.tsx": [
+      "lib/acquisition/client.ts"
+    ],
+    "components/waitlist/waitlist-form.tsx": [
+      "lib/acquisition/client.ts",
+      "components/ui/button.tsx",
+      "components/ui/form-field.tsx"
+    ],
+    "components/layout/query-provider.tsx": [],
+    "components/layout/landing-hero.tsx": [
+      "components/waitlist/landing-measurement.tsx",
+      "components/waitlist/waitlist-form.tsx"
+    ],
+    "components/layout/auth-guard.tsx": [
+      "lib/api/auth.ts",
+      "components/ui/states.tsx"
+    ],
+    "components/layout/app-shell.tsx": [],
+    "components/safety/report-button.tsx": [
+      "lib/api/reports.ts",
+      "types/api.ts"
+    ],
+    "components/safety/block-button.tsx": [],
+    "components/onboarding/onboarding-question-form.tsx": [
+      "components/ui/button.tsx",
+      "components/ui/card.tsx",
+      "components/ui/form-field.tsx",
+      "components/ui/states.tsx",
+      "lib/api/onboarding.ts"
+    ],
+    "components/match/match-card.tsx": [
+      "components/ui/card.tsx",
+      "types/match.ts"
+    ],
+    "components/alpha/operator-invite-console.tsx": [
+      "components/ui/button.tsx"
+    ],
+    "components/alpha/support-inbox.tsx": [],
+    "components/alpha/operator-support-console.tsx": [
+      "components/ui/button.tsx"
+    ],
+    "components/profile/blurred-profile-section.tsx": [
+      "types/profile.ts",
+      "components/ui/card.tsx"
+    ],
+    "components/profile/profile-header.tsx": [
+      "types/profile.ts"
+    ],
+    "components/profile/profile-basics-form.tsx": [
+      "components/ui/card.tsx",
+      "components/ui/button.tsx",
+      "components/ui/form-field.tsx",
+      "lib/profile/basics.ts",
+      "lib/identity/browser-flow.ts"
+    ],
+    "components/profile/candidate-card.tsx": [
+      "types/profile.ts",
+      "components/ui/card.tsx"
+    ],
+    "components/auth/register-form.tsx": [
+      "components/layout/app-shell.tsx",
+      "components/ui/button.tsx",
+      "components/ui/card.tsx",
+      "app/login/actions.ts",
+      "lib/auth/canonical-origin.ts",
+      "lib/legal/acceptance.ts"
+    ],
+    "components/auth/reset-password-form.tsx": [
+      "components/layout/app-shell.tsx",
+      "components/ui/button.tsx",
+      "components/ui/card.tsx",
+      "lib/auth/client.ts"
+    ],
+    "tests/integration/profile-fixture.ts": [
+      "lib/identity/contracts.ts",
+      "lib/db/schema/profile-basics.ts",
+      "lib/profile/basics.ts",
+      "tests/integration/helpers.ts"
+    ],
+    "tests/integration/helpers.ts": [
+      "lib/config/database-env.ts",
+      "lib/db/neon-websocket.ts",
+      "lib/db/client.ts",
+      "lib/db/migration-guards.ts",
+      "lib/db/schema/index.ts",
+      "lib/readiness/integration-database.ts",
+      "lib/db/types.ts"
+    ],
+    "tests/integration/suite/invites.test.ts": [
+      "tests/integration/helpers.ts",
+      "lib/db/schema/invites.ts",
+      "lib/db/schema/auth.ts",
+      "lib/db/schema/profiles.ts",
+      "lib/auth/invite-gate.ts",
+      "lib/auth/invite-finalization.ts",
+      "lib/auth/invite-crypto.ts",
+      "lib/auth/invite-ticket.ts",
+      "lib/auth/email-verification.ts",
+      "lib/readiness/integration-case-log.ts",
+      "lib/db/errors.ts",
+      "lib/legal/acceptance.ts"
+    ],
+    "tests/integration/suite/db-unlock.test.ts": [
+      "lib/db/repositories/profile-basics.repository.ts",
+      "lib/db/repositories/identity.repository.ts",
+      "lib/db/repositories/introduction-policy.ts",
+      "lib/db/repositories/candidates.repository.ts",
+      "lib/db/repositories/messages.repository.ts",
+      "lib/db/schema/profile-basics.ts",
+      "lib/profile/basics.ts",
+      "lib/identity/contracts.ts",
+      "tests/integration/profile-fixture.ts",
+      "tests/integration/helpers.ts",
+      "lib/db/seed-data.ts",
+      "lib/db/schema/auth.ts",
+      "lib/db/schema/profiles.ts",
+      "lib/db/schema/unlocks.ts",
+      "lib/db/schema/unlock-attempts.ts",
+      "lib/server/unlock/db-unlock.service.ts",
+      "lib/db/repositories/profile-private.repository.ts",
+      "lib/readiness/integration-case-log.ts",
+      "lib/db/repositories/unlocks.repository.ts"
+    ],
+    "tests/integration/suite/persistence.test.ts": [
+      "tests/integration/profile-fixture.ts",
+      "tests/integration/helpers.ts",
+      "lib/db/errors.ts",
+      "lib/db/repositories/blocks.repository.ts",
+      "lib/db/repositories/unlocks.repository.ts",
+      "lib/db/repositories/reports.repository.ts",
+      "lib/db/schema/reports.ts",
+      "lib/db/schema/messages.ts",
+      "lib/db/schema/alpha-activity.ts",
+      "lib/db/schema/alpha-exposures.ts",
+      "lib/db/schema/waitlist.ts",
+      "lib/db/schema/profiles.ts",
+      "lib/db/schema/profile-basics.ts",
+      "lib/identity/contracts.ts",
+      "lib/db/repositories/profile-basics.repository.ts",
+      "lib/db/repositories/identity.repository.ts",
+      "lib/identity/service.ts",
+      "lib/identity/reconciliation.ts",
+      "lib/identity/completion-window.ts",
+      "lib/server/profile/profile-basics.repository.interface.ts",
+      "lib/profile/basics.ts",
+      "lib/db/repositories/profile-bootstrap.ts",
+      "lib/db/repositories/answers.repository.ts",
+      "lib/db/schema/auth.ts",
+      "lib/readiness/integration-case-log.ts",
+      "lib/db/repositories/messages.repository.ts",
+      "lib/waitlist/waitlist.repository.ts",
+      "lib/alpha/metrics-snapshot.ts"
+    ],
+    "tests/integration/suite/migrations.test.ts": [
+      "lib/db/migration-manifest.ts",
+      "tests/integration/helpers.ts",
+      "lib/db/run-migrations.ts",
+      "lib/db/migration-contract.ts",
+      "lib/db/seed-data.ts",
+      "lib/readiness/integration-case-log.ts"
+    ],
+    "lib/data/mock-private.server.ts": [
+      "types/profile.ts"
+    ],
+    "lib/data/mock-public.ts": [
+      "types/profile.ts",
+      "types/match.ts",
+      "types/user.ts"
+    ],
+    "lib/data/mock-public.test.ts": [],
+    "lib/identity/operator-purge-policy.ts": [],
+    "lib/identity/didit-environment.ts": [],
+    "lib/identity/didit-webhook.ts": [
+      "lib/identity/didit-environment.ts"
+    ],
+    "lib/identity/notice.ts": [],
+    "lib/identity/readiness.ts": [
+      "lib/identity/didit.ts"
+    ],
+    "lib/identity/completion-window.ts": [
+      "lib/identity/contracts.ts"
+    ],
+    "lib/identity/didit.ts": [
+      "lib/identity/contracts.ts",
+      "lib/http/profile-request.ts",
+      "lib/identity/didit-environment.ts"
+    ],
+    "lib/identity/contracts.ts": [],
+    "lib/identity/browser-flow.ts": [
+      "lib/identity/contracts.ts"
+    ],
+    "lib/identity/service.ts": [
+      "lib/identity/contracts.ts",
+      "lib/identity/completion-window.ts"
+    ],
+    "lib/identity/reconciliation.ts": [
+      "lib/identity/contracts.ts"
+    ],
+    "lib/smoke/response-redaction.ts": [],
+    "lib/smoke/session-revocation.ts": [
+      "lib/smoke/cookie-jar.ts"
+    ],
+    "lib/smoke/cookie-jar.ts": [],
+    "lib/smoke/authorization-preflight.ts": [
+      "lib/server/unlock/uuid.ts"
+    ],
+    "lib/security/report-validation.test.ts": [],
+    "lib/security/operator-token.ts": [],
+    "lib/security/rate-limit-policy.ts": [],
+    "lib/security/rate-limit.ts": [
+      "lib/db/client.ts",
+      "lib/security/rate-limit-policy.ts"
+    ],
+    "lib/security/message-validation.ts": [],
+    "lib/security/rate-limit.test.ts": [],
+    "lib/security/report-validation.ts": [
+      "types/api.ts"
+    ],
+    "lib/security/onboarding-validation.ts": [],
+    "lib/http/private-json.ts": [],
+    "lib/http/profile-request.ts": [],
+    "lib/waitlist/waitlist-token.ts": [],
+    "lib/waitlist/waitlist.repository.ts": [
+      "lib/acquisition/acquisition.repository.ts",
+      "lib/acquisition/policy.ts",
+      "lib/alpha/stage1-policy.ts",
+      "lib/db/client.ts",
+      "lib/db/schema/waitlist.ts",
+      "lib/waitlist/waitlist-token.ts"
+    ],
+    "lib/waitlist/waitlist-validation.ts": [
+      "lib/acquisition/policy.ts",
+      "lib/alpha/stage1-policy.ts",
+      "lib/auth/invite-crypto.ts"
+    ],
+    "lib/readiness/hostnames.ts": [
+      "lib/readiness/proof-constants.ts"
+    ],
+    "lib/readiness/proof-artifact.ts": [
+      "lib/readiness/proof-constants.ts",
+      "lib/readiness/hostnames.ts",
+      "lib/readiness/secret-scan.ts",
+      "lib/readiness/canonical-timestamp.ts"
+    ],
+    "lib/readiness/secret-scan.ts": [],
+    "lib/readiness/proof-artifact.test.ts": [
+      "lib/readiness/proof-artifact.ts",
+      "lib/readiness/proof-constants.ts",
+      "lib/readiness/evidence.ts",
+      "lib/smoke/cookie-jar.ts",
+      "lib/smoke/session-revocation.ts"
+    ],
+    "lib/readiness/proof-constants.ts": [],
+    "lib/readiness/integration-database.ts": [
+      "lib/db/neon-websocket.ts"
+    ],
+    "lib/readiness/evidence.ts": [
+      "lib/readiness/proof-artifact.ts",
+      "lib/readiness/proof-constants.ts",
+      "lib/readiness/hostnames.ts"
+    ],
+    "lib/readiness/integration-runner-core.ts": [
+      "lib/config/database-env.ts",
+      "lib/db/migration-guards.ts",
+      "lib/readiness/evidence.ts",
+      "lib/readiness/integration-database.ts",
+      "lib/readiness/proof-artifact.ts",
+      "lib/readiness/proof-constants.ts",
+      "lib/readiness/integration-case-log.ts",
+      "lib/readiness/integration-fixture-baseline.ts"
+    ],
+    "lib/readiness/canonical-timestamp.ts": [],
+    "lib/readiness/integration-case-log.ts": [
+      "lib/readiness/proof-artifact.ts",
+      "lib/readiness/proof-constants.ts"
+    ],
+    "lib/readiness/integration-fixture-baseline.ts": [
+      "lib/db/neon-websocket.ts"
+    ],
+    "lib/guard/no-legacy-backend-audit.ts": [],
+    "lib/server/unlock-signature.ts": [],
+    "lib/server/unlock-cookies.ts": [
+      "lib/server/unlock-signature.ts"
+    ],
+    "lib/debug/db-fingerprint.ts": [
+      "lib/db/migration-guards.ts",
+      "lib/db/migration-contract.ts"
+    ],
+    "lib/debug/auth-env-diagnostics.ts": [
+      "lib/config/runtime-mode.ts",
+      "lib/config/persistence-mode.ts"
+    ],
+    "lib/operations/production-evidence.ts": [
+      "lib/operations/production-readiness.ts"
+    ],
+    "lib/operations/production-readiness.ts": [
+      "lib/db/migration-contract.ts",
+      "lib/db/migration-manifest.ts",
+      "lib/debug/db-fingerprint.ts",
+      "lib/db/seed-data.ts",
+      "lib/unlock/question-constants.ts"
+    ],
+    "lib/operations/closed-alpha-gate.ts": [
+      "lib/security/rate-limit-policy.ts",
+      "lib/alpha/stage1-policy.ts",
+      "lib/alpha/metrics.ts",
+      "lib/operations/production-evidence.ts",
+      "lib/identity/notice.ts"
+    ],
+    "lib/acquisition/client.ts": [
+      "lib/acquisition/policy.ts"
+    ],
+    "lib/acquisition/acquisition.repository.ts": [
+      "lib/db/client.ts",
+      "lib/acquisition/policy.ts",
+      "lib/db/client.ts"
+    ],
+    "lib/acquisition/policy.ts": [],
+    "lib/api/candidates.ts": [
+      "types/profile.ts"
+    ],
+    "lib/api/profiles.ts": [
+      "types/profile.ts"
+    ],
+    "lib/api/mock-data.ts": [
+      "lib/data/mock-public.ts"
+    ],
+    "lib/api/onboarding-store.ts": [
+      "lib/depth/evaluate-depth-answer.ts"
+    ],
+    "lib/api/onboarding.ts": [
+      "app/onboarding/actions.ts",
+      "lib/api/mock-data.ts",
+      "lib/api/onboarding-store.ts",
+      "types/user.ts"
+    ],
+    "lib/api/matches.ts": [
+      "lib/api/mock-data.ts",
+      "types/match.ts"
+    ],
+    "lib/api/answers.ts": [
+      "types/api.ts"
+    ],
+    "lib/api/reports.ts": [
+      "types/api.ts"
+    ],
+    "lib/api/auth.ts": [
+      "types/user.ts"
+    ],
+    "lib/legal/acceptance.ts": [],
+    "lib/legal/acceptance.test.ts": [
+      "lib/legal/acceptance.ts"
+    ],
+    "lib/depth/verdict-copy.ts": [
+      "lib/depth/evaluate-depth-answer.ts"
+    ],
+    "lib/depth/evaluate-depth-answer.ts": [],
+    "lib/alpha/operator-auth.ts": [],
+    "lib/alpha/invite-admin.ts": [
+      "lib/alpha/stage1-policy.ts",
+      "lib/auth/invite-crypto.ts",
+      "lib/db/client.ts",
+      "lib/db/schema/auth.ts",
+      "lib/db/schema/invites.ts"
+    ],
+    "lib/alpha/invite-link.ts": [
+      "lib/auth/canonical-origin.ts"
+    ],
+    "lib/alpha/stage1-policy.ts": [],
+    "lib/alpha/metrics-snapshot.ts": [
+      "lib/alpha/stage1-policy.ts",
+      "lib/alpha/metrics.ts",
+      "lib/db/repositories/profile-recruitment.repository.ts",
+      "lib/db/client.ts"
+    ],
+    "lib/alpha/metrics.ts": [
+      "lib/alpha/stage1-policy.ts"
+    ],
+    "lib/profile/basics.ts": [
+      "lib/identity/contracts.ts"
+    ],
+    "lib/db/seed-data.ts": [
+      "lib/data/mock-public.ts",
+      "lib/unlock/question-constants.ts"
+    ],
+    "lib/db/config.ts": [],
+    "lib/db/migration-contract.ts": [],
+    "lib/db/schema-snapshot.ts": [
+      "lib/db/migration-contract.ts"
+    ],
+    "lib/db/neon-websocket.test.ts": [
+      "lib/db/neon-websocket.ts"
+    ],
+    "lib/db/errors.ts": [],
+    "lib/db/types.ts": [
+      "lib/db/schema/index.ts"
+    ],
+    "lib/db/migration-manifest.ts": [],
+    "lib/db/client.ts": [
+      "lib/db/config.ts",
+      "lib/db/neon-websocket.ts",
+      "lib/db/schema/index.ts",
+      "lib/db/types.ts"
+    ],
+    "lib/db/neon-websocket.ts": [],
+    "lib/db/migration-guards.ts": [
+      "lib/config/database-env.ts"
+    ],
+    "lib/db/run-migrations.ts": [
+      "lib/db/neon-websocket.ts",
+      "lib/db/schema-snapshot.ts",
+      "lib/db/migration-contract.ts",
+      "lib/db/migration-contract.ts",
+      "lib/db/schema-snapshot.ts"
+    ],
+    "lib/auth/invite-ticket.ts": [
+      "lib/legal/acceptance.ts"
+    ],
+    "lib/auth/page-guard.ts": [
+      "lib/config/runtime-mode.ts",
+      "lib/server/profile/profile-basics.service.ts",
+      "lib/auth/server.ts"
+    ],
+    "lib/auth/canonical-origin.ts": [],
+    "lib/auth/session-view.ts": [
+      "lib/auth/server.ts"
+    ],
+    "lib/auth/invite-crypto.test.ts": [
+      "lib/legal/acceptance.ts"
+    ],
+    "lib/auth/email-verification-crypto.test.ts": [
+      "lib/auth/email-verification-crypto.ts"
+    ],
+    "lib/auth/mock-session.server.ts": [
+      "lib/config/auth-mode.ts"
+    ],
+    "lib/auth/session-view.test.ts": [],
+    "lib/auth/email-verification-crypto.ts": [
+      "lib/auth/invite-crypto.ts"
+    ],
+    "lib/auth/password-policy.ts": [],
+    "lib/auth/invite-crypto.ts": [],
+    "lib/auth/password-policy.test.ts": [
+      "lib/auth/password-policy.ts"
+    ],
+    "lib/auth/invite-gate.ts": [
+      "lib/db/client.ts",
+      "lib/db/types.ts",
+      "lib/db/schema/invites.ts",
+      "lib/auth/invite-crypto.ts",
+      "lib/auth/invite-ticket.ts",
+      "lib/auth/invite-ticket.ts",
+      "lib/alpha/stage1-policy.ts"
+    ],
+    "lib/auth/invite-finalization.ts": [
+      "lib/db/client.ts",
+      "lib/db/types.ts",
+      "lib/db/schema/auth.ts",
+      "lib/db/schema/legal-acceptances.ts",
+      "lib/auth/invite-gate.ts",
+      "lib/auth/email-verification.ts",
+      "lib/db/repositories/profile-bootstrap.ts",
+      "lib/auth/invite-ticket.ts",
+      "lib/legal/acceptance.ts"
+    ],
+    "lib/auth/preview-session-import.ts": [
+      "lib/identity/operator-purge-policy.ts"
+    ],
+    "lib/auth/client.ts": [],
+    "lib/auth/email-verification.ts": [
+      "lib/db/client.ts",
+      "lib/db/types.ts",
+      "lib/db/schema/email-verification.ts",
+      "lib/db/schema/invites.ts",
+      "lib/alpha/stage1-policy.ts",
+      "lib/auth/email-verification-crypto.ts",
+      "lib/auth/invite-crypto.ts",
+      "lib/auth/invite-ticket.ts"
+    ],
+    "lib/auth/server.ts": [
+      "lib/config/auth-mode.ts",
+      "lib/auth/auth.ts",
+      "lib/auth/mock-session.server.ts",
+      "lib/auth/invite-finalization.ts",
+      "lib/db/repositories/profile-bootstrap.ts",
+      "lib/db/errors.ts",
+      "lib/db/repositories/alpha-activity.repository.ts"
+    ],
+    "lib/auth/auth.ts": [
+      "lib/db/client.ts",
+      "lib/db/schema/index.ts",
+      "lib/db/schema/auth.ts",
+      "lib/auth/email-verification.ts",
+      "lib/auth/invite-crypto.ts",
+      "lib/auth/password-policy.ts",
+      "lib/auth/invite-gate.ts",
+      "lib/auth/invite-finalization.ts",
+      "lib/auth/invite-ticket.ts",
+      "lib/email/transactional.ts",
+      "lib/auth/preview-session-import.ts",
+      "lib/auth/canonical-origin.ts"
+    ],
+    "lib/auth/callback-diagnostics.ts": [],
+    "lib/unlock/question-constants.ts": [],
+    "lib/unlock/unlock-codes.ts": [],
+    "lib/email/transactional.ts": [],
+    "lib/config/auth-mode.test.ts": [],
+    "lib/config/answers-persistence-mode.ts": [
+      "lib/config/runtime-mode.ts"
+    ],
+    "lib/config/auth-production.ts": [
+      "lib/config/runtime-mode.ts"
+    ],
+    "lib/config/auth-mode.ts": [
+      "lib/config/runtime-mode.ts"
+    ],
+    "lib/config/runtime-mode.ts": [],
+    "lib/config/database-env.ts": [],
+    "lib/config/persistence-mode.ts": [
+      "lib/config/runtime-mode.ts"
+    ],
+    "lib/config/auth-mode-client.ts": [],
+    "lib/server/persistence/reports.repository.factory.ts": [
+      "lib/config/persistence-mode.ts",
+      "lib/server/persistence/reports.repository.interface.ts",
+      "lib/server/persistence/reports.types.ts",
+      "lib/server/persistence/reports.types.ts",
+      "lib/db/repositories/reports.repository.ts"
+    ],
+    "lib/server/persistence/answers.http-mapper.ts": [
+      "lib/server/persistence/answers.types.ts"
+    ],
+    "lib/server/persistence/answers.types.ts": [],
+    "lib/server/persistence/blocks.repository.interface.ts": [
+      "lib/db/repositories/blocks.repository.ts"
+    ],
+    "lib/server/persistence/reports.types.ts": [
+      "types/api.ts"
+    ],
+    "lib/server/persistence/blocks.repository.factory.ts": [
+      "lib/db/repositories/blocks.repository.ts",
+      "lib/server/persistence/blocks.repository.interface.ts"
+    ],
+    "lib/server/persistence/reports.http.ts": [
+      "lib/server/persistence/reports.http-mapper.ts",
+      "lib/server/persistence/reports.types.ts",
+      "lib/http/private-json.ts"
+    ],
+    "lib/server/persistence/onboarding-finalize.ts": [],
+    "lib/server/persistence/answers.repository.interface.ts": [
+      "lib/server/persistence/answers.types.ts"
+    ],
+    "lib/server/persistence/answers.repository.factory.ts": [
+      "lib/config/answers-persistence-mode.ts",
+      "lib/server/persistence/answers.repository.interface.ts",
+      "lib/server/persistence/answers.types.ts",
+      "lib/server/persistence/answers.types.ts",
+      "lib/db/repositories/answers.repository.ts"
+    ],
+    "lib/server/persistence/reports.repository.interface.ts": [
+      "lib/server/persistence/reports.types.ts"
+    ],
+    "lib/server/persistence/reports-row.mapper.ts": [
+      "types/api.ts"
+    ],
+    "lib/server/persistence/reports.http-mapper.ts": [
+      "lib/server/persistence/reports.types.ts"
+    ],
+    "lib/server/identity/identity-logger.ts": [
+      "lib/identity/contracts.ts"
+    ],
+    "lib/server/identity/http.ts": [
+      "lib/auth/server.ts",
+      "lib/config/runtime-mode.ts",
+      "lib/http/private-json.ts",
+      "lib/http/profile-request.ts",
+      "lib/identity/contracts.ts",
+      "lib/server/identity/provider.ts",
+      "lib/server/identity/identity-logger.ts",
+      "lib/server/identity/service.ts"
+    ],
+    "lib/server/identity/service.ts": [
+      "lib/identity/service.ts",
+      "lib/db/repositories/identity.repository.ts",
+      "lib/server/identity/provider.ts",
+      "lib/server/identity/identity-logger.ts",
+      "lib/security/rate-limit.ts"
+    ],
+    "lib/server/identity/provider.ts": [
+      "lib/identity/contracts.ts",
+      "lib/identity/didit.ts",
+      "lib/identity/notice.ts",
+      "lib/identity/readiness.ts",
+      "lib/server/identity/identity-logger.ts"
+    ],
+    "lib/server/support/contracts.ts": [],
+    "lib/server/profile/reporter-nickname.ts": [
+      "lib/auth/server.ts"
+    ],
+    "lib/server/profile/profile-bootstrap.http-mapper.ts": [
+      "lib/server/profile/profile.types.ts"
+    ],
+    "lib/server/profile/profile-bootstrap.ts": [
+      "lib/auth/server.ts",
+      "lib/config/persistence-mode.ts",
+      "lib/db/repositories/profile-bootstrap.ts",
+      "lib/server/profile/profile.types.ts"
+    ],
+    "lib/server/profile/profile.types.ts": [],
+    "lib/server/profile/profile-basics.service.ts": [
+      "lib/profile/basics.ts",
+      "lib/db/repositories/identity.repository.ts",
+      "lib/db/repositories/profile-basics.repository.ts",
+      "lib/server/identity/provider.ts"
+    ],
+    "lib/server/profile/profile-basics.repository.interface.ts": [
+      "lib/profile/basics.ts"
+    ],
+    "lib/server/profile/profile-session.ts": [
+      "lib/config/answers-persistence-mode.ts",
+      "lib/db/client.ts",
+      "lib/db/schema/profiles.ts"
+    ],
+    "lib/server/unlock/uuid.ts": [],
+    "lib/server/unlock/db-unlock.service.ts": [
+      "lib/db/repositories/introduction-policy.ts",
+      "lib/db/client.ts",
+      "lib/db/repositories/candidates.repository.ts",
+      "lib/db/repositories/unlocks.repository.ts",
+      "lib/db/schema/unlock-attempts.ts",
+      "lib/depth/evaluate-depth-answer.ts",
+      "lib/server/unlock/question-config.ts",
+      "lib/unlock/unlock-codes.ts",
+      "lib/server/unlock/unlock-logger.ts"
+    ],
+    "lib/server/unlock/unlock-logger.ts": [
+      "lib/db/errors.ts"
+    ],
+    "lib/server/unlock/question-config.ts": [
+      "lib/db/client.ts",
+      "lib/db/schema/app-config.ts",
+      "lib/db/schema/questions.ts",
+      "lib/server/unlock/uuid.ts",
+      "lib/unlock/question-constants.ts"
+    ],
+    "lib/db/repositories/alpha-exposures.repository.ts": [
+      "lib/db/client.ts"
+    ],
+    "lib/db/repositories/answers.repository.ts": [
+      "lib/db/client.ts",
+      "lib/db/schema/answers.ts",
+      "lib/db/schema/profiles.ts",
+      "lib/server/persistence/onboarding-finalize.ts",
+      "lib/server/persistence/answers.repository.interface.ts",
+      "lib/server/persistence/answers.types.ts",
+      "lib/server/persistence/answers.types.ts"
+    ],
+    "lib/db/repositories/identity.repository.ts": [
+      "lib/db/client.ts",
+      "lib/identity/completion-window.ts",
+      "lib/db/schema/profile-basics.ts",
+      "lib/db/schema/profiles.ts",
+      "lib/profile/basics.ts",
+      "lib/identity/contracts.ts"
+    ],
+    "lib/db/repositories/profile-bootstrap.ts": [
+      "lib/db/client.ts",
+      "lib/db/types.ts",
+      "lib/db/schema/profiles.ts",
+      "lib/auth/server.ts",
+      "lib/server/profile/reporter-nickname.ts"
+    ],
+    "lib/db/repositories/alpha-activity.repository.ts": [
+      "lib/db/client.ts",
+      "lib/db/schema/alpha-activity.ts",
+      "lib/db/types.ts"
+    ],
+    "lib/db/repositories/profile-basics.repository.ts": [
+      "lib/identity/contracts.ts",
+      "lib/db/client.ts",
+      "lib/identity/completion-window.ts",
+      "lib/db/schema/profile-basics.ts",
+      "lib/db/schema/profiles.ts",
+      "lib/db/repositories/introduction-policy.ts",
+      "lib/server/profile/profile-basics.repository.interface.ts",
+      "lib/profile/basics.ts",
+      "lib/profile/basics.ts"
+    ],
+    "lib/db/repositories/blocks.repository.ts": [
+      "lib/db/client.ts",
+      "lib/db/repositories/conversation-lock.ts",
+      "lib/db/schema/blocks.ts",
+      "lib/db/schema/profiles.ts",
+      "lib/db/errors.ts",
+      "lib/server/unlock/uuid.ts"
+    ],
+    "lib/db/repositories/profile-private.repository.ts": [
+      "lib/db/repositories/introduction-policy.ts",
+      "lib/db/client.ts",
+      "lib/db/schema/profiles.ts",
+      "lib/db/repositories/unlocks.repository.ts",
+      "lib/server/unlock/uuid.ts",
+      "lib/server/unlock/unlock-logger.ts",
+      "lib/unlock/unlock-codes.ts"
+    ],
+    "lib/db/repositories/introduction-policy.ts": [
+      "lib/db/client.ts",
+      "lib/db/types.ts",
+      "lib/identity/contracts.ts",
+      "lib/profile/basics.ts"
+    ],
+    "lib/db/repositories/reports.repository.ts": [
+      "lib/db/client.ts",
+      "lib/db/errors.ts",
+      "lib/db/schema/reports.ts",
+      "lib/server/persistence/reports.repository.interface.ts",
+      "lib/server/persistence/reports.types.ts",
+      "lib/server/persistence/reports.types.ts"
+    ],
+    "lib/db/repositories/messages.repository.ts": [
+      "lib/db/repositories/introduction-policy.ts",
+      "lib/db/client.ts",
+      "lib/db/repositories/conversation-lock.ts",
+      "lib/db/schema/blocks.ts",
+      "lib/db/schema/messages.ts",
+      "lib/db/schema/profiles.ts",
+      "lib/db/schema/unlocks.ts",
+      "lib/server/unlock/uuid.ts",
+      "lib/db/types.ts"
+    ],
+    "lib/db/repositories/unlocks.repository.ts": [
+      "lib/db/client.ts",
+      "lib/db/types.ts",
+      "lib/db/schema/unlocks.ts"
+    ],
+    "lib/db/repositories/candidates.repository.ts": [
+      "lib/db/repositories/introduction-policy.ts",
+      "lib/db/schema/profile-basics.ts",
+      "lib/db/client.ts",
+      "lib/db/schema/profiles.ts",
+      "lib/server/unlock/question-config.ts",
+      "lib/server/unlock/uuid.ts"
+    ],
+    "lib/db/repositories/profile-recruitment.repository.ts": [
+      "lib/db/client.ts",
+      "lib/alpha/stage1-policy.ts",
+      "lib/db/repositories/introduction-policy.ts"
+    ],
+    "lib/db/repositories/conversation-lock.ts": [
+      "lib/db/types.ts"
+    ],
+    "lib/db/repositories/support.repository.ts": [
+      "lib/db/client.ts",
+      "lib/db/schema/support.ts",
+      "lib/server/support/contracts.ts"
+    ],
+    "lib/db/schema/questions.ts": [],
+    "lib/db/schema/alpha-exposures.ts": [
+      "lib/db/schema/auth.ts",
+      "lib/db/schema/profiles.ts"
+    ],
+    "lib/db/schema/unlocks.ts": [
+      "lib/db/schema/auth.ts",
+      "lib/db/schema/profiles.ts"
+    ],
+    "lib/db/schema/alpha-activity.ts": [
+      "lib/db/schema/auth.ts"
+    ],
+    "lib/db/schema/profiles.ts": [
+      "lib/db/schema/auth.ts"
+    ],
+    "lib/db/schema/index.ts": [
+      "lib/db/schema/acquisition.ts",
+      "lib/db/schema/acquisition.ts",
+      "lib/db/schema/profile-basics.ts",
+      "lib/db/schema/profile-basics.ts",
+      "lib/db/schema/auth.ts",
+      "lib/db/schema/profiles.ts",
+      "lib/db/schema/questions.ts",
+      "lib/db/schema/answers.ts",
+      "lib/db/schema/reports.ts",
+      "lib/db/schema/blocks.ts",
+      "lib/db/schema/unlocks.ts",
+      "lib/db/schema/unlock-attempts.ts",
+      "lib/db/schema/invites.ts",
+      "lib/db/schema/app-config.ts",
+      "lib/db/schema/support.ts",
+      "lib/db/schema/messages.ts",
+      "lib/db/schema/alpha-activity.ts",
+      "lib/db/schema/alpha-exposures.ts",
+      "lib/db/schema/waitlist.ts",
+      "lib/db/schema/legal-acceptances.ts",
+      "lib/db/schema/email-verification.ts",
+      "lib/db/schema/auth.ts",
+      "lib/db/schema/profiles.ts",
+      "lib/db/schema/questions.ts",
+      "lib/db/schema/answers.ts",
+      "lib/db/schema/reports.ts",
+      "lib/db/schema/blocks.ts",
+      "lib/db/schema/unlocks.ts",
+      "lib/db/schema/unlock-attempts.ts",
+      "lib/db/schema/invites.ts",
+      "lib/db/schema/app-config.ts",
+      "lib/db/schema/support.ts",
+      "lib/db/schema/messages.ts",
+      "lib/db/schema/alpha-activity.ts",
+      "lib/db/schema/alpha-exposures.ts",
+      "lib/db/schema/waitlist.ts",
+      "lib/db/schema/legal-acceptances.ts",
+      "lib/db/schema/email-verification.ts"
+    ],
+    "lib/db/schema/unlock-attempts.ts": [
+      "lib/db/schema/auth.ts",
+      "lib/db/schema/profiles.ts",
+      "lib/db/schema/questions.ts"
+    ],
+    "lib/db/schema/legal-acceptances.ts": [
+      "lib/db/schema/auth.ts"
+    ],
+    "lib/db/schema/app-config.ts": [],
+    "lib/db/schema/email-verification.ts": [
+      "lib/db/schema/auth.ts",
+      "lib/db/schema/invites.ts"
+    ],
+    "lib/db/schema/messages.ts": [
+      "lib/db/schema/auth.ts"
+    ],
+    "lib/db/schema/acquisition.ts": [],
+    "lib/db/schema/profile-basics.ts": [
+      "lib/db/schema/auth.ts"
+    ],
+    "lib/db/schema/answers.ts": [
+      "lib/db/schema/auth.ts",
+      "lib/db/schema/profiles.ts",
+      "lib/db/schema/questions.ts"
+    ],
+    "lib/db/schema/reports.ts": [
+      "lib/db/schema/auth.ts"
+    ],
+    "lib/db/schema/auth.ts": [],
+    "lib/db/schema/waitlist.ts": [],
+    "lib/db/schema/invites.ts": [
+      "lib/db/schema/auth.ts",
+      "lib/alpha/stage1-policy.ts"
+    ],
+    "lib/db/schema/blocks.ts": [
+      "lib/db/schema/auth.ts"
+    ],
+    "lib/db/schema/support.ts": [
+      "lib/db/schema/auth.ts"
+    ]
+  },
+  "env_names": [
+    "ALPHA_EMAIL_VERIFICATION_PEPPER",
+    "ALPHA_INVITE_PEPPER",
+    "AUTH_COOKIE_SECRET",
+    "BETTER_AUTH_SECRET",
+    "BETTER_AUTH_URL",
+    "DATABASE_ENV",
+    "DATABASE_URL",
+    "HTTPS_PROXY",
+    "IDENTITY_RECONCILE_LIMIT",
+    "NEXT_PUBLIC_RUNTIME_MODE",
+    "NODE_ENV",
+    "RESEND_API_KEY",
+    "SMOKE_BASE_URL",
+    "SMOKE_DATABASE_FINGERPRINT_SHA256",
+    "SMOKE_DEPLOYMENT_GIT_SHA",
+    "SMOKE_DEPLOYMENT_ID",
+    "SMOKE_SESSION_INPUT_FILE",
+    "SMOKE_USER_A_EMAIL",
+    "SMOKE_USER_A_PASSWORD",
+    "SMOKE_USER_A_PROFILE_ID",
+    "SMOKE_USER_B_EMAIL",
+    "SMOKE_USER_B_PASSWORD",
+    "SMOKE_USER_B_PROFILE_ID",
+    "SMOKE_VERCEL_PROTECTION_BYPASS",
+    "SMOKE_VERCEL_SHARE_URL",
+    "TEST_DATABASE_URL",
+    "UNSTANDARD_APP_URL",
+    "UNSTANDARD_CONFIRM_DB_MIGRATE",
+    "UNSTANDARD_CONFIRM_DESTRUCTIVE_TEST",
+    "UNSTANDARD_DEBUG_CHECK_TOKEN",
+    "UNSTANDARD_EMAIL_FROM",
+    "UNSTANDARD_EXPECTED_PREVIEW_HOSTNAME",
+    "UNSTANDARD_INTEGRATION_CASE_LOG",
+    "UNSTANDARD_INTEGRATION_EVIDENCE_PATH",
+    "UNSTANDARD_INVITE_OPERATOR_TOKEN",
+    "UNSTANDARD_PROOF_OVERWRITE_DIFFERENT_SHA",
+    "UNSTANDARD_READINESS_EVIDENCE_OUT",
+    "UNSTANDARD_READINESS_EVIDENCE_PATH",
+    "UNSTANDARD_RUNTIME_MODE",
+    "UNSTANDARD_SMOKE_EVIDENCE_OUT",
+    "UNSTANDARD_SMOKE_EVIDENCE_PATH",
+    "UNSTANDARD_TEST_INJECT_FINALIZE_FAILURE",
+    "UNSTANDARD_TEST_POSTGRES_WEBSOCKET",
+    "VERCEL_ENV",
+    "WAITLIST_TOKEN_PEPPER",
+    "WSS_PROXY"
+  ]
+}

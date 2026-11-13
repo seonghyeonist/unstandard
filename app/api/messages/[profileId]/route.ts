@@ -1,3 +1,4 @@
+import { isSameOriginMutation, readSmallJson } from "@/lib/http/profile-request";
 import { getAuthenticatedUser, ServiceUnavailableError } from "@/lib/auth/server";
 import { isDatabaseRuntime } from "@/lib/config/runtime-mode";
 import {
@@ -57,6 +58,8 @@ export async function POST(request: Request, context: { params: Promise<{ profil
   if (user === "unavailable") return privateJson({ error: "Messages unavailable" }, { status: 503 });
   if (!user) return privateJson({ error: "Unauthorized" }, { status: 401 });
 
+  if (!isSameOriginMutation(request)) return privateJson({ error: "Forbidden" }, { status: 403 });
+
   try {
     const decision = await consumeRateLimit({ scope: "messageSend", subject: user.id });
     if (!decision.allowed) {
@@ -74,7 +77,7 @@ export async function POST(request: Request, context: { params: Promise<{ profil
 
   let value: unknown;
   try {
-    const body = (await request.json()) as { body?: unknown };
+    const body = (await readSmallJson(request, 16 * 1024)) as { body?: unknown };
     value = body?.body;
   } catch {
     return privateJson({ error: "Invalid JSON" }, { status: 400 });

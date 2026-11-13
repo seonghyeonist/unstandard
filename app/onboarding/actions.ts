@@ -12,6 +12,7 @@ import {
 } from "@/lib/depth/evaluate-depth-answer";
 import { createAnswersRepository } from "@/lib/server/persistence/answers.repository.factory";
 import { validateOnboardingAnswerInput } from "@/lib/security/onboarding-validation";
+import { consumeRateLimit } from "@/lib/security/rate-limit";
 import type { CurrentUser } from "@/types/user";
 
 export type PersistOnboardingAnswerResult = {
@@ -34,6 +35,8 @@ export async function persistOnboardingAnswer(input: {
       throw error;
     }
 
+    const decision = await consumeRateLimit({ scope: "onboardingAnswer", subject: user.id });
+    if (!decision.allowed) throw new Error("Too many requests");
     const validated = validateOnboardingAnswerInput(input);
     const evaluation = evaluateDepthAnswer({
       questionText: onboardingQuestion.prompt,
