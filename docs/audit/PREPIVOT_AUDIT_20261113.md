@@ -2,7 +2,7 @@
 
 ## Verdict and scope
 
-INCONCLUSIVE pending real database integration evidence. Source fixes and local regression checks are complete for the findings below; this does not certify every route, absence of P0/P1, Production security, or pivot launch readiness. Production was not patched. No real member data, account, email delivery, Live KYC or paid AI was used.
+**CONDITIONAL PASS for the corrected audit branch. Current Production/default-main controls remain FAIL against the confirmed P1 findings until separately approved integration.** Source fixes and local regression checks are complete for the findings below; this does not certify every route, absence of P0/P1, Production security, or pivot launch readiness. Production was not patched. No real member data, account, email delivery, Live KYC or paid AI was used.
 
 Production alias readback: `unstandard.app` → `dpl_BvmGTnKqyuxQyZ6Aut6xwJPsk16p`, READY, source `f5b3843494e6cfb6a87ef21339243e68d28151b9`. Main `30d0c78ee19d652fed2bedcae7271931f8f04b31` is an ancestor, 114 commits behind along Production ancestry. Production equals branch `feat/mobile-editorial-20261105`; audit PR #97 deliberately targets that branch. Do not retarget to main without reconciling the existing 237-file deployment delta.
 
@@ -56,7 +56,7 @@ Sources: https://github.com/advisories/GHSA-p3m5-59mp-jv5r ; https://github.com/
 | OpenCode | REPAIR / residual QUARANTINE candidate | owner-only trigger; mutable third-party action remains maintenance risk; no activation during audit |
 | Mock auth/unlock/Depth | QUARANTINE | dev-only runtime boundaries preserved; no production AI/reveal/matching activation |
 | Persistence repository boundary/privateJson | PRESERVE | DB path remains canonical; generic errors and private response policy preserved |
-| Cyclic imports / unused packages | UNRESOLVED inventory | literal edge map supplied; no complete cycle or package reachability proof, no speculative deletion |
+| Cyclic imports / unused packages | PRESERVE / investigate | one static SCC spans auth/server/profile bootstrap; reverse links in profile bootstrap and reporter-nickname are type-only, so this graph is not evidence of a runtime cycle. lucide-react has no literal reference but full reachability not proven; no speculative deletion |
 | Full tooling audit | KEEP pending narrow follow-up | 7 moderate entries in minimatch/typescript-eslint tooling chain; production0, high0, critical0; no broad tooling upgrade |
 | Historical credentials | PRESERVE caution | pattern scan1661 history blobs found only placeholder DB URLs; limited scanner is not a full secret audit |
 
@@ -75,7 +75,7 @@ Runtime: Node24.22.1, Linux, npm ci --ignore-scripts baseline. Source baseline f
 | guard:no-legacy-backend | no active legacy backend in guard inventory | PASS |
 | npm audit --omit=dev | no known production dependency advisories | PASS0 |
 | npm audit (all) | record every finding |7 moderate tooling entries;0 high/critical; command exits1 |
-| Real isolated DB migration/integration/auth | exercise actual transactions and A/B deletion/session behavior | PENDING — see final execution appendix |
+| Real isolated DB migration/integration/auth | exercise actual transactions and A/B deletion/session behavior | Migration PASS; original runner29/31 with2 connection failures; direct persistence retry16/16; five auth scenarios PASS; rate concurrency PASS — see final appendix |
 | Production real-user/Live provider tests | outside authorized scope | NOT_RUN deliberately |
 
 The 410 total is new execution, not the old405 record. Helper tests assert observable cancellation/bytes/results rather than source spelling. Route/DB end-to-end and actual Vercel headers remain separate evidence. No test assertions or security guards were weakened.
@@ -126,3 +126,79 @@ Comparison is against actual Production, not PR95's older base. Next16.4.2 was s
 | js-yaml4.3.2→4.3.1 / brace-expansion override changes | reject stale mitigation rewrite |
 
 PR95 must not be merged wholesale into the deployed lineage on the strength of this audit. Only the explicitly selected versions received current compatibility checks.
+
+
+## Production schema readback (metadata only)
+
+2026-11-13 read-only catalog queries confirmed public sessions.user_id references users ON DELETE CASCADE; account/profile/private/answer/evaluation/message/legal/support/unlock relationships have the documented cascade constraints. Invites and verification consumed_by_user_id use SET NULL. Catalog includes users_delete_linked_residuals BEFORE DELETE and identity_verifications_queue_provider_purge AFTER DELETE triggers, plus alpha capacity INSERT/UPDATE guard. This proves deployed constraint/trigger presence, not successful erasure of any real record. No user table rows or secrets were selected.
+
+
+## Confirmed remote checks
+
+Commit0adc15a1d9b90392260208e9669b62f76936f290: CI#286 SUCCESS (https://github.com/seonghyeonist/unstandard/actions/runs/43371850766), Rebuild CI#226 SUCCESS (https://github.com/seonghyeonist/unstandard/actions/runs/43371850783). Subsequent report-only edits do not change the tested runtime tree. The local DB runner begins from local HEAD92610e4 with the corresponding audited runtime edits present; its recorded HEAD alone is not a clean-checkout attestation. The code/tree comparison is documented rather than silently labelling that local run as a clean remote SHA run.
+
+
+## Remediation code locations
+
+|Finding|Current location|
+|---|---|
+|SEC-01|`package.json:49`|
+|SEC-02|`.github/workflows/opencode.yml:12`|
+|SEC-03|`app/api/identity/webhook/route.ts:39`|
+|SEC-04|`app/api/reports/route.ts:26`|
+|SEC-04|`app/api/messages/[profileId]/route.ts:61`|
+|SEC-04|`app/api/answers/unlock/route.ts:49`|
+|SEC-04|`app/api/onboarding/answer/route.ts:33`|
+|SEC-05|`app/onboarding/actions.ts:38`|
+|SEC-06|`package.json:56`|
+
+## Database execution appendix — intermediate results retained
+
+The first short deadline runs were interrupted and are not PASS. The subsequent full integration runner against the fresh synthetic project completed with **29/31 tests PASS, 2 FAIL**: all db-unlock3, invites10 and migration/seed2 passed; persistence14/16 passed. The two failures occurred while inserting synthetic fixture users, with `Connection terminated due to connection timeout`; assertions were not relaxed. Failure-path baseline restoration and pool cleanup passed. A direct-endpoint persistence retry is recorded separately, never substituted as a PASS for the failed full runner.
+
+Actual successful cases include invite and capacity parallel-request controls, consume/finalize/profile fault rollback, user-isolated unlock/private profile access, self-unlock rejection, verified/withdrawal introduction gates, and synthetic deletion producing an opaque provider-purge queue row. The schema migration completed and17 migration-ledger entries were confirmed in the synthetic database.
+
+Auth test startup initially refused the pooler endpoint, as designed. Direct endpoint attempts then exposed a test-driver origin/target mismatch (`localhost` vs `127.0.0.1`); native fetch ignored an attempted Host override. Final driver uses the same127.0.0.1 authority for connection, Origin and auth configuration. No runtime guard or assertion was weakened. New driver lint/typecheck passed; independent reviewer examined the correction.
+
+Didit direct security scenario exited0:9 negative/replay conditions PASS and no identity/purge side effects; fixture/rate cleanup returned to zero. No Live provider call or real mail delivery was made. Remaining direct-auth/persistence/rate outcomes follow in the final appendix.
+
+
+## Final code snapshot and operational boundary
+
+Final runtime/test-harness source commit is9a00dd16ea611c76f77ca7f3f2f8216cfe141a6e. Source content for app/lib/scripts/package/workflows/tests was compared byte-for-byte with the fetched remote commit (git diff --exit-code succeeded after staging the new test). CI#287 SUCCESS (https://github.com/seonghyeonist/unstandard/actions/runs/43373875657) and Rebuild CI#227 SUCCESS (https://github.com/seonghyeonist/unstandard/actions/runs/43373877356). Final local npm run check again passed410tests, lint, typecheck and build after bounding the remaining waitlist POST and Preview-only session-import JSON readers. The native browser callers use application/json; existing field validation and Preview/operator guards remain in place. These final two routes were independently diff-reviewed; their end-to-end success/oversized rejection was not separately executed.
+
+**Branch remediation is not operational remediation.** issue_comment workflows execute default-main configuration: the current main workflow still permits the old public comment trigger until reviewed integration. Production still runs the old Next version until separately approved deployment. These operational P1 exposures remain present. This audit did not alter default-main workflow settings, merge any PR or deploy Production. The verdict for the corrected audit branch must not be presented as a PASS for current Production.
+
+
+## 창업자용 핵심 인계
+
+1. **실제 확인한 결함:** 외부 댓글의 유료 AI 워크플로 실행 경로, 적용 가능한 Next Server Action DoS 권고, 웹훅의 제한 전 전체 본문 적재, 일부 API 입력 경계 누락, 온보딩의 우회 가능한 rate limit 경로다. 실제 회원을 공격하지 않았다.
+2. **수정한 범위:** 감사 브랜치에서 워크플로 호출을 소유자로 제한하고, Next/Zod 수정 버전을 적용했다. 웹훅 원문 서명 바이트를 보존하는 제한 읽기와 API JSON 제한을 적용하고, 온보딩 두 진입점에 동일한 제한을 적용했다.
+3. **제거·격리:** 사용되지 않는 신고용 sessionStorage/서버 메모리 버퍼 두 파일을 삭제했다. 현재 신고 DB 기능은 유지했다. 기존 mock/Depth/매칭을 새 상품에 활성화하지 않았다.
+4. **정상 동작 근거:** 최종 로컬410개 테스트·lint·typecheck·build 및 GitHub CI287/Rebuild227 성공. 합성 DB의 잠금해제·초대 동시성·탈퇴·신고·저장소와 로컬 Next의 가입·로그인·차단·지원·삭제 검증 결과는 실행 부록에 기록한다. 최초 DB 전체 실행29/31과 연결 변경 후16/16 재검증을 서로 구분한다.
+5. **남은 운영 위험:** 기본 main 워크플로와 Production은 구버전이므로 P1 운영 노출은 아직 남아 있다. 실제 앱 DB 연결 역할, Preview 프록시·브라우저 동작, 공급자 실제 헤더는 미검증이다. mutable OpenCode action 및 개발 도구 moderate7건도 별도 기록했다.
+6. **피벗에 가져갈 후보:** UI 기본 요소, privateJson, 제한된 본문 읽기, allowlist 방식 UTM 처리. DB/rate limit/migration/CI 패턴은 새 프로젝트의 정책·역할·환경에 맞춰 수정해야 한다.
+7. **가져가면 안 되는 자산:** 기존 회원 데이터·세션·키·DB·동의를 자동 재사용하면 안 된다. Depth 점수와 라벨을 심리 결과의 정답으로 바꾸거나 신고 테이블을 분석 결과 저장소로 전용해서도 안 된다.
+8. **다음 운영 단계:** 감사 브랜치 수정안을 운영 계보에 어떻게 통합할지 검토하고, 별도 승인된 변경으로 main 워크플로와 Production에 반영해야 한다. 이번 작업에서는 병합·운영 배포·운영 데이터 변경을 하지 않았다.
+
+
+## Final runtime verification appendix
+
+- Direct persistence retry: **16/16 PASS**, including the two fixture-INSERT timeout failures in the original pooler run. Before/after users, profiles, invites and rate_limits all0; pools closed. Original whole runner remains **FAIL29/31**, not silently relabelled.
+- Corrected-origin email-proof scenario: **PASS**, wrong code/relationship, expired, invalidated and replayed proof rejected; no unauthorized auth rows; fixtures and rate limits cleaned.
+- Didit-security scenario: **PASS**,9 negative/replay conditions, no side effects; synthetic fixtures cleaned. Live provider deletion was not attempted.
+- Profile-visibility scenario: **PASS**, signup/login/logout, profile no-op saves, onboarding, unverified visibility denial, block denying messaging, withdrawal reducing visibility; cleanup0.
+- Support-lifecycle scenario: **PASS**, requester isolation, operator reply authorization, CSRF denial, audit records, concurrent replay200/409; missing/wrong delete password rejected; correct deletion, stale session denial, subsequent signin denial and cascade checks passed; cleanup0.
+- Password-reset-delete scenario: **PASS**, old sessions revoked, old password rejected/new password accepted, reset-token replay rejected, logout DB session invalidated, password-authorized deletion cascades owned data; cleanup0.
+- Dedicated rate-limit concurrency: **PASS**,30 simultaneous real consumeRateLimit(messageSend) calls on a random synthetic subject,20 allowed/10 denied/0 exceptions; stored counter30. Only that test HMAC row removed and zero verified, pool closed.
+
+No assertion was removed or weakened. Initial short-deadline interruptions, rejected pooler startup, mismatched-origin failures and original connection failures remain separate historical results. No API request used a real member or real provider credential. Runtime tests used source matching remote9a00dd1; local git HEAD remained92610e4 with staged matching source rather than pretending to be a clean checkout.
+
+Remaining limits: no actual Preview browser/proxy verification, no Live provider/real email, no runtime Production credential-role inspection, no complete dynamic-import/unused-package proof. The owner-gated OpenCode action still uses a mutable tag;7 moderate tooling advisory entries remain. These limits and current operational P1 exposure prevent a global PASS/security-clearance claim. No new pivot product or data migration was implemented.
+
+
+## Final cleanup and immutable handoff
+
+All29public application tables in the synthetic project were verified empty after tests;17 migration-ledger rows preserved. Temporary credential env file removed; pools/Next processes closed. Nineteen DB logs scanned with0Postgres-URI matches. Endpoint ep-still-wildflower-bd4dwj5r remains in the retained synthetic project at min=max0.25CU with300-second automatic suspension. No remote project, credential or Production resource was deleted. Final readback of unstandard.app still resolves to original READY Production dpl_BvmGTnKqyuxQyZ6Aut6xwJPsk16p/f5b3843494e6cfb6a87ef21339243e68d28151b9.
+
+Sanitized evidence files are under docs/audit/evidence; the original failed whole integration and final passing component retries are both retained. A reader can reproduce unit boundaries with `node --import tsx --test tests/audit-request-boundary.test.ts`, all local gates with `npm run check`, and DB scenarios with the existing scripts against a separately verified empty test database and ephemeral test credentials. Credentials are deliberately not included. The small report-only follow-up commit does not change runtime9a00dd1.

@@ -1,0 +1,10 @@
+{"event":"auth.postgres.e2e","case":"fresh_pre_auth_zero_counts","outcome":"PASS"}
+{"event":"auth.postgres.e2e","case":"normal_invite_registration_and_database_deltas","outcome":"PASS"}
+{"event":"auth.postgres.e2e","case":"existing_credential_account_signin_and_session","outcome":"PASS"}
+{"event":"auth.postgres.e2e","case":"profile_setup_first_answer_and_unverified_visibility_denied","outcome":"PASS"}
+{"event":"auth.postgres.e2e","case":"block_action_persists_and_denies_post_block_messaging","outcome":"PASS"}
+{"event":"auth.postgres.e2e","case":"profile_withdrawal_reduces_visibility","outcome":"PASS"}
+{"event":"auth.postgres.e2e","case":"profile_withdrawal_removes_basics_without_verified_identity_fixture","outcome":"PASS"}
+{"event":"auth.postgres.e2e","case":"support_owner_reply_member_isolation_csrf_audit_concurrent_replay","outcome":"PASS"}
+{"event":"auth.postgres.e2e","case":"password_login_logout_stale_cookie_wrong_password_delete_cascade_no_reset","outcome":"PASS"}
+{"event":"auth.postgres.e2e","outcome":"PASS","evidence":"sanitized_count_only"}

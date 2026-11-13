@@ -1,0 +1,423 @@
+npm warn Unknown env config "http-proxy". This will stop working in the next major version of npm.
+
+> unstandard-alpha-web@0.1.0 test:integration
+> node --import tsx scripts/test/integration-supervisor.ts
+
+◇ injected env (0) from .env.local // tip: ◈ secrets for agents [www.dotenvx.com]
+◇ injected env (0) from .env // tip: ◈ encrypted .env [www.dotenvx.com]
+{"event":"integration.db_reachability","phase":"start"}
+{"event":"integration.database","boundary":"reachability","phase":"start"}
+{"event":"integration.database","boundary":"first_select","phase":"start","transport":"pool_query_fetch"}
+{"event":"integration.database","boundary":"first_select","phase":"end","outcome":"PASS"}
+{"event":"integration.database","boundary":"first_transaction_begin","phase":"start","transport":"pool_client"}
+{"event":"integration.database","boundary":"first_transaction_begin","phase":"end","outcome":"PASS"}
+{"event":"integration.database","boundary":"first_transaction_commit","phase":"start"}
+{"event":"integration.database","boundary":"first_transaction_commit","phase":"end","outcome":"PASS"}
+{"event":"integration.database","boundary":"pool_close","phase":"start"}
+{"event":"integration.database","boundary":"pool_close","phase":"end","outcome":"PASS"}
+{"event":"integration.database","boundary":"reachability","phase":"end","outcome":"PASS","elapsed_ms":13178,"transaction_probe":true}
+{"event":"integration.db_reachability","phase":"end","outcome":"PASS"}
+{"event":"integration.fixture_baseline","phase":"start"}
+{"event":"integration.fixture_baseline","phase":"end","outcome":"PASS","elapsed_ms":23314,"counts_only":true}
+{"event":"integration.suite","suite":"tests/integration/suite/db-unlock.test.ts","phase":"start","timeout_ms":240000}
+{"event":"integration.db_unlock_boundary","boundary":"insert_first_account","phase":"start","started_at":"2026-11-13T05:24:41.717Z"}
+{"event":"integration.db_unlock_sql_boundary","boundary":"insert_user","phase":"start","started_at":"2026-11-13T05:24:41.718Z"}
+{"event":"integration.db_unlock_sql_boundary","boundary":"insert_user","phase":"end","outcome":"PASS","ended_at":"2026-11-13T05:24:48.624Z","elapsed_ms":6906}
+{"event":"integration.db_unlock_sql_boundary","boundary":"insert_profile","phase":"start","started_at":"2026-11-13T05:24:48.624Z"}
+{"event":"integration.db_unlock_sql_boundary","boundary":"insert_profile","phase":"end","outcome":"PASS","ended_at":"2026-11-13T05:24:48.863Z","elapsed_ms":239}
+{"event":"integration.db_unlock_sql_boundary","boundary":"insert_profile_basics","phase":"start","started_at":"2026-11-13T05:24:48.863Z"}
+{"event":"integration.db_unlock_sql_boundary","boundary":"insert_profile_basics","phase":"end","outcome":"PASS","ended_at":"2026-11-13T05:24:49.103Z","elapsed_ms":240}
+{"event":"integration.db_unlock_boundary","boundary":"insert_first_account","phase":"end","outcome":"PASS","ended_at":"2026-11-13T05:24:49.103Z","elapsed_ms":7386}
+{"event":"integration.db_unlock_boundary","boundary":"begin_first_identity_request","phase":"start","started_at":"2026-11-13T05:24:49.103Z"}
+{"event":"integration.transaction","boundary":"BEGIN","phase":"statement","transport":"pool_client"}
+{"event":"integration.transaction","boundary":"COMMIT","phase":"statement","transport":"pool_client"}
+{"event":"integration.db_unlock_boundary","boundary":"begin_first_identity_request","phase":"end","outcome":"PASS","ended_at":"2026-11-13T05:24:56.623Z","elapsed_ms":7520}
+{"event":"integration.db_unlock_boundary","boundary":"bind_first_provider_reference","phase":"start","started_at":"2026-11-13T05:24:56.623Z"}
+{"event":"integration.db_unlock_boundary","boundary":"bind_first_provider_reference","phase":"end","outcome":"PASS","ended_at":"2026-11-13T05:24:56.863Z","elapsed_ms":240}
+{"event":"integration.db_unlock_boundary","boundary":"delete_first_account","phase":"start","started_at":"2026-11-13T05:24:56.863Z"}
+{"event":"integration.db_unlock_boundary","boundary":"delete_first_account","phase":"end","outcome":"PASS","ended_at":"2026-11-13T05:24:57.064Z","elapsed_ms":201}
+{"event":"integration.db_unlock_boundary","boundary":"read_first_verification_after_delete","phase":"start","started_at":"2026-11-13T05:24:57.064Z"}
+{"event":"integration.db_unlock_boundary","boundary":"read_first_verification_after_delete","phase":"end","outcome":"PASS","ended_at":"2026-11-13T05:24:57.259Z","elapsed_ms":195}
+{"event":"integration.db_unlock_boundary","boundary":"read_first_purge_queue_row","phase":"start","started_at":"2026-11-13T05:24:57.259Z"}
+{"event":"integration.db_unlock_boundary","boundary":"read_first_purge_queue_row","phase":"end","outcome":"PASS","ended_at":"2026-11-13T05:24:57.453Z","elapsed_ms":194}
+{"event":"integration.db_unlock_boundary","boundary":"insert_second_account","phase":"start","started_at":"2026-11-13T05:24:57.455Z"}
+{"event":"integration.db_unlock_sql_boundary","boundary":"insert_user","phase":"start","started_at":"2026-11-13T05:24:57.455Z"}
+{"event":"integration.db_unlock_sql_boundary","boundary":"insert_user","phase":"end","outcome":"PASS","ended_at":"2026-11-13T05:24:57.691Z","elapsed_ms":236}
+{"event":"integration.db_unlock_sql_boundary","boundary":"insert_profile","phase":"start","started_at":"2026-11-13T05:24:57.691Z"}
+{"event":"integration.db_unlock_sql_boundary","boundary":"insert_profile","phase":"end","outcome":"PASS","ended_at":"2026-11-13T05:24:57.927Z","elapsed_ms":236}
+{"event":"integration.db_unlock_sql_boundary","boundary":"insert_profile_basics","phase":"start","started_at":"2026-11-13T05:24:57.927Z"}
+{"event":"integration.db_unlock_sql_boundary","boundary":"insert_profile_basics","phase":"end","outcome":"PASS","ended_at":"2026-11-13T05:24:58.163Z","elapsed_ms":236}
+{"event":"integration.db_unlock_boundary","boundary":"insert_second_account","phase":"end","outcome":"PASS","ended_at":"2026-11-13T05:24:58.163Z","elapsed_ms":708}
+{"event":"integration.db_unlock_boundary","boundary":"begin_duplicate_identity_request","phase":"start","started_at":"2026-11-13T05:24:58.163Z"}
+{"event":"integration.transaction","boundary":"BEGIN","phase":"statement","transport":"pool_client"}
+{"event":"integration.transaction","boundary":"COMMIT","phase":"statement","transport":"pool_client"}
+{"event":"integration.db_unlock_boundary","boundary":"begin_duplicate_identity_request","phase":"end","outcome":"PASS","ended_at":"2026-11-13T05:24:59.324Z","elapsed_ms":1161}
+{"event":"integration.db_unlock_boundary","boundary":"bind_duplicate_provider_reference","phase":"start","started_at":"2026-11-13T05:24:59.324Z"}
+{"event":"integration.db_unlock_boundary","boundary":"bind_duplicate_provider_reference","phase":"end","outcome":"PASS","ended_at":"2026-11-13T05:24:59.519Z","elapsed_ms":195}
+{"event":"integration.db_unlock_boundary","boundary":"rekey_duplicate_identity_request","phase":"start","started_at":"2026-11-13T05:24:59.519Z"}
+{"event":"integration.db_unlock_boundary","boundary":"rekey_duplicate_identity_request","phase":"end","outcome":"PASS","ended_at":"2026-11-13T05:24:59.713Z","elapsed_ms":194}
+{"event":"integration.db_unlock_boundary","boundary":"delete_second_account","phase":"start","started_at":"2026-11-13T05:24:59.714Z"}
+{"event":"integration.db_unlock_boundary","boundary":"delete_second_account","phase":"end","outcome":"PASS","ended_at":"2026-11-13T05:24:59.951Z","elapsed_ms":237}
+{"event":"integration.db_unlock_boundary","boundary":"read_duplicate_queue_rows","phase":"start","started_at":"2026-11-13T05:24:59.951Z"}
+{"event":"integration.db_unlock_boundary","boundary":"read_duplicate_queue_rows","phase":"end","outcome":"PASS","ended_at":"2026-11-13T05:25:00.152Z","elapsed_ms":201}
+{"event":"integration.db_unlock_boundary","boundary":"mark_provider_purge_retry","phase":"start","started_at":"2026-11-13T05:25:00.152Z"}
+{"event":"integration.db_unlock_boundary","boundary":"mark_provider_purge_retry","phase":"end","outcome":"PASS","ended_at":"2026-11-13T05:25:00.346Z","elapsed_ms":194}
+{"event":"integration.db_unlock_boundary","boundary":"read_retried_purge_row","phase":"start","started_at":"2026-11-13T05:25:00.346Z"}
+{"event":"integration.db_unlock_boundary","boundary":"read_retried_purge_row","phase":"end","outcome":"PASS","ended_at":"2026-11-13T05:25:00.540Z","elapsed_ms":194}
+{"event":"integration.db_unlock_boundary","boundary":"list_not_due_provider_purges","phase":"start","started_at":"2026-11-13T05:25:00.540Z"}
+{"event":"integration.db_unlock_boundary","boundary":"list_not_due_provider_purges","phase":"end","outcome":"PASS","ended_at":"2026-11-13T05:25:00.734Z","elapsed_ms":194}
+{"event":"integration.db_unlock_boundary","boundary":"insert_due_queue_fixtures","phase":"start","started_at":"2026-11-13T05:25:00.734Z"}
+{"event":"integration.db_unlock_boundary","boundary":"insert_due_queue_fixtures","phase":"end","outcome":"PASS","ended_at":"2026-11-13T05:25:01.122Z","elapsed_ms":388}
+{"event":"integration.db_unlock_boundary","boundary":"list_bounded_due_provider_purges","phase":"start","started_at":"2026-11-13T05:25:01.123Z"}
+{"event":"integration.db_unlock_boundary","boundary":"list_bounded_due_provider_purges","phase":"end","outcome":"PASS","ended_at":"2026-11-13T05:25:01.317Z","elapsed_ms":194}
+{"event":"integration.db_unlock_boundary","boundary":"cleanup_synthetic_users","phase":"start","started_at":"2026-11-13T05:25:01.318Z"}
+{"event":"integration.db_unlock_boundary","boundary":"cleanup_synthetic_users","phase":"end","outcome":"PASS","ended_at":"2026-11-13T05:25:01.512Z","elapsed_ms":194}
+{"event":"integration.db_unlock_boundary","boundary":"cleanup_synthetic_queue_rows","phase":"start","started_at":"2026-11-13T05:25:01.512Z"}
+{"event":"integration.db_unlock_boundary","boundary":"cleanup_synthetic_queue_rows","phase":"end","outcome":"PASS","ended_at":"2026-11-13T05:25:01.712Z","elapsed_ms":200}
+▶ integration: db-backed unlock vertical slice
+  ✔ queues only opaque Didit references after account deletion and bounds retries (20001.404441ms)
+{"event":"integration.db_unlock_sql_boundary","boundary":"insert_user","phase":"start","started_at":"2026-11-13T05:25:38.395Z"}
+{"event":"integration.db_unlock_sql_boundary","boundary":"insert_user","phase":"end","outcome":"PASS","ended_at":"2026-11-13T05:25:45.372Z","elapsed_ms":6977}
+{"event":"integration.db_unlock_sql_boundary","boundary":"insert_profile","phase":"start","started_at":"2026-11-13T05:25:45.372Z"}
+{"event":"integration.db_unlock_sql_boundary","boundary":"insert_profile","phase":"end","outcome":"PASS","ended_at":"2026-11-13T05:25:45.619Z","elapsed_ms":247}
+{"event":"integration.db_unlock_sql_boundary","boundary":"insert_private_profile","phase":"start","started_at":"2026-11-13T05:25:45.619Z"}
+{"event":"integration.db_unlock_sql_boundary","boundary":"insert_private_profile","phase":"end","outcome":"PASS","ended_at":"2026-11-13T05:25:45.871Z","elapsed_ms":252}
+{"event":"integration.db_unlock_sql_boundary","boundary":"insert_verified_profile_basics","phase":"start","started_at":"2026-11-13T05:25:45.871Z"}
+{"event":"integration.db_unlock_sql_boundary","boundary":"insert_verified_profile_basics","phase":"end","outcome":"PASS","ended_at":"2026-11-13T05:25:46.360Z","elapsed_ms":489}
+{"event":"integration.db_unlock_sql_boundary","boundary":"insert_user","phase":"start","started_at":"2026-11-13T05:25:46.360Z"}
+{"event":"integration.db_unlock_sql_boundary","boundary":"insert_user","phase":"end","outcome":"PASS","ended_at":"2026-11-13T05:25:46.607Z","elapsed_ms":247}
+{"event":"integration.db_unlock_sql_boundary","boundary":"insert_profile","phase":"start","started_at":"2026-11-13T05:25:46.607Z"}
+{"event":"integration.db_unlock_sql_boundary","boundary":"insert_profile","phase":"end","outcome":"PASS","ended_at":"2026-11-13T05:25:46.851Z","elapsed_ms":244}
+{"event":"integration.db_unlock_sql_boundary","boundary":"insert_private_profile","phase":"start","started_at":"2026-11-13T05:25:46.851Z"}
+{"event":"integration.db_unlock_sql_boundary","boundary":"insert_private_profile","phase":"end","outcome":"PASS","ended_at":"2026-11-13T05:25:47.095Z","elapsed_ms":244}
+{"event":"integration.db_unlock_sql_boundary","boundary":"insert_verified_profile_basics","phase":"start","started_at":"2026-11-13T05:25:47.095Z"}
+{"event":"integration.db_unlock_sql_boundary","boundary":"insert_verified_profile_basics","phase":"end","outcome":"PASS","ended_at":"2026-11-13T05:25:47.583Z","elapsed_ms":488}
+{"event":"integration.db_unlock_sql_boundary","boundary":"insert_user","phase":"start","started_at":"2026-11-13T05:25:47.583Z"}
+{"event":"integration.db_unlock_sql_boundary","boundary":"insert_user","phase":"end","outcome":"PASS","ended_at":"2026-11-13T05:25:47.827Z","elapsed_ms":244}
+{"event":"integration.db_unlock_sql_boundary","boundary":"insert_profile","phase":"start","started_at":"2026-11-13T05:25:47.827Z"}
+{"event":"integration.db_unlock_sql_boundary","boundary":"insert_profile","phase":"end","outcome":"PASS","ended_at":"2026-11-13T05:25:48.071Z","elapsed_ms":244}
+{"event":"integration.db_unlock_sql_boundary","boundary":"insert_private_profile","phase":"start","started_at":"2026-11-13T05:25:48.071Z"}
+{"event":"integration.db_unlock_sql_boundary","boundary":"insert_private_profile","phase":"end","outcome":"PASS","ended_at":"2026-11-13T05:25:48.315Z","elapsed_ms":244}
+{"event":"integration.db_unlock_sql_boundary","boundary":"insert_verified_profile_basics","phase":"start","started_at":"2026-11-13T05:25:48.316Z"}
+{"event":"integration.db_unlock_sql_boundary","boundary":"insert_verified_profile_basics","phase":"end","outcome":"PASS","ended_at":"2026-11-13T05:25:48.803Z","elapsed_ms":487}
+{"event":"unlock.submit.start","correlationId":"88fd3599-5a9e-4dd3-af2d-45d092f7e7ec","stage":"AUTH","status":"ok","viewerUserIdPrefix":"unlockus","targetProfileIdPrefix":"2c9c4ec4"}
+{"event":"integration.transaction","boundary":"BEGIN","phase":"statement","transport":"pool_client"}
+{"event":"integration.transaction","boundary":"COMMIT","phase":"statement","transport":"pool_client"}
+{"event":"unlock.submit.pass","correlationId":"88fd3599-5a9e-4dd3-af2d-45d092f7e7ec","stage":"UNLOCK_UPSERT","status":"ok","viewerUserIdPrefix":"unlockus","targetProfileIdPrefix":"2c9c4ec4","verdict":"PASS","idempotent":false,"durationMs":1980}
+{"event":"integration.transaction","boundary":"BEGIN","phase":"statement","transport":"pool_client"}
+{"event":"integration.transaction","boundary":"COMMIT","phase":"statement","transport":"pool_client"}
+{"event":"integration.transaction","boundary":"BEGIN","phase":"statement","transport":"pool_client"}
+{"event":"integration.transaction","boundary":"COMMIT","phase":"statement","transport":"pool_client"}
+{"event":"private.missing_row","correlationId":"f7f88895-45ec-4d40-a2ca-702d7e1b0307","stage":"PRIVATE_FETCH","status":"error","code":"PRIVATE_NOT_FOUND","viewerUserIdPrefix":"unlockus","targetProfileIdPrefix":"2c9c4ec4"}
+{"event":"integration.transaction","boundary":"BEGIN","phase":"statement","transport":"pool_client"}
+{"event":"integration.transaction","boundary":"COMMIT","phase":"statement","transport":"pool_client"}
+{"event":"integration.transaction","boundary":"BEGIN","phase":"statement","transport":"pool_client"}
+{"event":"integration.transaction","boundary":"COMMIT","phase":"statement","transport":"pool_client"}
+{"event":"integration.transaction","boundary":"BEGIN","phase":"statement","transport":"pool_client"}
+{"event":"integration.transaction","boundary":"ROLLBACK","phase":"statement","transport":"pool_client"}
+{"event":"integration.transaction","boundary":"BEGIN","phase":"statement","transport":"pool_client"}
+{"event":"integration.transaction","boundary":"COMMIT","phase":"statement","transport":"pool_client"}
+{"event":"integration.transaction","boundary":"BEGIN","phase":"statement","transport":"pool_client"}
+{"event":"integration.transaction","boundary":"COMMIT","phase":"statement","transport":"pool_client"}
+{"event":"integration.transaction","boundary":"BEGIN","phase":"statement","transport":"pool_client"}
+{"event":"integration.transaction","boundary":"COMMIT","phase":"statement","transport":"pool_client"}
+{"event":"integration.transaction","boundary":"BEGIN","phase":"statement","transport":"pool_client"}
+{"event":"integration.transaction","boundary":"COMMIT","phase":"statement","transport":"pool_client"}
+{"event":"integration.transaction","boundary":"BEGIN","phase":"statement","transport":"pool_client"}
+{"event":"integration.transaction","boundary":"COMMIT","phase":"statement","transport":"pool_client"}
+{"event":"integration.transaction","boundary":"BEGIN","phase":"statement","transport":"pool_client"}
+{"event":"integration.transaction","boundary":"COMMIT","phase":"statement","transport":"pool_client"}
+{"event":"integration.transaction","boundary":"BEGIN","phase":"statement","transport":"pool_client"}
+{"event":"integration.transaction","boundary":"COMMIT","phase":"statement","transport":"pool_client"}
+  ✔ profile eligibility, direct access, revision binding and deletion fail closed (84133.478319ms)
+{"event":"integration.db_unlock_sql_boundary","boundary":"insert_user","phase":"start","started_at":"2026-11-13T05:27:00.208Z"}
+{"event":"integration.db_unlock_sql_boundary","boundary":"insert_user","phase":"end","outcome":"PASS","ended_at":"2026-11-13T05:27:06.948Z","elapsed_ms":6740}
+{"event":"integration.db_unlock_sql_boundary","boundary":"insert_profile","phase":"start","started_at":"2026-11-13T05:27:06.948Z"}
+{"event":"integration.db_unlock_sql_boundary","boundary":"insert_profile","phase":"end","outcome":"PASS","ended_at":"2026-11-13T05:27:07.195Z","elapsed_ms":247}
+{"event":"integration.db_unlock_sql_boundary","boundary":"insert_private_profile","phase":"start","started_at":"2026-11-13T05:27:07.195Z"}
+{"event":"integration.db_unlock_sql_boundary","boundary":"insert_private_profile","phase":"end","outcome":"PASS","ended_at":"2026-11-13T05:27:07.443Z","elapsed_ms":248}
+{"event":"integration.db_unlock_sql_boundary","boundary":"insert_verified_profile_basics","phase":"start","started_at":"2026-11-13T05:27:07.444Z"}
+{"event":"integration.db_unlock_sql_boundary","boundary":"insert_verified_profile_basics","phase":"end","outcome":"PASS","ended_at":"2026-11-13T05:27:07.939Z","elapsed_ms":495}
+{"event":"integration.db_unlock_sql_boundary","boundary":"insert_user","phase":"start","started_at":"2026-11-13T05:27:07.939Z"}
+{"event":"integration.db_unlock_sql_boundary","boundary":"insert_user","phase":"end","outcome":"PASS","ended_at":"2026-11-13T05:27:08.187Z","elapsed_ms":248}
+{"event":"integration.db_unlock_sql_boundary","boundary":"insert_profile","phase":"start","started_at":"2026-11-13T05:27:08.187Z"}
+{"event":"integration.db_unlock_sql_boundary","boundary":"insert_profile","phase":"end","outcome":"PASS","ended_at":"2026-11-13T05:27:08.435Z","elapsed_ms":248}
+{"event":"integration.db_unlock_sql_boundary","boundary":"insert_private_profile","phase":"start","started_at":"2026-11-13T05:27:08.435Z"}
+{"event":"integration.db_unlock_sql_boundary","boundary":"insert_private_profile","phase":"end","outcome":"PASS","ended_at":"2026-11-13T05:27:08.683Z","elapsed_ms":248}
+{"event":"integration.db_unlock_sql_boundary","boundary":"insert_verified_profile_basics","phase":"start","started_at":"2026-11-13T05:27:08.683Z"}
+{"event":"integration.db_unlock_sql_boundary","boundary":"insert_verified_profile_basics","phase":"end","outcome":"PASS","ended_at":"2026-11-13T05:27:09.179Z","elapsed_ms":496}
+{"event":"integration.db_unlock_sql_boundary","boundary":"insert_user","phase":"start","started_at":"2026-11-13T05:27:09.179Z"}
+{"event":"integration.db_unlock_sql_boundary","boundary":"insert_user","phase":"end","outcome":"PASS","ended_at":"2026-11-13T05:27:09.427Z","elapsed_ms":248}
+{"event":"integration.db_unlock_sql_boundary","boundary":"insert_profile","phase":"start","started_at":"2026-11-13T05:27:09.428Z"}
+{"event":"integration.db_unlock_sql_boundary","boundary":"insert_profile","phase":"end","outcome":"PASS","ended_at":"2026-11-13T05:27:09.675Z","elapsed_ms":247}
+{"event":"integration.db_unlock_sql_boundary","boundary":"insert_private_profile","phase":"start","started_at":"2026-11-13T05:27:09.675Z"}
+{"event":"integration.db_unlock_sql_boundary","boundary":"insert_private_profile","phase":"end","outcome":"PASS","ended_at":"2026-11-13T05:27:09.919Z","elapsed_ms":244}
+{"event":"integration.db_unlock_sql_boundary","boundary":"insert_verified_profile_basics","phase":"start","started_at":"2026-11-13T05:27:09.919Z"}
+{"event":"integration.db_unlock_sql_boundary","boundary":"insert_verified_profile_basics","phase":"end","outcome":"PASS","ended_at":"2026-11-13T05:27:10.411Z","elapsed_ms":492}
+{"event":"unlock.submit.start","correlationId":"56128751-93f1-4717-8f6c-80198ce07893","stage":"AUTH","status":"ok","viewerUserIdPrefix":"unlockus","targetProfileIdPrefix":"344cd020"}
+{"event":"integration.transaction","boundary":"BEGIN","phase":"statement","transport":"pool_client"}
+{"event":"integration.transaction","boundary":"COMMIT","phase":"statement","transport":"pool_client"}
+{"event":"unlock.submit.evaluated","correlationId":"56128751-93f1-4717-8f6c-80198ce07893","stage":"ATTEMPT_INSERT","status":"ok","viewerUserIdPrefix":"unlockus","targetProfileIdPrefix":"344cd020","verdict":"REJECT","durationMs":7774}
+{"event":"unlock.submit.start","correlationId":"d44bf2e5-4598-4514-88c1-7c815aa83c14","stage":"AUTH","status":"ok","viewerUserIdPrefix":"unlockus","targetProfileIdPrefix":"344cd020"}
+{"event":"integration.transaction","boundary":"BEGIN","phase":"statement","transport":"pool_client"}
+{"event":"integration.transaction","boundary":"COMMIT","phase":"statement","transport":"pool_client"}
+{"event":"unlock.submit.pass","correlationId":"d44bf2e5-4598-4514-88c1-7c815aa83c14","stage":"UNLOCK_UPSERT","status":"ok","viewerUserIdPrefix":"unlockus","targetProfileIdPrefix":"344cd020","verdict":"PASS","idempotent":false,"durationMs":1907}
+{"event":"unlock.submit.start","correlationId":"a4006ae7-3bb2-4b0e-9563-bf15b1a1d3df","stage":"AUTH","status":"ok","viewerUserIdPrefix":"unlockus","targetProfileIdPrefix":"344cd020"}
+{"event":"integration.transaction","boundary":"BEGIN","phase":"statement","transport":"pool_client"}
+{"event":"integration.transaction","boundary":"COMMIT","phase":"statement","transport":"pool_client"}
+{"event":"unlock.submit.pass","correlationId":"a4006ae7-3bb2-4b0e-9563-bf15b1a1d3df","stage":"UNLOCK_UPSERT","status":"ok","viewerUserIdPrefix":"unlockus","targetProfileIdPrefix":"344cd020","verdict":"PASS","idempotent":true,"durationMs":2091}
+{"event":"unlock.submit.start","correlationId":"cfdbfe16-a3cd-409a-9d27-7ce2d1451ccf","stage":"AUTH","status":"ok","viewerUserIdPrefix":"unlockus","targetProfileIdPrefix":"344cd020"}
+{"event":"integration.transaction","boundary":"BEGIN","phase":"statement","transport":"pool_client"}
+{"event":"integration.transaction","boundary":"ROLLBACK","phase":"statement","transport":"pool_client"}
+{"event":"unlock.status","correlationId":"900b644b-ccf7-4f62-bc49-34707e626bd5","stage":"PRIVATE_AUTHORIZATION","status":"ok","viewerUserIdPrefix":"unlockus","targetProfileIdPrefix":"344cd020","idempotent":true}
+{"event":"unlock.status","correlationId":"712fa1f1-ff5d-4b4d-ac87-19a6a04e5536","stage":"PRIVATE_AUTHORIZATION","status":"ok","viewerUserIdPrefix":"unlockus","targetProfileIdPrefix":"344cd020","idempotent":false}
+{"event":"private.forbidden","correlationId":"97264c88-fd40-49b8-b93e-60aa586f2818","stage":"PRIVATE_AUTHORIZATION","status":"error","code":"FORBIDDEN","viewerUserIdPrefix":"unlockus","targetProfileIdPrefix":"344cd020"}
+{"event":"private.ok","correlationId":"76ebe271-5c43-432a-8c35-85eea11d4898","stage":"PRIVATE_FETCH","status":"ok","viewerUserIdPrefix":"unlockus","targetProfileIdPrefix":"344cd020"}
+{"event":"private.forbidden","correlationId":"bdecee5c-0614-4115-a848-4ab6a23493ce","stage":"PRIVATE_AUTHORIZATION","status":"error","code":"FORBIDDEN","viewerUserIdPrefix":"unlockus","targetProfileIdPrefix":"8796787d"}
+{"event":"unlock.submit.start","correlationId":"c09ae1c1-dd1a-490d-b213-edf48b31f5fd","stage":"AUTH","status":"ok","viewerUserIdPrefix":"unlockus","targetProfileIdPrefix":"8796787d"}
+{"event":"integration.transaction","boundary":"BEGIN","phase":"statement","transport":"pool_client"}
+{"event":"integration.transaction","boundary":"COMMIT","phase":"statement","transport":"pool_client"}
+{"event":"unlock.submit.pass","correlationId":"c09ae1c1-dd1a-490d-b213-edf48b31f5fd","stage":"UNLOCK_UPSERT","status":"ok","viewerUserIdPrefix":"unlockus","targetProfileIdPrefix":"8796787d","verdict":"PASS","idempotent":false,"durationMs":1895}
+{"event":"unlock.status","correlationId":"ce8d0a6b-4224-4714-8cdc-95c9eb3e2040","stage":"PRIVATE_AUTHORIZATION","status":"ok","viewerUserIdPrefix":"unlockus","targetProfileIdPrefix":"344cd020","idempotent":true}
+{"event":"unlock.status","correlationId":"557b43cb-aa64-436c-baec-2eff1bf29eb4","stage":"PRIVATE_AUTHORIZATION","status":"ok","viewerUserIdPrefix":"unlockus","targetProfileIdPrefix":"8796787d","idempotent":true}
+{"event":"unlock.submit.start","correlationId":"1b584231-0b6b-43e2-aafa-0fe4de286d6f","stage":"AUTH","status":"ok","viewerUserIdPrefix":"unlockus","targetProfileIdPrefix":"8796787d"}
+{"event":"unlock.submit.reject","correlationId":"1b584231-0b6b-43e2-aafa-0fe4de286d6f","stage":"TARGET_LOOKUP","status":"error","code":"SELF_UNLOCK_NOT_ALLOWED","viewerUserIdPrefix":"unlockus","targetProfileIdPrefix":"8796787d","durationMs":190}
+{"event":"unlock.submit.start","correlationId":"b223bd2d-cebf-4f49-82fb-83bd0e26224a","stage":"AUTH","status":"ok","viewerUserIdPrefix":"unlockus","targetProfileIdPrefix":"c3"}
+{"event":"unlock.submit.reject","correlationId":"b223bd2d-cebf-4f49-82fb-83bd0e26224a","stage":"TARGET_LOOKUP","status":"error","code":"INVALID_PROFILE_ID","viewerUserIdPrefix":"unlockus","targetProfileIdPrefix":"c3","durationMs":0}
+{"event":"integration.pool_cleanup","phase":"start","open_pool_count":1}
+{"event":"integration.pool_cleanup","phase":"end","outcome":"PASS","closed_pool_count":1,"failed_pool_count":0}
+{"event":"integration.shared_pool_cleanup","phase":"start","open_pool":true}
+{"event":"integration.shared_pool_cleanup","phase":"end","outcome":"PASS","closed_pool":true}
+  ✔ pass creates unlock; non-pass does not; isolation + private gate (69791.712525ms)
+✔ integration: db-backed unlock vertical slice (173930.456694ms)
+ℹ tests 3
+ℹ suites 1
+ℹ pass 3
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 174795.773303
+{"event":"integration.suite","suite":"tests/integration/suite/db-unlock.test.ts","phase":"end","elapsed_ms":174915,"status":0,"signal":null,"error_code":null}
+{"event":"integration.suite","suite":"tests/integration/suite/invites.test.ts","phase":"start","timeout_ms":240000}
+▶ integration: invite reservation lifecycle
+  ✔ requires separate versioned consent before counting an A/B role (13693.350346ms)
+  ✔ legacy_invite_excluded_from_stage1 (14826.419795ms)
+  ✔ alpha_stage1_capacity_concurrency (18063.425205ms)
+  ✔ invite_concurrency (7142.074532ms)
+  ✔ invite_consumed_by_user_fk (1818.861815ms)
+  ✔ releases stale reservations (616.320002ms)
+✔ integration: invite reservation lifecycle (56163.381012ms)
+{"event":"integration.transaction","boundary":"BEGIN","phase":"statement","transport":"pool_client"}
+{"event":"integration.transaction","boundary":"COMMIT","phase":"statement","transport":"pool_client"}
+{"event":"integration.transaction","boundary":"BEGIN","phase":"statement","transport":"pool_client"}
+{"event":"integration.transaction","boundary":"COMMIT","phase":"statement","transport":"pool_client"}
+{"event":"integration.transaction","boundary":"BEGIN","phase":"statement","transport":"pool_client"}
+{"event":"integration.transaction","boundary":"COMMIT","phase":"statement","transport":"pool_client"}
+▶ integration: invite finalization transaction
+  ✔ invite_finalization_success (5670.616591ms)
+{"event":"integration.transaction","boundary":"BEGIN","phase":"statement","transport":"pool_client"}
+{"event":"integration.transaction","boundary":"COMMIT","phase":"statement","transport":"pool_client"}
+{"event":"integration.transaction","boundary":"BEGIN","phase":"statement","transport":"pool_client"}
+{"event":"integration.transaction","boundary":"COMMIT","phase":"statement","transport":"pool_client"}
+{"event":"integration.transaction","boundary":"BEGIN","phase":"statement","transport":"pool_client"}
+{"event":"integration.transaction","boundary":"ROLLBACK","phase":"statement","transport":"pool_client"}
+{"event":"integration.transaction","boundary":"BEGIN","phase":"statement","transport":"pool_client"}
+{"event":"integration.transaction","boundary":"COMMIT","phase":"statement","transport":"pool_client"}
+{
+  action: 'invite_finalization_failed',
+  code: 'INJECTED_CONSUME_FAILURE'
+}
+  ✔ invite_finalization_rollback (consume inject) (4460.60219ms)
+{"event":"integration.transaction","boundary":"BEGIN","phase":"statement","transport":"pool_client"}
+{"event":"integration.transaction","boundary":"COMMIT","phase":"statement","transport":"pool_client"}
+{"event":"integration.transaction","boundary":"BEGIN","phase":"statement","transport":"pool_client"}
+{"event":"integration.transaction","boundary":"COMMIT","phase":"statement","transport":"pool_client"}
+{"event":"integration.transaction","boundary":"BEGIN","phase":"statement","transport":"pool_client"}
+{"event":"integration.transaction","boundary":"ROLLBACK","phase":"statement","transport":"pool_client"}
+{"event":"integration.transaction","boundary":"BEGIN","phase":"statement","transport":"pool_client"}
+{"event":"integration.transaction","boundary":"COMMIT","phase":"statement","transport":"pool_client"}
+{
+  action: 'invite_finalization_failed',
+  code: 'INJECTED_FINALIZE_FAILURE'
+}
+  ✔ rolls back consumed invite when finalize update is injected to fail (5256.401776ms)
+{"event":"integration.transaction","boundary":"BEGIN","phase":"statement","transport":"pool_client"}
+{"event":"integration.transaction","boundary":"COMMIT","phase":"statement","transport":"pool_client"}
+{"event":"integration.transaction","boundary":"BEGIN","phase":"statement","transport":"pool_client"}
+{"event":"integration.transaction","boundary":"COMMIT","phase":"statement","transport":"pool_client"}
+{"event":"integration.transaction","boundary":"BEGIN","phase":"statement","transport":"pool_client"}
+{"event":"integration.transaction","boundary":"ROLLBACK","phase":"statement","transport":"pool_client"}
+{"event":"integration.transaction","boundary":"BEGIN","phase":"statement","transport":"pool_client"}
+{"event":"integration.transaction","boundary":"COMMIT","phase":"statement","transport":"pool_client"}
+{
+  action: 'invite_finalization_failed',
+  code: 'INJECTED_PROFILE_FAILURE'
+}
+  ✔ rolls back consumed invite when profile bootstrap is injected to fail (5463.045151ms)
+✔ integration: invite finalization transaction (20851.534992ms)
+{"event":"integration.pool_cleanup","phase":"start","open_pool_count":1}
+{"event":"integration.pool_cleanup","phase":"end","outcome":"PASS","closed_pool_count":1,"failed_pool_count":0}
+{"event":"integration.shared_pool_cleanup","phase":"start","open_pool":true}
+{"event":"integration.shared_pool_cleanup","phase":"end","outcome":"PASS","closed_pool":true}
+ℹ tests 10
+ℹ suites 2
+ℹ pass 10
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 78828.656146
+{"event":"integration.suite","suite":"tests/integration/suite/invites.test.ts","phase":"end","elapsed_ms":78993,"status":0,"signal":null,"error_code":null}
+{"event":"integration.suite","suite":"tests/integration/suite/migrations.test.ts","phase":"start","timeout_ms":240000}
+▶ integration: migrations and seed
+  ✔ migration_schema_inventory_read_only (9626.064919ms)
+{"event":"integration.pool_cleanup","phase":"start","open_pool_count":1}
+{"event":"integration.pool_cleanup","phase":"end","outcome":"PASS","closed_pool_count":1,"failed_pool_count":0}
+{"event":"integration.shared_pool_cleanup","phase":"start","open_pool":false}
+{"event":"integration.shared_pool_cleanup","phase":"end","outcome":"PASS","closed_pool":false}
+  ✔ seed_idempotency (7629.929083ms)
+✔ integration: migrations and seed (17259.041058ms)
+ℹ tests 2
+ℹ suites 1
+ℹ pass 2
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 17972.241948
+{"event":"integration.suite","suite":"tests/integration/suite/migrations.test.ts","phase":"end","elapsed_ms":18047,"status":0,"signal":null,"error_code":null}
+{"event":"integration.suite","suite":"tests/integration/suite/persistence.test.ts","phase":"start","timeout_ms":240000}
+{"event":"integration.transaction","boundary":"BEGIN","phase":"statement","transport":"pool_client"}
+{"event":"integration.transaction","boundary":"COMMIT","phase":"statement","transport":"pool_client"}
+{"event":"integration.transaction","boundary":"BEGIN","phase":"statement","transport":"pool_client"}
+{"event":"integration.transaction","boundary":"COMMIT","phase":"statement","transport":"pool_client"}
+▶ integration: profile save and identity state
+  ✔ persists canonical failure and purge retry states until successful reconciliation (18850.00963ms)
+{"event":"integration.transaction","boundary":"BEGIN","phase":"statement","transport":"pool_client"}
+{"event":"integration.transaction","boundary":"COMMIT","phase":"statement","transport":"pool_client"}
+{"event":"integration.transaction","boundary":"BEGIN","phase":"statement","transport":"pool_client"}
+{"event":"integration.transaction","boundary":"COMMIT","phase":"statement","transport":"pool_client"}
+  ✔ enforces the persisted completion window: timely (4399.350933ms)
+{"event":"integration.transaction","boundary":"BEGIN","phase":"statement","transport":"pool_client"}
+{"event":"integration.transaction","boundary":"COMMIT","phase":"statement","transport":"pool_client"}
+  ✔ enforces the persisted completion window: missing (3002.283781ms)
+{"event":"integration.transaction","boundary":"BEGIN","phase":"statement","transport":"pool_client"}
+{"event":"integration.transaction","boundary":"COMMIT","phase":"statement","transport":"pool_client"}
+  ✔ enforces the persisted completion window: late (3013.549181ms)
+{"event":"integration.transaction","boundary":"BEGIN","phase":"statement","transport":"pool_client"}
+{"event":"integration.transaction","boundary":"COMMIT","phase":"statement","transport":"pool_client"}
+  ✔ enforces the persisted completion window: missing-event (3001.402916ms)
+{"event":"integration.transaction","boundary":"BEGIN","phase":"statement","transport":"pool_client"}
+{"event":"integration.transaction","boundary":"COMMIT","phase":"statement","transport":"pool_client"}
+  ✔ enforces the persisted completion window: future (3015.838672ms)
+{"event":"integration.transaction","boundary":"BEGIN","phase":"statement","transport":"pool_client"}
+{"event":"integration.transaction","boundary":"COMMIT","phase":"statement","transport":"pool_client"}
+  ✔ enforces the persisted completion window: grace-expired (2913.879501ms)
+  ✔ preserves a webhook-scheduled pending request on a no-op save and blocks real edits (4821.557494ms)
+  ✔ preserves verified eligibility on a no-op and requires re-verification after a material edit (4846.044258ms)
+✔ integration: profile save and identity state (47866.454353ms)
+{"event":"integration.transaction","boundary":"BEGIN","phase":"statement","transport":"pool_client"}
+{"event":"integration.transaction","boundary":"COMMIT","phase":"statement","transport":"pool_client"}
+{"event":"integration.transaction","boundary":"BEGIN","phase":"statement","transport":"pool_client"}
+{"event":"integration.transaction","boundary":"COMMIT","phase":"statement","transport":"pool_client"}
+{"event":"integration.transaction","boundary":"BEGIN","phase":"statement","transport":"pool_client"}
+{"event":"integration.transaction","boundary":"COMMIT","phase":"statement","transport":"pool_client"}
+▶ integration: persistence invariants
+  ✔ message_unlock_block_authorization + message_deletion_residuals (27580.204418ms)
+{"event":"integration.transaction","boundary":"BEGIN","phase":"statement","transport":"pool_client"}
+{"event":"integration.transaction","boundary":"COMMIT","phase":"statement","transport":"pool_client"}
+  ✔ waitlist_revisit_and_delete + alpha_metrics_fail_closed_maturity (16744.72706ms)
+  ✔ report_user_fk + duplicate_report_idempotency + no_duplicate_report_row (1991.776687ms)
+  ✔ lowercase_report_target_type (1177.079475ms)
+  ✖ block_uniqueness + unlock_uniqueness (15008.188453ms)
+✖ integration: persistence invariants (62511.309081ms)
+▶ integration: private profile container lifecycle
+  ✖ normal profile bootstrap repairs an omitted private container without overwriting content (15011.296302ms)
+{"event":"integration.transaction","boundary":"BEGIN","phase":"statement","transport":"pool_client"}
+{"event":"integration.transaction","boundary":"COMMIT","phase":"statement","transport":"pool_client"}
+{"event":"integration.transaction","boundary":"BEGIN","phase":"statement","transport":"pool_client"}
+{"event":"integration.transaction","boundary":"COMMIT","phase":"statement","transport":"pool_client"}
+  ✔ onboarding finalization persists the private container and duplicate submission remains idempotent (21173.677956ms)
+✖ integration: private profile container lifecycle (36185.814268ms)
+{"event":"integration.pool_cleanup","phase":"start","open_pool_count":1}
+{"event":"integration.pool_cleanup","phase":"end","outcome":"PASS","closed_pool_count":1,"failed_pool_count":0}
+{"event":"integration.shared_pool_cleanup","phase":"start","open_pool":true}
+{"event":"integration.shared_pool_cleanup","phase":"end","outcome":"PASS","closed_pool":true}
+ℹ tests 16
+ℹ suites 3
+ℹ pass 14
+ℹ fail 2
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 148272.962629
+
+✖ failing tests:
+
+test at tests/integration/suite/persistence.test.ts:2:25508
+✖ block_uniqueness + unlock_uniqueness (15008.188453ms)
+  Error: Failed query: insert into "users" ("id", "name", "email", "email_verified", "image", "invite_finalized_at", "created_at", "updated_at") values ($1, $2, $3, $4, default, $5, default, default)
+  params: user-block-1794547848966,User block-1794547848966,block-1794547848966@example.com,true,2026-11-13T05:30:48.966Z
+      at NeonPreparedQuery.queryWithCache (/workspace/scratch/e457d4bd4f3e/repo/node_modules/src/pg-core/session.ts:73:11)
+      at processTicksAndRejections (node:internal/process/task_queues:104:5)
+      ... 2 lines matching cause stack trace ...
+      at process.processTimers (node:internal/timers:618:7)
+      at async NeonPreparedQuery.execute (/workspace/scratch/e457d4bd4f3e/repo/node_modules/src/neon-serverless/session.ts:147:11)
+      at async insertUserWithProfile (/workspace/scratch/e457d4bd4f3e/repo/tests/integration/suite/persistence.test.ts:44:3)
+      at async TestContext.<anonymous> (/workspace/scratch/e457d4bd4f3e/repo/tests/integration/suite/persistence.test.ts:482:22)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Suite.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    query: 'insert into "users" ("id", "name", "email", "email_verified", "image", "invite_finalized_at", "created_at", "updated_at") values ($1, $2, $3, $4, default, $5, default, default)',
+    params: [ 'user-block-1794547848966', 'User block-1794547848966', 'block-1794547848966@example.com', true, '2026-11-13T05:30:48.966Z' ],
+    cause: Error: Connection terminated due to connection timeout
+        at /workspace/scratch/e457d4bd4f3e/repo/node_modules/@neondatabase/serverless/index.js:1085:33
+        at processTicksAndRejections (node:internal/process/task_queues:104:5)
+        at runNextTicks (node:internal/process/task_queues:69:3)
+        at listOnTimeout (node:internal/timers:644:9)
+        at process.processTimers (node:internal/timers:618:7)
+        at async <anonymous> (/workspace/scratch/e457d4bd4f3e/repo/node_modules/src/neon-serverless/session.ts:148:12)
+        at async NeonPreparedQuery.queryWithCache (/workspace/scratch/e457d4bd4f3e/repo/node_modules/src/pg-core/session.ts:71:12)
+        at async NeonPreparedQuery.execute (/workspace/scratch/e457d4bd4f3e/repo/node_modules/src/neon-serverless/session.ts:147:11)
+        at async insertUserWithProfile (/workspace/scratch/e457d4bd4f3e/repo/tests/integration/suite/persistence.test.ts:44:3)
+        at async TestContext.<anonymous> (/workspace/scratch/e457d4bd4f3e/repo/tests/integration/suite/persistence.test.ts:482:22) {
+      [cause]: {}
+    }
+  }
+
+test at tests/integration/suite/persistence.test.ts:2:26968
+✖ normal profile bootstrap repairs an omitted private container without overwriting content (15011.296302ms)
+  Error: Failed query: insert into "users" ("id", "name", "email", "email_verified", "image", "invite_finalized_at", "created_at", "updated_at") values ($1, $2, $3, $4, default, $5, default, default)
+  params: user-private-repair-1794547863984,User private-repair-1794547863984,private-repair-1794547863984@example.com,true,2026-11-13T05:31:03.984Z
+      at NeonPreparedQuery.queryWithCache (/workspace/scratch/e457d4bd4f3e/repo/node_modules/src/pg-core/session.ts:73:11)
+      at processTicksAndRejections (node:internal/process/task_queues:104:5)
+      ... 2 lines matching cause stack trace ...
+      at process.processTimers (node:internal/timers:618:7)
+      at async NeonPreparedQuery.execute (/workspace/scratch/e457d4bd4f3e/repo/node_modules/src/neon-serverless/session.ts:147:11)
+      at async insertUserWithProfile (/workspace/scratch/e457d4bd4f3e/repo/tests/integration/suite/persistence.test.ts:44:3)
+      at async TestContext.<anonymous> (/workspace/scratch/e457d4bd4f3e/repo/tests/integration/suite/persistence.test.ts:523:20)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Promise.all (index 0) {
+    query: 'insert into "users" ("id", "name", "email", "email_verified", "image", "invite_finalized_at", "created_at", "updated_at") values ($1, $2, $3, $4, default, $5, default, default)',
+    params: [ 'user-private-repair-1794547863984', 'User private-repair-1794547863984', 'private-repair-1794547863984@example.com', true, '2026-11-13T05:31:03.984Z' ],
+    cause: Error: Connection terminated due to connection timeout
+        at /workspace/scratch/e457d4bd4f3e/repo/node_modules/@neondatabase/serverless/index.js:1085:33
+        at processTicksAndRejections (node:internal/process/task_queues:104:5)
+        at runNextTicks (node:internal/process/task_queues:69:3)
+        at listOnTimeout (node:internal/timers:644:9)
+        at process.processTimers (node:internal/timers:618:7)
+        at async <anonymous> (/workspace/scratch/e457d4bd4f3e/repo/node_modules/src/neon-serverless/session.ts:148:12)
+        at async NeonPreparedQuery.queryWithCache (/workspace/scratch/e457d4bd4f3e/repo/node_modules/src/pg-core/session.ts:71:12)
+        at async NeonPreparedQuery.execute (/workspace/scratch/e457d4bd4f3e/repo/node_modules/src/neon-serverless/session.ts:147:11)
+        at async insertUserWithProfile (/workspace/scratch/e457d4bd4f3e/repo/tests/integration/suite/persistence.test.ts:44:3)
+        at async TestContext.<anonymous> (/workspace/scratch/e457d4bd4f3e/repo/tests/integration/suite/persistence.test.ts:523:20) {
+      [cause]: {}
+    }
+  }
+{"event":"integration.suite","suite":"tests/integration/suite/persistence.test.ts","phase":"end","elapsed_ms":148360,"status":1,"signal":null,"error_code":"SUITE_NONZERO_EXIT"}
+{"event":"integration.fixture_cleanup","phase":"start","failure_path":true}
+{"event":"integration.fixture_cleanup","phase":"end","outcome":"PASS","elapsed_ms":24786,"counts_only":true,"failure_path":true}
+{"event":"integration.observation_log_cleanup","phase":"start"}
+{"event":"integration.observation_log_cleanup","phase":"end"}
+FAIL: integration suite failed to start: SUITE_NONZERO_EXIT
+{"event":"integration.process_exit","status":1,"signal":null,"error_code":null,"timeout_ms":1200000}

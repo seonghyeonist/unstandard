@@ -1591,5 +1591,14 @@
     "VERCEL_ENV",
     "WAITLIST_TOKEN_PEPPER",
     "WSS_PROXY"
+  ],
+  "static_import_cycles": [
+    [
+      "lib/auth/auth.ts",
+      "lib/auth/invite-finalization.ts",
+      "lib/auth/server.ts",
+      "lib/db/repositories/profile-bootstrap.ts",
+      "lib/server/profile/reporter-nickname.ts"
+    ]
   ]
 }

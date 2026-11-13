@@ -1,0 +1,80 @@
+{
+  "date_kst": "2026-11-13",
+  "production_sha": "f5b3843494e6cfb6a87ef21339243e68d28151b9",
+  "remediation_sha": "9a00dd16ea611c76f77ca7f3f2f8216cfe141a6e",
+  "local_check": {
+    "tests": 410,
+    "failures": 0,
+    "lint": "PASS",
+    "typecheck": "PASS",
+    "build": "PASS",
+    "node": "24.22.1",
+    "next": "16.4.2",
+    "zod": "4.6.7"
+  },
+  "github_ci": [
+    {
+      "name": "CI",
+      "number": 287,
+      "conclusion": "success",
+      "url": "https://github.com/seonghyeonist/unstandard/actions/runs/43373875657"
+    },
+    {
+      "name": "Rebuild CI",
+      "number": 227,
+      "conclusion": "success",
+      "url": "https://github.com/seonghyeonist/unstandard/actions/runs/43373877356"
+    }
+  ],
+  "dependency_audit_production": {
+    "total": 0
+  },
+  "dependency_audit_all": {
+    "moderate": 7,
+    "high": 0,
+    "critical": 0
+  },
+  "independent_boundary_tests": {
+    "pass": 5,
+    "fail": 0
+  },
+  "isolated_test_project": "raspy-art-18056978",
+  "real_user_or_live_provider_test": "NOT_RUN",
+  "verdict_audit_branch": "CONDITIONAL PASS",
+  "operational_p1_status": "NOT_DEPLOYED_NOT_MERGED",
+  "database": {
+    "migration": "PASS",
+    "original_runner": {
+      "passed": 29,
+      "failed": 2,
+      "result": "FAIL",
+      "cause": "fixture INSERT connection timeout"
+    },
+    "direct_persistence_retry": {
+      "passed": 16,
+      "failed": 0
+    },
+    "auth_scenarios": {
+      "proofs": "PASS",
+      "didit-security": "PASS",
+      "profile-visibility": "PASS",
+      "support-lifecycle": "PASS",
+      "password-reset-delete": "PASS"
+    },
+    "concurrent_rate_limit": {
+      "requests": 30,
+      "allowed": 20,
+      "denied": 10,
+      "exceptions": 0,
+      "counter": 30,
+      "cleanup": "PASS"
+    },
+    "final_cleanup": {
+      "application_tables": 29,
+      "application_rows": 0,
+      "migration_ledger_rows": 17,
+      "temporary_credentials_removed": true,
+      "pools_closed": true
+    }
+  }
+}

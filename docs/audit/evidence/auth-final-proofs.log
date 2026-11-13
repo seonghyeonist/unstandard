@@ -1,0 +1,7 @@
+{"event":"auth.postgres.e2e","case":"fresh_pre_auth_zero_counts","outcome":"PASS"}
+{"event":"auth.postgres.e2e","case":"wrong_email_code_rejected_no_auth_rows","outcome":"PASS"}
+{"event":"auth.postgres.e2e","case":"wrong_invite_email_relationship_rejected","outcome":"PASS"}
+{"event":"auth.postgres.e2e","case":"expired_proof_rejected","outcome":"PASS"}
+{"event":"auth.postgres.e2e","case":"invalidated_proof_rejected","outcome":"PASS"}
+{"event":"auth.postgres.e2e","case":"replayed_proof_rejected","outcome":"PASS"}
+{"event":"auth.postgres.e2e","outcome":"PASS","evidence":"sanitized_count_only"}

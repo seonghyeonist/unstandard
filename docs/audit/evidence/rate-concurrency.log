@@ -1,0 +1,2 @@
+{"case":"concurrent_rate_limit_30_calls","allowed":20,"denied":10,"failures":0,"counter":30}
+{"event":"integration.shared_pool_cleanup","phase":"end","outcome":"PASS","closed_pool":true}
