@@ -45,17 +45,12 @@
 
 ## D. 신고(report) 영속화 (브라우저 수동)
 
-대상: `lib/api/reports.ts` + `lib/api/report-store.ts` (sessionStorage 키 `unstandard.alpha.reports`).
+대상: `lib/api/reports.ts` → `app/api/reports/route.ts` → 서버 신고 저장소.
 
-1. 잠금해제한 프로필(`/app/profile/[id]`)에서 "불편한 내용 신고" 클릭.
-   - [ ] 버튼 문구가 "알려줘서 고마워요"로 바뀐다(성공).
-2. DevTools → Application → Session Storage → `unstandard.alpha.reports` 확인.
-   - [ ] 배열에 `{ id, targetType, targetId, reason, createdAt, status:"OPEN" }` 레코드가 생긴다.
-   - [ ] (가능하면) 다른 대상도 신고 → 배열에 **append**되어 항목이 늘어난다(기존 항목 유지).
-3. 페이지 **새로고침** 후:
-   - [ ] 앱이 깨지지 않는다(저장된 reports JSON 파싱 안전).
-4. UI 점검:
-   - [ ] 화면에 관리자/모더레이션/대기열 같은 내부 개념이 노출되지 않는다.
+1. 격리 테스트 환경에서 프로필 신고를 제출하고 성공 응답을 확인한다.
+2. 새로고침 후에도 화면이 정상 작동하는지 확인한다.
+3. 신고의 영속성과 중복 처리는 격리 DB 통합 테스트로 확인한다.
+4. 브라우저 저장소 또는 서버 메모리를 신고의 정본으로 사용하지 않는다.
 
 ## E. reasonCode 기반 사용자 문구 (브라우저 수동)
 
