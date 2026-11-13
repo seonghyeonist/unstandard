@@ -6,14 +6,14 @@ import { canImportPreviewSession, existingSessionCookie } from "@/lib/auth/previ
 import { getDb } from "@/lib/db/client";
 import { profiles } from "@/lib/db/schema/profiles";
 import { privateJson } from "@/lib/http/private-json";
-import { isSameOriginMutation } from "@/lib/http/profile-request";
+import { isSameOriginMutation, readSmallJson } from "@/lib/http/profile-request";
 import { isCanonicalUuid } from "@/lib/server/unlock/uuid";
 
 export async function POST(request: Request) {
   if (!canImportPreviewSession(process.env)) return privateJson({ error: "Not available" }, { status: 404 });
   if (!isSameOriginMutation(request) || !(await hasOperatorSession())) return privateJson({ error: "Unauthorized" }, { status: 403 });
   try {
-    const body = await request.json();
+    const body = await readSmallJson(request, 16 * 1024) as { sessionToken?: unknown; profileId?: unknown } | null;
     if (typeof body?.sessionToken !== "string" || typeof body?.profileId !== "string" || !isCanonicalUuid(body.profileId)) {
       return privateJson({ error: "Invalid input" }, { status: 400 });
     }
