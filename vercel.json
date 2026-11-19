@@ -2,5 +2,10 @@
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "framework": "nextjs",
   "buildCommand": "npm run build",
-  "installCommand": "npm ci"
+  "installCommand": "npm ci",
+  "git": {
+    "deploymentEnabled": {
+      "pivot/b2c-v4-foundation-20261119": false
+    }
+  }
 }
