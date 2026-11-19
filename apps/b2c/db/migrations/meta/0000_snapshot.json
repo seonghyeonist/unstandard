@@ -1,0 +1,1194 @@
+{
+  "id": "6242b16e-b25e-404a-a2c3-71b7c56100af",
+  "prevId": "00000000-0000-0000-0000-000000000000",
+  "version": "7",
+  "dialect": "postgresql",
+  "tables": {
+    "b2c.cards": {
+      "name": "cards",
+      "schema": "b2c",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "room_id": {
+          "name": "room_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "round_id": {
+          "name": "round_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "owner_member_id": {
+          "name": "owner_member_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "kind": {
+          "name": "kind",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "revision": {
+          "name": "revision",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "payload": {
+          "name": "payload",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "indexes": {
+        "cards_shared_revision": {
+          "name": "cards_shared_revision",
+          "columns": [
+            {
+              "expression": "round_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "kind",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "revision",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "where": "\"b2c\".\"cards\".\"kind\" = 'shared'",
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "cards_personal_revision": {
+          "name": "cards_personal_revision",
+          "columns": [
+            {
+              "expression": "room_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "owner_member_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "revision",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "where": "\"b2c\".\"cards\".\"kind\" = 'personal'",
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "cards_room": {
+          "name": "cards_room",
+          "columns": [
+            {
+              "expression": "room_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "cards_room_id_rooms_id_fk": {
+          "name": "cards_room_id_rooms_id_fk",
+          "tableFrom": "cards",
+          "tableTo": "rooms",
+          "schemaTo": "b2c",
+          "columnsFrom": [
+            "room_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "cards_round_scope": {
+          "name": "cards_round_scope",
+          "tableFrom": "cards",
+          "tableTo": "rounds",
+          "schemaTo": "b2c",
+          "columnsFrom": [
+            "room_id",
+            "round_id"
+          ],
+          "columnsTo": [
+            "room_id",
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "cards_owner_scope": {
+          "name": "cards_owner_scope",
+          "tableFrom": "cards",
+          "tableTo": "members",
+          "schemaTo": "b2c",
+          "columnsFrom": [
+            "room_id",
+            "owner_member_id"
+          ],
+          "columnsTo": [
+            "room_id",
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "cards_scope": {
+          "name": "cards_scope",
+          "value": "(\"b2c\".\"cards\".\"kind\" = 'personal' and \"b2c\".\"cards\".\"owner_member_id\" is not null and \"b2c\".\"cards\".\"round_id\" is null)\n    or (\"b2c\".\"cards\".\"kind\" = 'shared' and \"b2c\".\"cards\".\"owner_member_id\" is null and \"b2c\".\"cards\".\"round_id\" is not null)"
+        },
+        "cards_revision": {
+          "name": "cards_revision",
+          "value": "\"b2c\".\"cards\".\"revision\" >= 0"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "b2c.invites": {
+      "name": "invites",
+      "schema": "b2c",
+      "columns": {
+        "token_digest": {
+          "name": "token_digest",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "room_id": {
+          "name": "room_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "expires_at": {
+          "name": "expires_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "used_at": {
+          "name": "used_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "revoked_at": {
+          "name": "revoked_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {
+        "invites_one_open_per_room": {
+          "name": "invites_one_open_per_room",
+          "columns": [
+            {
+              "expression": "room_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "where": "\"b2c\".\"invites\".\"used_at\" is null and \"b2c\".\"invites\".\"revoked_at\" is null",
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "invites_room": {
+          "name": "invites_room",
+          "columns": [
+            {
+              "expression": "room_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "invites_room_id_rooms_id_fk": {
+          "name": "invites_room_id_rooms_id_fk",
+          "tableFrom": "invites",
+          "tableTo": "rooms",
+          "schemaTo": "b2c",
+          "columnsFrom": [
+            "room_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "invites_digest": {
+          "name": "invites_digest",
+          "value": "\"b2c\".\"invites\".\"token_digest\" ~ '^[0-9a-f]{64}$'"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "b2c.jobs": {
+      "name": "jobs",
+      "schema": "b2c",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "order_id": {
+          "name": "order_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "kind": {
+          "name": "kind",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "revision": {
+          "name": "revision",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "lease_until": {
+          "name": "lease_until",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "attempts": {
+          "name": "attempts",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "payload": {
+          "name": "payload",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "finished_at": {
+          "name": "finished_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {
+        "jobs_open_lease": {
+          "name": "jobs_open_lease",
+          "columns": [
+            {
+              "expression": "lease_until",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "where": "\"b2c\".\"jobs\".\"finished_at\" is null",
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "jobs_order_id_orders_id_fk": {
+          "name": "jobs_order_id_orders_id_fk",
+          "tableFrom": "jobs",
+          "tableTo": "orders",
+          "schemaTo": "b2c",
+          "columnsFrom": [
+            "order_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "jobs_order_kind_revision": {
+          "name": "jobs_order_kind_revision",
+          "nullsNotDistinct": false,
+          "columns": [
+            "order_id",
+            "kind",
+            "revision"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {
+        "jobs_attempts": {
+          "name": "jobs_attempts",
+          "value": "\"b2c\".\"jobs\".\"attempts\" between 0 and 3 and \"b2c\".\"jobs\".\"revision\" >= 0"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "b2c.members": {
+      "name": "members",
+      "schema": "b2c",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "room_id": {
+          "name": "room_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "role": {
+          "name": "role",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "locale": {
+          "name": "locale",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "time_zone": {
+          "name": "time_zone",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'UTC'"
+        },
+        "revision": {
+          "name": "revision",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "revoked_at": {
+          "name": "revoked_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "members_room_id_rooms_id_fk": {
+          "name": "members_room_id_rooms_id_fk",
+          "tableFrom": "members",
+          "tableTo": "rooms",
+          "schemaTo": "b2c",
+          "columnsFrom": [
+            "room_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "members_room_role": {
+          "name": "members_room_role",
+          "nullsNotDistinct": false,
+          "columns": [
+            "room_id",
+            "role"
+          ]
+        },
+        "members_room_id": {
+          "name": "members_room_id",
+          "nullsNotDistinct": false,
+          "columns": [
+            "room_id",
+            "id"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {
+        "members_role": {
+          "name": "members_role",
+          "value": "\"b2c\".\"members\".\"role\" in ('buyer', 'partner')"
+        },
+        "members_locale": {
+          "name": "members_locale",
+          "value": "\"b2c\".\"members\".\"locale\" in ('en', 'ko')"
+        },
+        "members_revision": {
+          "name": "members_revision",
+          "value": "\"b2c\".\"members\".\"revision\" >= 0"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "b2c.orders": {
+      "name": "orders",
+      "schema": "b2c",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "request_key": {
+          "name": "request_key",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "sku": {
+          "name": "sku",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "usd_cents": {
+          "name": "usd_cents",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "currency": {
+          "name": "currency",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'USD'"
+        },
+        "price_id": {
+          "name": "price_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "provider_tx": {
+          "name": "provider_tx",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "state": {
+          "name": "state",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'pending'"
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "paid_at": {
+          "name": "paid_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "orders_request_key_unique": {
+          "name": "orders_request_key_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "request_key"
+          ]
+        },
+        "orders_provider_tx_unique": {
+          "name": "orders_provider_tx_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "provider_tx"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {
+        "orders_usd_only": {
+          "name": "orders_usd_only",
+          "value": "\"b2c\".\"orders\".\"currency\" = 'USD' and \"b2c\".\"orders\".\"usd_cents\" > 0"
+        },
+        "orders_state": {
+          "name": "orders_state",
+          "value": "\"b2c\".\"orders\".\"state\" in ('pending', 'paid', 'refunded', 'disputed')"
+        },
+        "orders_paid_fields": {
+          "name": "orders_paid_fields",
+          "value": "\"b2c\".\"orders\".\"state\" <> 'paid' or (\"b2c\".\"orders\".\"paid_at\" is not null and \"b2c\".\"orders\".\"provider_tx\" is not null)"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "b2c.payment_events": {
+      "name": "payment_events",
+      "schema": "b2c",
+      "columns": {
+        "event_id": {
+          "name": "event_id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "event_type": {
+          "name": "event_type",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "provider_tx": {
+          "name": "provider_tx",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "order_id": {
+          "name": "order_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "occurred_at": {
+          "name": "occurred_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "received_at": {
+          "name": "received_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "payment_events_tx_time": {
+          "name": "payment_events_tx_time",
+          "columns": [
+            {
+              "expression": "provider_tx",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "occurred_at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "payment_events_order_id_orders_id_fk": {
+          "name": "payment_events_order_id_orders_id_fk",
+          "tableFrom": "payment_events",
+          "tableTo": "orders",
+          "schemaTo": "b2c",
+          "columnsFrom": [
+            "order_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "b2c.rooms": {
+      "name": "rooms",
+      "schema": "b2c",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "order_id": {
+          "name": "order_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "expires_at": {
+          "name": "expires_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "revoked_at": {
+          "name": "revoked_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {
+        "rooms_expiration": {
+          "name": "rooms_expiration",
+          "columns": [
+            {
+              "expression": "expires_at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "rooms_order_id_orders_id_fk": {
+          "name": "rooms_order_id_orders_id_fk",
+          "tableFrom": "rooms",
+          "tableTo": "orders",
+          "schemaTo": "b2c",
+          "columnsFrom": [
+            "order_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "rooms_order_id_unique": {
+          "name": "rooms_order_id_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "order_id"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "b2c.rounds": {
+      "name": "rounds",
+      "schema": "b2c",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "room_id": {
+          "name": "room_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "version": {
+          "name": "version",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "slots": {
+          "name": "slots",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "deadline": {
+          "name": "deadline",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "rounds_room_id_rooms_id_fk": {
+          "name": "rounds_room_id_rooms_id_fk",
+          "tableFrom": "rounds",
+          "tableTo": "rooms",
+          "schemaTo": "b2c",
+          "columnsFrom": [
+            "room_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "rounds_room_id": {
+          "name": "rounds_room_id",
+          "nullsNotDistinct": false,
+          "columns": [
+            "room_id",
+            "id"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {
+        "rounds_version": {
+          "name": "rounds_version",
+          "value": "\"b2c\".\"rounds\".\"version\" >= 0"
+        },
+        "rounds_slots": {
+          "name": "rounds_slots",
+          "value": "case when jsonb_typeof(\"b2c\".\"rounds\".\"slots\") = 'array' then jsonb_array_length(\"b2c\".\"rounds\".\"slots\") between 1 and 6 else false end"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "b2c.sessions": {
+      "name": "sessions",
+      "schema": "b2c",
+      "columns": {
+        "token_digest": {
+          "name": "token_digest",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "member_id": {
+          "name": "member_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "issued_at": {
+          "name": "issued_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "expires_at": {
+          "name": "expires_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "revoked_at": {
+          "name": "revoked_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {
+        "sessions_member": {
+          "name": "sessions_member",
+          "columns": [
+            {
+              "expression": "member_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "sessions_expiration": {
+          "name": "sessions_expiration",
+          "columns": [
+            {
+              "expression": "expires_at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "sessions_member_id_members_id_fk": {
+          "name": "sessions_member_id_members_id_fk",
+          "tableFrom": "sessions",
+          "tableTo": "members",
+          "schemaTo": "b2c",
+          "columnsFrom": [
+            "member_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "sessions_digest": {
+          "name": "sessions_digest",
+          "value": "\"b2c\".\"sessions\".\"token_digest\" ~ '^[0-9a-f]{64}$'"
+        },
+        "sessions_lifetime": {
+          "name": "sessions_lifetime",
+          "value": "\"b2c\".\"sessions\".\"expires_at\" > \"b2c\".\"sessions\".\"issued_at\""
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "b2c.submissions": {
+      "name": "submissions",
+      "schema": "b2c",
+      "columns": {
+        "room_id": {
+          "name": "room_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "round_id": {
+          "name": "round_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "member_id": {
+          "name": "member_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "tuples": {
+          "name": "tuples",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "share_version": {
+          "name": "share_version",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        }
+      },
+      "indexes": {
+        "submissions_member_scope_idx": {
+          "name": "submissions_member_scope_idx",
+          "columns": [
+            {
+              "expression": "room_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "member_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "submissions_round_scope": {
+          "name": "submissions_round_scope",
+          "tableFrom": "submissions",
+          "tableTo": "rounds",
+          "schemaTo": "b2c",
+          "columnsFrom": [
+            "room_id",
+            "round_id"
+          ],
+          "columnsTo": [
+            "room_id",
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "submissions_member_scope": {
+          "name": "submissions_member_scope",
+          "tableFrom": "submissions",
+          "tableTo": "members",
+          "schemaTo": "b2c",
+          "columnsFrom": [
+            "room_id",
+            "member_id"
+          ],
+          "columnsTo": [
+            "room_id",
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "submissions_round_member": {
+          "name": "submissions_round_member",
+          "nullsNotDistinct": false,
+          "columns": [
+            "round_id",
+            "member_id"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {
+        "submissions_tuples": {
+          "name": "submissions_tuples",
+          "value": "case when jsonb_typeof(\"b2c\".\"submissions\".\"tuples\") = 'array' then jsonb_array_length(\"b2c\".\"submissions\".\"tuples\") <= 36 else false end"
+        },
+        "submissions_version": {
+          "name": "submissions_version",
+          "value": "\"b2c\".\"submissions\".\"share_version\" >= 0"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "b2c.votes": {
+      "name": "votes",
+      "schema": "b2c",
+      "columns": {
+        "room_id": {
+          "name": "room_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "round_id": {
+          "name": "round_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "member_id": {
+          "name": "member_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "candidate_id": {
+          "name": "candidate_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "revision": {
+          "name": "revision",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "accepted_at": {
+          "name": "accepted_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "indexes": {
+        "votes_member_scope_idx": {
+          "name": "votes_member_scope_idx",
+          "columns": [
+            {
+              "expression": "room_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "member_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "votes_round_scope": {
+          "name": "votes_round_scope",
+          "tableFrom": "votes",
+          "tableTo": "rounds",
+          "schemaTo": "b2c",
+          "columnsFrom": [
+            "room_id",
+            "round_id"
+          ],
+          "columnsTo": [
+            "room_id",
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "votes_member_scope": {
+          "name": "votes_member_scope",
+          "tableFrom": "votes",
+          "tableTo": "members",
+          "schemaTo": "b2c",
+          "columnsFrom": [
+            "room_id",
+            "member_id"
+          ],
+          "columnsTo": [
+            "room_id",
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "votes_round_member": {
+          "name": "votes_round_member",
+          "nullsNotDistinct": false,
+          "columns": [
+            "round_id",
+            "member_id"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {
+        "votes_revision": {
+          "name": "votes_revision",
+          "value": "\"b2c\".\"votes\".\"revision\" >= 0"
+        }
+      },
+      "isRLSEnabled": false
+    }
+  },
+  "enums": {},
+  "schemas": {
+    "b2c": "b2c"
+  },
+  "sequences": {},
+  "roles": {},
+  "policies": {},
+  "views": {},
+  "_meta": {
+    "columns": {},
+    "schemas": {},
+    "tables": {}
+  }
+}
