@@ -1,18 +1,29 @@
+import typescriptParser from "@typescript-eslint/parser";
+
 const config = [
   {
-    files: ["{src,scripts,tests}/**/*.mjs"],
+    files: ["{src,scripts,tests,server,db}/**/*.{mjs,mts}", "drizzle.config.mts"],
     languageOptions: { ecmaVersion: "latest" },
     linterOptions: { reportUnusedDisableDirectives: "error" },
     rules: {
       "no-debugger": "error",
       "no-duplicate-imports": "error",
-      "no-redeclare": "error",
-      "no-shadow-restricted-names": "error",
       "no-unreachable": "error",
-      "no-unused-vars": "error",
       "no-var": "error",
       "prefer-const": "error",
     },
+  },
+  {
+    files: ["**/*.mjs"],
+    rules: {
+      "no-redeclare": "error",
+      "no-shadow-restricted-names": "error",
+      "no-unused-vars": "error",
+    },
+  },
+  {
+    files: ["**/*.mts"],
+    languageOptions: { parser: typescriptParser },
   },
   {
     files: ["src/**/*.mjs"],
