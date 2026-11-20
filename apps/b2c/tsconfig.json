@@ -24,6 +24,7 @@
     "db/*.mts",
     "scripts/*.mts",
     "tests/*.mts",
+    "api/**/*.ts",
     "drizzle.config.mts"
   ]
 }

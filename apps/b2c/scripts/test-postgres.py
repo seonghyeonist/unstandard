@@ -4,6 +4,7 @@ from pathlib import Path
 import shutil
 import socket
 import subprocess
+import sys
 from tempfile import TemporaryDirectory
 
 APP = Path(__file__).resolve().parents[1]
@@ -13,7 +14,8 @@ def pg(name):
     bin_dir = os.environ.get("B2C_PG_BIN")
     path = str(Path(bin_dir) / name) if bin_dir else shutil.which(name)
     if not path or not Path(path).is_file():
-        raise SystemExit("PostgreSQL tools unavailable. Set B2C_PG_BIN to a PostgreSQL 17 bin directory.")
+        print("PostgreSQL tools unavailable. Set B2C_PG_BIN to a PostgreSQL 17 bin directory.", file=sys.stderr)
+        raise SystemExit(78)
     return path
 
 
@@ -22,6 +24,8 @@ def run(*args, env=None):
 
 
 def main():
+    for name in ("initdb", "pg_ctl"):
+        pg(name)
     with TemporaryDirectory(prefix="unstandard-b2c-pg-") as folder:
         data = str(Path(folder) / "data")
         log = str(Path(folder) / "postgres.log")
@@ -52,7 +56,10 @@ def main():
             )
             run("npm", "run", "db:migrate", env=env)
             run("npm", "run", "db:migrate", env=env)
-            run("npm", "run", "test:db", env=env)
+            if sys.argv[1:] == ["payment"]:
+                run("node", "--test", "tests/payment.integration.mts", env=env)
+            else:
+                run("npm", "run", "test:db", env=env)
         finally:
             run(pg("pg_ctl"), "-D", data, "-m", "fast", "-w", "stop")
 
