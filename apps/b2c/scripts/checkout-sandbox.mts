@@ -5,6 +5,10 @@ import { loadPaymentConfig } from "../server/payment-config.mts";
 import { hostedSandboxCheckout } from "../server/polar-provider.mts";
 import { allowWrites, Blocked, delay, required, summarize } from "./sandbox-helpers.mts";
 
+function stage(name: string, status = "PASS", httpStatus?: number) {
+  console.log(JSON.stringify({ layer: "polar_sandbox_checkout", status, stage: name, http_status: httpStatus }));
+}
+
 async function waitFor<T>(read: () => Promise<T | undefined>, timeout: number, reason: string) {
   const until = Date.now() + timeout;
   while (Date.now() < until) {
@@ -39,24 +43,35 @@ await summarize("polar_sandbox_checkout_refund", async () => {
   if (accessKey && !/^[a-f0-9]{64}$/i.test(accessKey)) throw new Error("invalid_sandbox_access_key");
   if (!local) {
     const anonymous = await fetch(origin + "/checkout", { redirect: "error", signal: AbortSignal.timeout(12_000) });
+    stage("anonymous_checkout_probe", anonymous.status === 401 ? "PASS" : "FAIL", anonymous.status);
     if (anonymous.status !== 401) throw new Blocked("sandbox_checkout_gate_not_reachable");
   }
   await provider.validateCatalog();
-  const browser = await chromium.launch({ executablePath: process.env.B2C_BROWSER });
+  stage("sandbox_catalog");
+  const browser = await chromium.launch({ executablePath: process.env.B2C_BROWSER })
+    .catch(() => { throw new Blocked("sandbox_browser_launch_failed"); });
+  stage("browser_launched");
   try {
     const context = await browser.newContext({ locale: "en-US",
       httpCredentials: accessKey ? { username: "b2c", password: accessKey, origin } : undefined });
     const page = await context.newPage();
-    await page.goto(origin + "/checkout", { timeout: 15_000 });
+    const pageReply = await page.goto(origin + "/checkout", { timeout: 15_000 })
+      .catch(() => { throw new Blocked("sandbox_checkout_page_not_reachable"); });
+    stage("app_checkout_page", pageReply?.status() === 200 ? "PASS" : "FAIL", pageReply?.status());
+    if (pageReply?.status() !== 200) throw new Blocked("sandbox_checkout_page_access_not_verified");
     const before = await context.request.get(origin + "/api/b2c/me/card");
+    stage("unpaid_card_api", before.status() === 401 ? "PASS" : "FAIL", before.status());
     if (before.status() !== 401) throw new Error("unpaid_card_access_expected_401");
     const orderReply = page.waitForResponse((reply) =>
       reply.url() === origin + "/api/b2c/orders" && reply.request().method() === "POST", { timeout: 20_000 });
     await page.getByRole("button", { name: "Open Sandbox checkout" }).click({ timeout: 10_000 });
     const order = await orderReply;
+    stage("app_create_checkout", order.status() === 201 ? "PASS" : "FAIL", order.status());
     if (order.status() !== 201) throw new Error("sandbox_order_create_failed");
     const { transactionId, checkoutUrl } = await order.json() as { transactionId: string; checkoutUrl: string };
-    await page.waitForURL(hostedSandboxCheckout(checkoutUrl), { timeout: 20_000 });
+    await page.waitForURL(hostedSandboxCheckout(checkoutUrl), { timeout: 20_000 })
+      .catch(() => { throw new Blocked("sandbox_hosted_checkout_not_reached"); });
+    stage("polar_checkout_opened");
     const email = `p2-smoke-${randomUUID()}@example.com`;
     await page.getByRole("textbox", { name: "Email", exact: true }).fill(email);
     await (await cardField(page, /Card number/i)).fill("4242424242424242");
@@ -80,6 +95,7 @@ await summarize("polar_sandbox_checkout_refund", async () => {
     } catch {
       throw new Blocked("sandbox_checkout_control_unavailable");
     }
+    stage("test_card_submitted");
     const paid = await waitFor(async () => {
       const { items } = await provider.client.orders.list({ organization_id: organizationId, checkout_id: transactionId, limit: 2 });
       if (items.length > 1) throw new Error("duplicate_sandbox_order");
