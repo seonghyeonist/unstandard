@@ -65,6 +65,17 @@ async function handle(origin: string, incoming: IncomingMessage, outgoing: Serve
   outgoing.writeHead(response.status).end(Buffer.from(await response.arrayBuffer()));
 }
 
+async function waitForTransport(origin: string) {
+  for (let attempt = 0; attempt < 12; attempt++) {
+    try {
+      const reply = await fetch(origin + "/", { redirect: "error", signal: AbortSignal.timeout(3000) });
+      if (reply.status === 204) return;
+    } catch {}
+    await delay(2000);
+  }
+  throw new Blocked("temporary_https_transport_not_verified");
+}
+
 async function waitForGates(origin: string) {
   for (let attempt = 0; attempt < 12; attempt++) {
     try {
@@ -83,7 +94,16 @@ function providerFailure(stage: string, error: unknown): never {
   const status = error instanceof Error && "statusCode" in error && typeof error.statusCode === "number"
     ? error.statusCode : null;
   const errorType = error instanceof Error && /^[A-Za-z0-9]{1,80}$/.test(error.name) ? error.name : "Unknown";
-  console.log(JSON.stringify({ layer: "polar_temporary_https", stage, status: "FAIL", http_status: status, error_type: errorType }));
+  const detail = error instanceof Error && "error" in error && error.error && typeof error.error === "object" &&
+    "detail" in error.error ? error.error.detail : null;
+  const knownFields = new Set(["body", "url", "events", "organization_id", "format", "api_version", "name"]);
+  const validation = Array.isArray(detail) ? detail.slice(0, 5).map((item) => {
+    const loc = Array.isArray(item?.loc) ? item.loc.filter((part: string) => knownFields.has(part)) : [];
+    const type = typeof item?.type === "string" && /^[a-z_0-9]{1,60}$/.test(item.type) ? item.type : null;
+    return { loc, type };
+  }) : undefined;
+  console.log(JSON.stringify({ layer: "polar_temporary_https", stage, status: "FAIL", http_status: status,
+    error_type: errorType, validation }));
   if (status === 401 || status === 403) throw new Blocked(stage + "_authorization");
   throw new Error(stage + "_failed");
 }
@@ -109,11 +129,27 @@ await summarize("polar_temporary_https", async () => {
     "http://127.0.0.1:" + localPort], { env: { PATH: process.env.PATH }, stdio: ["ignore", "pipe", "pipe"] });
   let endpoint: string | undefined;
   let server: ReturnType<typeof createServer> | undefined;
+  let ready = false;
   try {
     const origin = await tunnelOrigin(tunnel);
     console.log(JSON.stringify({ layer: "polar_temporary_https", status: "PASS", stage: "temporary_origin_assigned" }));
+    server = createServer({ requestTimeout: 30_000 }, (req, res) => {
+      if (!ready) {
+        res.writeHead(req.method === "GET" && req.url === "/" ? 204 : 503).end();
+        return;
+      }
+      void handle(origin, req, res).catch(() => {
+        if (!res.headersSent) res.writeHead(503);
+        res.end();
+      });
+    });
+    await new Promise<void>((resolve, reject) => {
+      server!.once("error", reject).listen(localPort, "127.0.0.1", resolve);
+    });
+    await waitForTransport(origin);
+    console.log(JSON.stringify({ layer: "polar_temporary_https", status: "PASS", stage: "https_transport_verified" }));
     const destination = await sdk.webhooks.createWebhookEndpoint({
-      organization_id: organizationId, name: "UNSTANDARD P2 temporary " + randomUUID(),
+      name: "UNSTANDARD P2 " + randomUUID().slice(0, 8),
       url: origin + webhookPath, format: "raw", api_version: "2026-10", events: [...polarEvents],
     }).catch((error: unknown) => providerFailure("sandbox_webhook_create", error));
     endpoint = destination.id;
@@ -127,15 +163,7 @@ await summarize("polar_temporary_https", async () => {
       B2C_PAYMENT_TOKEN_KEY: randomBytes(32).toString("hex"),
       B2C_SANDBOX_ACCESS_KEY: randomBytes(32).toString("hex"),
     });
-    server = createServer({ requestTimeout: 30_000 }, (req, res) => {
-      void handle(origin, req, res).catch(() => {
-        if (!res.headersSent) res.writeHead(503);
-        res.end();
-      });
-    });
-    await new Promise<void>((resolve, reject) => {
-      server!.once("error", reject).listen(localPort, "127.0.0.1", resolve);
-    });
+    ready = true;
     await waitForGates(origin);
     console.log(JSON.stringify({ layer: "polar_temporary_https", status: "PASS", stage: "origin_and_gates" }));
     const result = await new Promise<number | null>((resolve, reject) => {
