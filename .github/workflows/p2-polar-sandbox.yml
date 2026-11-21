@@ -1,0 +1,70 @@
+name: P2 Polar Sandbox rehearsal
+
+on:
+  push:
+    branches: [pivot/b2c-v4-p2-paddle]
+    paths: [.github/workflows/p2-polar-sandbox.yml]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: p2-polar-sandbox-rehearsal
+  cancel-in-progress: false
+
+jobs:
+  rehearsal:
+    if: github.repository == 'seonghyeonist/unstandard' && github.ref == 'refs/heads/pivot/b2c-v4-p2-paddle'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    environment: p2-polar-sandbox
+    defaults:
+      run:
+        working-directory: apps/b2c
+    services:
+      pg:
+        image: postgres:17
+        env:
+          POSTGRES_USER: b2c_runner
+          POSTGRES_PASSWORD: local-fixture-only
+          POSTGRES_DB: unstandard_b2c
+        ports:
+          - 5432
+        options: >-
+          --health-cmd "pg_isready -U b2c_runner -d unstandard_b2c"
+          --health-interval 3s --health-timeout 3s --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24.x
+      - name: Install and verify B2C
+        run: |
+          npm ci --no-audit --no-fund
+          npm run check
+          npx playwright install --with-deps chromium
+      - name: Install verified Cloudflare tunnel client
+        shell: bash
+        run: |
+          curl --fail --silent --show-error --location --proto '=https' --max-time 90 \
+            https://github.com/cloudflare/cloudflared/releases/download/2026.11.0/cloudflared-linux-amd64 \
+            --output "$RUNNER_TEMP/cloudflared"
+          printf '%s  %s\n' 51f7c68b57ed7269164075d7e789efce5b59355982f06392deeb037d982a51fd "$RUNNER_TEMP/cloudflared" | sha256sum --check --status
+          chmod 0700 "$RUNNER_TEMP/cloudflared"
+      - name: Migrate isolated runner database
+        env:
+          B2C_DATABASE_URL: postgresql://b2c_runner:local-fixture-only@127.0.0.1:${{ job.services.pg.ports[5432] }}/unstandard_b2c
+          B2C_MIGRATE_CONFIRM: local-b2c
+        run: npm run db:migrate
+      - name: Capture app order before Polar redirects, then rehearse refund
+        env:
+          B2C_DATABASE_URL: postgresql://b2c_runner:local-fixture-only@127.0.0.1:${{ job.services.pg.ports[5432] }}/unstandard_b2c
+          B2C_POLAR_ORGANIZATION_ID: e9d6161a-1711-4571-837b-05996cc8bd43
+          B2C_POLAR_PRODUCT_ID: 903bf4e5-61c0-4fe0-9325-9364c8b52754
+          B2C_POLAR_ACCESS_TOKEN: ${{ secrets.B2C_POLAR_ACCESS_TOKEN }}
+          B2C_POLAR_E2E_REFUND_TOKEN: ${{ secrets.B2C_POLAR_E2E_REFUND_TOKEN }}
+          B2C_POLAR_E2E_WEBHOOK_TOKEN: ${{ secrets.B2C_POLAR_E2E_WEBHOOK_TOKEN }}
+          B2C_SANDBOX_WRITE_CONFIRM: checkout-b2c-polar-sandbox
+        run: B2C_CLOUDFLARED="$RUNNER_TEMP/cloudflared" node scripts/polar-tunnel-rehearsal.mts

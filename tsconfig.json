@@ -36,6 +36,7 @@
     ".next/dev/types/**/*.ts"
   ],
   "exclude": [
+    "apps/b2c",
     "node_modules",
     "**/*.test.ts",
     "tests/**"

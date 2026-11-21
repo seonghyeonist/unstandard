@@ -2,7 +2,7 @@ import typescriptParser from "@typescript-eslint/parser";
 
 const config = [
   {
-    files: ["{src,scripts,tests,server,db}/**/*.{mjs,mts}", "drizzle.config.mts"],
+    files: ["{src,scripts,tests,server,db}/**/*.{mjs,mts}", "drizzle.config.mts", "api/**/*.ts"],
     languageOptions: { ecmaVersion: "latest" },
     linterOptions: { reportUnusedDisableDirectives: "error" },
     rules: {
@@ -22,7 +22,7 @@ const config = [
     },
   },
   {
-    files: ["**/*.mts"],
+    files: ["**/*.mts", "api/**/*.ts"],
     languageOptions: { parser: typescriptParser },
   },
   {

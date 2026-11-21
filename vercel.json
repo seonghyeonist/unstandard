@@ -6,7 +6,8 @@
   "git": {
     "deploymentEnabled": {
       "pivot/b2c-v4-foundation-20261119": false,
-      "pivot/b2c-v4-p1-data-session": false
+      "pivot/b2c-v4-p1-data-session": false,
+      "pivot/b2c-v4-p2-paddle": false
     }
   }
 }

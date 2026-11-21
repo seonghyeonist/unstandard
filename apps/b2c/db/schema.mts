@@ -18,7 +18,22 @@ export const orders = schema.table("orders", {
   state: text("state", { enum: ["pending", "paid", "refunded", "disputed"] }).notNull().default("pending"),
   createdAt: stamp("created_at").notNull().defaultNow(),
   paidAt: stamp("paid_at"),
+  paymentMode: text("payment_mode", { enum: ["synthetic", "sandbox"] }),
+  checkoutLocale: text("checkout_locale", { enum: ["en", "ko"] }),
+  purchaseDigest: text("purchase_digest"),
+  purchaseExpiresAt: stamp("purchase_expires_at"),
+  purchaseRevokedAt: stamp("purchase_revoked_at"),
+  customerId: text("payment_customer_id"),
+  emailDigest: text("payment_email_digest"),
+  paymentReview: text("payment_review"),
+  checkoutAttemptAt: stamp("checkout_attempt_at"),
 }, (t) => [
+  index("orders_payment_email").on(t.emailDigest),
+  index("orders_payment_pending").on(t.createdAt).where(sql`${t.state} = 'pending'`),
+  check("orders_payment_mode", sql`${t.paymentMode} in ('synthetic', 'sandbox')`),
+  check("orders_checkout_locale", sql`${t.checkoutLocale} in ('en', 'ko')`),
+  check("orders_purchase_digest", sql`${t.purchaseDigest} ~ '^[0-9a-f]{64}$'`),
+  check("orders_email_digest", sql`${t.emailDigest} ~ '^[0-9a-f]{64}$'`),
   check("orders_usd_only", sql`${t.currency} = 'USD' and ${t.usdCents} > 0`),
   check("orders_state", sql`${t.state} in ('pending', 'paid', 'refunded', 'disputed')`),
   check("orders_paid_fields", sql`${t.state} <> 'paid' or (${t.paidAt} is not null and ${t.providerTx} is not null)`),
@@ -159,3 +174,21 @@ export const invites = schema.table("invites", {
   index("invites_room").on(t.roomId),
   check("invites_digest", sql`${t.digest} ~ '^[0-9a-f]{64}$'`),
 ]);
+
+export const recoveryTokens = schema.table("recovery_tokens", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  digest: text("token_digest").notNull().unique(),
+  orderId: uuid("order_id").notNull().references(() => orders.id),
+  expiresAt: stamp("expires_at").notNull(),
+  usedAt: stamp("used_at"),
+  revokedAt: stamp("revoked_at"),
+}, (t) => [
+  index("recovery_order").on(t.orderId),
+  check("recovery_digest", sql`${t.digest} ~ '^[0-9a-f]{64}$'`),
+]);
+
+export const paymentRateLimits = schema.table("payment_rate_limits", {
+  key: text("key").primaryKey(),
+  count: integer("count").notNull(),
+  expiresAt: stamp("expires_at").notNull(),
+}, (t) => [index("payment_rate_limits_expires").on(t.expiresAt)]);
