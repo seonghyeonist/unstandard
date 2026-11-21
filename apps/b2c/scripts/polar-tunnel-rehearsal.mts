@@ -6,7 +6,7 @@ import { Readable } from "node:stream";
 import { createPolar } from "@polar-sh/sdk/2026-10";
 import { databaseTarget } from "../db/client.mts";
 import handler from "../api/b2c/[...path].ts";
-import { polarEvents } from "../server/polar-provider.mts";
+import { PolarSandboxProvider, polarEvents } from "../server/polar-provider.mts";
 import { allowWrites, Blocked, delay, required, summarize } from "./sandbox-helpers.mts";
 
 const localPort = 4173;
@@ -79,6 +79,15 @@ async function waitForGates(origin: string) {
   throw new Blocked("temporary_https_gates_not_verified");
 }
 
+function providerFailure(stage: string, error: unknown): never {
+  const status = error instanceof Error && "statusCode" in error && typeof error.statusCode === "number"
+    ? error.statusCode : null;
+  const errorType = error instanceof Error && /^[A-Za-z0-9]{1,80}$/.test(error.name) ? error.name : "Unknown";
+  console.log(JSON.stringify({ layer: "polar_temporary_https", stage, status: "FAIL", http_status: status, error_type: errorType }));
+  if (status === 401 || status === 403) throw new Blocked(stage + "_authorization");
+  throw new Error(stage + "_failed");
+}
+
 await summarize("polar_temporary_https", async () => {
   allowWrites("checkout-b2c-polar-sandbox");
   if (!databaseTarget().local) throw new Error("temporary_https_requires_disposable_loopback_database");
@@ -90,7 +99,11 @@ await summarize("polar_temporary_https", async () => {
     throw new Error("three_separate_sandbox_tokens_required");
   }
   const organizationId = required("B2C_POLAR_ORGANIZATION_ID");
-  required("B2C_POLAR_PRODUCT_ID");
+  const productId = required("B2C_POLAR_PRODUCT_ID");
+  const catalog = new PolarSandboxProvider({ accessToken: runtime, organizationId, productId,
+    webhookSecret: "unused-before-provider-configuration", origin: "https://p2.example.test" });
+  await catalog.validateCatalog().catch((error: unknown) => providerFailure("sandbox_catalog", error));
+  console.log(JSON.stringify({ layer: "polar_temporary_https", status: "PASS", stage: "sandbox_catalog" }));
   const sdk = createPolar({ accessToken: setup, environment: "sandbox", timeout: 10 });
   const tunnel = spawn(required("B2C_CLOUDFLARED"), ["tunnel", "--no-autoupdate", "--url",
     "http://127.0.0.1:" + localPort], { env: { PATH: process.env.PATH }, stdio: ["ignore", "pipe", "pipe"] });
@@ -98,10 +111,11 @@ await summarize("polar_temporary_https", async () => {
   let server: ReturnType<typeof createServer> | undefined;
   try {
     const origin = await tunnelOrigin(tunnel);
+    console.log(JSON.stringify({ layer: "polar_temporary_https", status: "PASS", stage: "temporary_origin_assigned" }));
     const destination = await sdk.webhooks.createWebhookEndpoint({
       organization_id: organizationId, name: "UNSTANDARD P2 temporary " + randomUUID(),
       url: origin + webhookPath, format: "raw", api_version: "2026-10", events: [...polarEvents],
-    });
+    }).catch((error: unknown) => providerFailure("sandbox_webhook_create", error));
     endpoint = destination.id;
     if (destination.url !== origin + webhookPath || destination.organization_id !== organizationId ||
         !destination.enabled || !destination.uses_standard_webhook_signature || !destination.secret) {
