@@ -58,7 +58,7 @@ jobs:
           B2C_DATABASE_URL: postgresql://b2c_runner:local-fixture-only@127.0.0.1:${{ job.services.pg.ports[5432] }}/unstandard_b2c
           B2C_MIGRATE_CONFIRM: local-b2c
         run: npm run db:migrate
-      - name: Verify HTTPS transport, rehearse Polar Checkout and refund, then close HTTPS
+      - name: Verify both HTTPS access gates and rehearse Polar Checkout and refund
         env:
           B2C_DATABASE_URL: postgresql://b2c_runner:local-fixture-only@127.0.0.1:${{ job.services.pg.ports[5432] }}/unstandard_b2c
           B2C_POLAR_ORGANIZATION_ID: e9d6161a-1711-4571-837b-05996cc8bd43

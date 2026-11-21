@@ -77,16 +77,22 @@ async function waitForTransport(origin: string) {
 }
 
 async function waitForGates(origin: string) {
+  let last: { checkout: number; checkoutChallenge: boolean; webhook: number; webhookCode?: string } | undefined;
   for (let attempt = 0; attempt < 12; attempt++) {
     try {
       const options = { redirect: "error", signal: AbortSignal.timeout(3000) } as const;
       const checkout = await fetch(origin + "/checkout", options);
       const webhook = await fetch(origin + webhookPath, { ...options, method: "POST" });
-      if (checkout.status === 401 && checkout.headers.has("www-authenticate") &&
-          webhook.status === 401 && (await webhook.json()).error === "invalid_signature") return;
+      const body = await webhook.json().catch(() => null);
+      const allowedCodes = ["invalid_signature", "sandbox_access_required", "temporarily_unavailable", "not_found"];
+      last = { checkout: checkout.status, checkoutChallenge: checkout.headers.has("www-authenticate"),
+        webhook: webhook.status, webhookCode: allowedCodes.includes(body?.error) ? body.error : undefined };
+      if (last.checkout === 401 && last.checkoutChallenge && last.webhook === 401 &&
+          last.webhookCode === "invalid_signature") return;
     } catch {}
     await delay(2000);
   }
+  console.log(JSON.stringify({ layer: "polar_temporary_https", stage: "origin_and_gates", status: "FAIL", observed: last }));
   throw new Blocked("temporary_https_gates_not_verified");
 }
 
@@ -164,6 +170,10 @@ await summarize("polar_temporary_https", async () => {
       B2C_SANDBOX_ACCESS_KEY: randomBytes(32).toString("hex"),
     });
     ready = true;
+    const localCheck = await handler.fetch(new Request(origin + webhookPath, { method: "POST" }));
+    if (localCheck.status !== 401 || (await localCheck.json()).error !== "invalid_signature") {
+      throw new Error("local_unsigned_webhook_gate_failed");
+    }
     await waitForGates(origin);
     console.log(JSON.stringify({ layer: "polar_temporary_https", status: "PASS", stage: "origin_and_gates" }));
     const result = await new Promise<number | null>((resolve, reject) => {
