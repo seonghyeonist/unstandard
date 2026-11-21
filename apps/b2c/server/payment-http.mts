@@ -1,15 +1,15 @@
 import type { HttpRequest, HttpResponse } from "./request.mts";
 import { isIP } from "node:net";
-import { currency, sku, uuidPattern } from "./payment-provider.mts";
+import { InvalidWebhook, sku, uuidPattern } from "./payment-provider.mts";
 import { normalizeEmail, PaymentError, proofDigest, purchaseCookie, purchaseToken, tokenPattern, type Payments } from "./payments.mts";
 import { json } from "./response.mts";
 import { digestToken } from "./session.mts";
 
 const minute = 60_000;
-const webhook = "/api/b2c/webhooks/paddle";
+const webhook = "/api/b2c/webhooks/polar";
 const routes = new Set([
   "/api/b2c/purchase-proof", "/api/b2c/purchase-proof/rotate", "/api/b2c/orders", "/api/b2c/orders/claim",
-  "/api/b2c/recovery/request", "/api/b2c/recovery/claim", webhook, webhook + "/simulator",
+  "/api/b2c/recovery/request", "/api/b2c/recovery/claim", webhook,
 ]);
 
 async function readBody(req: HttpRequest, maxBytes: number) {
@@ -51,25 +51,21 @@ export function createPaymentHandler(payment: Payments, origin: string, platform
         res.setHeader("Allow", "POST");
         throw new PaymentError(405, "method_not_allowed");
       }
-      if (path === webhook || path === webhook + "/simulator") {
-        const signature = req.headers["paddle-signature"];
-        if (typeof signature !== "string") throw new PaymentError(401, "invalid_signature");
+      if (path === webhook) {
+        const headers: Record<string, string> = {};
+        for (const name of ["webhook-id", "webhook-timestamp", "webhook-signature"]) {
+          const value = req.headers[name];
+          if (typeof value !== "string" || !value) throw new PaymentError(401, "invalid_signature");
+          headers[name] = value;
+        }
         const body = await readBody(req, 256 * 1024);
-        const source = path === webhook ? "platform" : "simulator";
-        let event;
         try {
-          event = await payment.provider.verifyWebhook(body, signature, source);
-        } catch {
-          throw new PaymentError(401, "invalid_signature_or_envelope");
+          const event = await payment.provider.verifyWebhook(body, headers);
+          if (event) await payment.ingest(event);
+        } catch (error) {
+          if (error instanceof InvalidWebhook) throw new PaymentError(401, "invalid_signature_or_envelope");
+          throw error;
         }
-        if (source === "simulator") {
-          if (!event) throw new PaymentError(422, "unsupported_simulation");
-          const simulated = "payment" in event ? event.payment : event.adjustment;
-          if (simulated.currency !== currency) throw new PaymentError(422, "simulation_currency_mismatch");
-          json(res, 200, { received: true, simulation: true });
-          return true;
-        }
-        if (event) await payment.ingest(event);
         json(res, 200, { received: true });
         return true;
       }
@@ -104,7 +100,7 @@ export function createPaymentHandler(payment: Payments, origin: string, platform
             throw new PaymentError(422, "invalid_order");
           }
           const order = await payment.createOrder(requestKey, owner, input.locale);
-          json(res, order.transactionId ? (order.created ? 201 : 200) : 202, { orderId: order.id, transactionId: order.transactionId });
+          json(res, order.transactionId ? (order.created ? 201 : 200) : 202, { orderId: order.id, transactionId: order.transactionId, checkoutUrl: order.checkoutUrl });
         } else {
           if (typeof input.orderId !== "string" || !uuidPattern.test(input.orderId) || Object.keys(input).length !== 1) {
             throw new PaymentError(422, "invalid_order");

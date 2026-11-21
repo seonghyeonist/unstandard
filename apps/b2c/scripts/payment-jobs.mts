@@ -4,7 +4,7 @@ import { connectDatabase } from "../db/client.mts";
 import { loadPaymentConfig } from "../server/payment-config.mts";
 import { createPayments } from "../server/payments.mts";
 import { runPaymentJobs } from "../server/payment-worker.mts";
-import { allowWrites, required, summarize } from "./paddle-api.mts";
+import { allowWrites, required, summarize } from "./sandbox-helpers.mts";
 
 await summarize("sandbox_payment_jobs", async () => {
   allowWrites("reconcile-b2c-sandbox");
@@ -12,7 +12,7 @@ await summarize("sandbox_payment_jobs", async () => {
   if (!isAbsolute(sink) || sink.startsWith(process.cwd() + "/")) throw new Error("private_mail_sink_required");
   const target = await stat(sink);
   if (!target.isDirectory() || (target.mode & 0o077) !== 0) throw new Error("private_mail_sink_required");
-  const config = loadPaymentConfig();
+  const config = loadPaymentConfig(process.env, true);
   const { db, pool } = connectDatabase();
   try {
     return await runPaymentJobs(db, createPayments(db, config.provider, config.tokenKey, config.origin), async (message) => {

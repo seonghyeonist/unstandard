@@ -19,9 +19,7 @@
     "b2c:test:unit": "node scripts/test-summary.mts unit",
     "b2c:test:db": "node scripts/test-summary.mts db",
     "b2c:test:payment:synthetic": "node scripts/test-summary.mts synthetic",
-    "b2c:paddle:preflight": "node scripts/paddle-sandbox.mts preflight",
-    "b2c:paddle:provision": "node scripts/paddle-sandbox.mts provision",
-    "b2c:paddle:simulator": "node scripts/paddle-sandbox.mts simulator",
+    "b2c:polar:preflight": "node scripts/polar-preflight.mts",
     "b2c:test:checkout:sandbox": "node scripts/checkout-sandbox.mts",
     "b2c:test:payment:reconcile": "node scripts/payment-jobs.mts",
     "b2c:test:all": "node scripts/test-summary.mts all"
@@ -37,7 +35,7 @@
     "typescript": "5.9.3"
   },
   "dependencies": {
-    "@paddle/paddle-node-sdk": "3.12.0",
+    "@polar-sh/sdk": "1.3.2",
     "drizzle-orm": "0.45.3",
     "pg": "8.23.1"
   },

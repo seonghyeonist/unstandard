@@ -2,7 +2,6 @@ import type { HttpRequest, HttpResponse } from "./request.mts";
 
 const scriptPath = "/api/b2c/checkout-script";
 const checkoutScript = String.raw`
-const app = document.querySelector("main");
 const status = document.querySelector("[role=status]");
 const button = document.querySelector("#buy");
 const korean = new URLSearchParams(location.search).get("lang") === "ko";
@@ -46,36 +45,28 @@ if (button) {
   check.textContent = words("Check payment", "결제 확인");
   check.onclick = claim;
   check.hidden = !attempt.orderId;
-  if (!window.Paddle) {
+  if (new URLSearchParams(location.search).get("return") === "1" && attempt.orderId) void claim();
+  button.onclick = async () => {
     button.disabled = true;
-    say("Sandbox checkout could not load.", "샌드박스 결제창을 불러오지 못했어요.");
-  } else {
-    window.Paddle.Environment.set("sandbox");
-    window.Paddle.Initialize({token: app.dataset.token, eventCallback(event) {
-      if (event.name === "checkout.completed") void claim();
-    }});
-    button.onclick = async () => {
-      button.disabled = true;
-      try {
-        const [ready] = await post("purchase-proof", {});
-        if (ready !== 200) throw new Error();
-        sessionStorage.setItem("b2c-checkout", JSON.stringify(attempt));
-        const [code, order] = await post("orders", {sku: "recontact-v4", locale: attempt.locale}, attempt.key);
-        if (code === 202) {
-          say("The server is preparing the same transaction. Retry here shortly.", "같은 거래를 준비하고 있어요. 잠시 후 여기서 다시 시도해 주세요.");
-          return;
-        }
-        if (code !== 200 && code !== 201) throw new Error();
-        Object.assign(attempt, order);
-        sessionStorage.setItem("b2c-checkout", JSON.stringify(attempt));
-        check.hidden = false;
-        window.Paddle.Checkout.open({transactionId: order.transactionId,
-          settings: {locale: attempt.locale, allowLogout: false, showAddDiscounts: false}});
-      } catch {
-        say("Checkout unavailable. Check your payment or try again with the same browser.", "결제창을 열 수 없어요. 결제를 확인하거나 같은 브라우저에서 다시 시도해 주세요.");
-      } finally { button.disabled = false; }
-    };
-  }
+    try {
+      const [ready] = await post("purchase-proof", {});
+      if (ready !== 200) throw new Error();
+      sessionStorage.setItem("b2c-checkout", JSON.stringify(attempt));
+      const [code, order] = await post("orders", {sku: "recontact-v4", locale: attempt.locale}, attempt.key);
+      if (code === 202) {
+        say("The server is preparing the same checkout. Try again shortly.", "같은 결제창을 준비하고 있어요. 잠시 후 다시 시도해 주세요.");
+        return;
+      }
+      if (code !== 200 && code !== 201) throw new Error();
+      attempt.orderId = order.orderId;
+      sessionStorage.setItem("b2c-checkout", JSON.stringify(attempt));
+      check.hidden = false;
+      if (order.checkoutUrl) location.assign(order.checkoutUrl);
+      else void claim();
+    } catch {
+      say("Checkout unavailable. Check your payment or try again with the same browser.", "결제창을 열 수 없어요. 결제를 확인하거나 같은 브라우저에서 다시 시도해 주세요.");
+    } finally { button.disabled = false; }
+  };
 } else {
   const form = document.querySelector("form");
   const token = new URLSearchParams(location.hash.slice(1)).get("token");
@@ -101,23 +92,20 @@ if (button) {
 }
 `;
 
-export function serveCheckout(req: HttpRequest, res: HttpResponse, path: string, token: string) {
+export function serveCheckout(req: HttpRequest, res: HttpResponse, path: string) {
   const script = path === scriptPath;
   const checkout = path === "/checkout";
   if ((!script && !checkout && path !== "/recover") || !["GET", "HEAD"].includes(req.method ?? "")) return false;
   const html = checkout
-    ? `<main data-token="${token}"><h1>UNSTANDARD Sandbox · USD $8.99</h1><button id="buy">Open Sandbox checkout</button> <button id="check" hidden>Check payment</button><p role="status"></p><a href="/recover">Recover access / 구매 복구</a></main>`
+    ? `<main><h1>UNSTANDARD Sandbox · USD $8.99</h1><button id="buy">Open Sandbox checkout</button> <button id="check" hidden>Check payment</button><p role="status"></p><a href="/recover">Recover access / 구매 복구</a></main>`
     : '<main><h1>Recover access</h1><form><label>Email <input name="email" type="email" maxlength="254"></label><button>Continue</button></form><p role="status"></p></main>';
-  const csp = checkout
-    ? "default-src 'none'; script-src 'self' https://cdn.paddle.com; frame-src https://*.paddle.com; connect-src 'self' https://*.paddle.com; img-src https://*.paddle.com; style-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'"
-    : "default-src 'none'; script-src 'self'; connect-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'";
+  const csp = "default-src 'none'; script-src 'self'; connect-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'";
   res.writeHead(200, {
     "Content-Type": script ? "text/javascript; charset=utf-8" : "text/html; charset=utf-8",
     "Cache-Control": "no-store", "Referrer-Policy": "no-referrer", "Content-Security-Policy": csp,
     "X-Content-Type-Options": "nosniff", "X-Robots-Tag": "noindex",
   });
-  const paddleScript = checkout ? '<script defer src="https://cdn.paddle.com/paddle/v2/paddle.js"></script>' : "";
   res.end(req.method === "HEAD" ? undefined : script ? checkoutScript :
-    `<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width"><title>UNSTANDARD</title>${paddleScript}<script defer src="${scriptPath}"></script>${html}</html>`);
+    `<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width"><title>UNSTANDARD</title><script defer src="${scriptPath}"></script>${html}</html>`);
   return true;
 }

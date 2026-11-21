@@ -44,7 +44,6 @@ async function readUpdate(req: HttpRequest) {
 
 type AppOptions = {
   payment?: ReturnType<typeof createPaymentHandler>;
-  clientToken?: string;
   serveStatic?: boolean;
 };
 
@@ -60,7 +59,7 @@ export function createAppHandler(repository: Repository, origin: string, options
     const path = req.url?.split("?", 1)[0] ?? "";
     try {
       const page = path === "/api/b2c/checkout" ? "/checkout" : path === "/api/b2c/recover" ? "/recover" : path;
-      if (options.clientToken && serveCheckout(req, res, page, options.clientToken)) return;
+      if (options.payment && serveCheckout(req, res, page)) return;
       if (options.payment && await options.payment(req, res, path)) return;
       const asset = options.serveStatic === false ? undefined : assets.get(path);
       if (asset && (req.method === "GET" || req.method === "HEAD")) {

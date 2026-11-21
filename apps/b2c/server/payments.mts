@@ -102,6 +102,7 @@ export function createPayments(db: Database, provider: PaymentProvider, key: str
     });
 
     let transactionId = order.providerTx;
+    let checkoutUrl: string | undefined;
     if (shouldCreate) {
       try {
         await provider.validateCatalog();
@@ -111,10 +112,14 @@ export function createPayments(db: Database, provider: PaymentProvider, key: str
           .where(and(eq(orders.id, order.id), isNull(orders.providerTx)));
         throw new PaymentError(503, "catalog_unavailable");
       }
-      // Reserve the attempt before the outbound call. Never blindly repeat an ambiguous Paddle create.
-      transactionId = await bind(order, await provider.createTransaction(order));
+      // Reconcile an ambiguous creation before starting a second checkout.
+      const checkout = await provider.createTransaction(order);
+      transactionId = await bind(order, checkout);
+      checkoutUrl = checkout.checkoutUrl;
+    } else if (transactionId) {
+      checkoutUrl = await provider.checkoutUrl?.(transactionId);
     }
-    return { id: order.id, transactionId, created: shouldCreate };
+    return { id: order.id, transactionId, checkoutUrl, created: shouldCreate };
   }
 
   async function apply(tx: Transaction, order: Order, effects: Effects) {
@@ -167,12 +172,14 @@ export function createPayments(db: Database, provider: PaymentProvider, key: str
       throw new PaymentError(422, "invalid_event");
     }
     const providerTx = payment?.id ?? adjustment?.transactionId;
+    const eventOrderId = payment?.orderId ?? adjustment?.orderId;
+    const adjustments = "payment" in event ? event.adjustments : adjustment ? [adjustment] : undefined;
     if (!providerTx) throw new PaymentError(422, "invalid_event");
     await db.transaction(async (tx) => {
       const [order] = await tx.select().from(orders).where(eq(orders.providerTx, providerTx)).for("update");
       if (!matches(order)) {
-        if (payment?.orderId && uuidPattern.test(payment.orderId)) {
-          const pending = await lockOrder(tx, payment.orderId);
+        if (eventOrderId && uuidPattern.test(eventOrderId)) {
+          const pending = await lockOrder(tx, eventOrderId);
           if (matches(pending) && pending.checkoutAttemptAt && !pending.providerTx) {
             throw new PaymentError(503, "transaction_binding_pending");
           }
@@ -182,7 +189,7 @@ export function createPayments(db: Database, provider: PaymentProvider, key: str
       const [recorded] = await tx.insert(paymentEvents).values({
         id: event.id, type: event.type, providerTx, orderId: order.id, occurredAt: event.occurredAt,
       }).onConflictDoNothing().returning({ id: paymentEvents.id });
-      if (recorded) await apply(tx, order, { payment, adjustments: adjustment ? [adjustment] : [] });
+      if (recorded) await apply(tx, order, { payment, adjustments });
     });
   }
 

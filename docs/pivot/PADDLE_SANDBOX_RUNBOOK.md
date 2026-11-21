@@ -1,5 +1,7 @@
 # UNSTANDARD Paddle Sandbox 런북
 
+이전 구현 기록. 현재 P2 검증은 [Polar Sandbox 런북](POLAR_SANDBOX_RUNBOOK.md)을 사용한다.
+
 모든 Paddle 호출은 `https://sandbox-api.paddle.com`으로 고정한다. 연동은 합성 고객·공식 테스트 카드 전용이다.
 
 | 범위 | 변수 |

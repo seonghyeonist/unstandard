@@ -2,7 +2,7 @@ import { timingSafeEqual } from "node:crypto";
 import { createFetchAdapter } from "../../server/fetch-adapter.mts";
 import { createRuntime } from "../../server/runtime.mts";
 
-const webhookPaths = new Set(["/api/b2c/webhooks/paddle", "/api/b2c/webhooks/paddle/simulator"]);
+const webhookPath = "/api/b2c/webhooks/polar";
 let fetchRequest: ReturnType<typeof createFetchAdapter> | undefined;
 
 function response(status: number, error: string, extra: Record<string, string> = {}) {
@@ -16,7 +16,7 @@ const handler = {
     try {
       const url = new URL(request.url);
       if (url.origin !== process.env.B2C_ORIGIN) return response(404, "not_found");
-      if (!webhookPaths.has(url.pathname)) {
+      if (url.pathname !== webhookPath) {
         const token = process.env.B2C_SANDBOX_ACCESS_KEY ?? "";
         if (!/^[a-f0-9]{64}$/i.test(token)) return response(503, "sandbox_access_unavailable");
         const expected = Buffer.from("Basic " + Buffer.from("b2c:" + token).toString("base64"));

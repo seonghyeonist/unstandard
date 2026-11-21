@@ -17,7 +17,7 @@ if (!databaseTarget().local || process.env.B2C_DB_FIXTURES !== "disposable-loopb
 }
 const { db, pool } = connectDatabase();
 const secret = "synthetic fixture signature key";
-const platform = "/webhooks/paddle";
+const platform = "/webhooks/polar";
 const card = "/me/card";
 const path = "/api/b2c";
 
@@ -53,7 +53,6 @@ async function app(f: ReturnType<typeof fixture>, payment = f.payment, fixedIp =
   const server = createAppServer(createRepository(db, f.clock), origin, {
     payment: createPaymentHandler(payment, origin,
       (req) => fixedIp ? "127.0.0.1" : req.headers["x-test-ip"]?.toString()),
-    clientToken: "test_fixture",
   });
   server.listen(0, "127.0.0.1");
   await once(server, "listening");
@@ -71,7 +70,7 @@ async function app(f: ReturnType<typeof fixture>, payment = f.payment, fixedIp =
         "X-Test-IP": options.ip ?? `127.0.0.${ip++}`,
         ...(options.cookie ? { Cookie: options.cookie } : {}),
         ...(options.key ? { "Idempotency-Key": options.key } : {}),
-        ...(options.signature ? { "Paddle-Signature": options.signature } : {}),
+        ...(options.signature ? { "Webhook-Signature": options.signature, "Webhook-Id": "test", "Webhook-Timestamp": "123" } : {}),
       },
       body: options.raw ?? (value === undefined ? undefined : JSON.stringify(value)),
     });
