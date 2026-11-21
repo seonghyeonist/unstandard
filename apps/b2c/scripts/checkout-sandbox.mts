@@ -62,15 +62,31 @@ await summarize("polar_sandbox_checkout_refund", async () => {
     const before = await context.request.get(origin + "/api/b2c/me/card");
     stage("unpaid_card_api", before.status() === 401 ? "PASS" : "FAIL", before.status());
     if (before.status() !== 401) throw new Error("unpaid_card_access_expected_401");
-    const orderReply = page.waitForResponse((reply) =>
-      reply.url() === origin + "/api/b2c/orders" && reply.request().method() === "POST", { timeout: 20_000 });
+    const orderPath = origin + "/api/b2c/orders";
+    let order: { status: number; transactionId?: string; checkoutUrl?: string } | undefined;
+    await page.route(orderPath, async (route) => {
+      if (route.request().method() !== "POST") return route.continue();
+      // Read from the proxied API response before the app leaves this document.
+      const response = await route.fetch({ maxRedirects: 0 });
+      const status = response.status();
+      const data = status === 201 ? await response.json() as { transactionId?: string; checkoutUrl?: string } : {};
+      order = { status, ...data };
+      await route.fulfill({ response });
+    }, { times: 1 });
     await page.getByRole("button", { name: "Open Sandbox checkout" }).click({ timeout: 10_000 });
-    const order = await orderReply;
-    stage("app_create_checkout", order.status() === 201 ? "PASS" : "FAIL", order.status());
-    if (order.status() !== 201) throw new Error("sandbox_order_create_failed");
-    const { transactionId, checkoutUrl } = await order.json() as { transactionId: string; checkoutUrl: string };
-    await page.waitForURL(hostedSandboxCheckout(checkoutUrl), { timeout: 20_000 })
-      .catch(() => { throw new Blocked("sandbox_hosted_checkout_not_reached"); });
+    const result = await waitFor(async () => order, 20_000, "sandbox_app_order_response_not_captured");
+    stage("app_create_checkout", result.status === 201 ? "PASS" : "FAIL", result.status);
+    if (result.status !== 201) throw new Error("sandbox_order_create_failed");
+    if (!result.checkoutUrl || !result.transactionId) throw new Error("sandbox_order_missing_hosted_checkout");
+    const { transactionId } = result;
+    let destination: URL;
+    try {
+      destination = new URL(hostedSandboxCheckout(result.checkoutUrl));
+    } catch {
+      throw new Error("sandbox_order_returned_unrecognized_checkout_url");
+    }
+    await page.waitForURL((url) => url.origin === destination.origin && url.pathname === destination.pathname,
+      { timeout: 20_000 }).catch(() => { throw new Blocked("sandbox_hosted_checkout_not_reached"); });
     stage("polar_checkout_opened");
     const email = `p2-smoke-${randomUUID()}@example.com`;
     await page.getByRole("textbox", { name: "Email", exact: true }).fill(email);
