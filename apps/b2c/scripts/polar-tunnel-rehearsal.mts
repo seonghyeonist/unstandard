@@ -66,13 +66,20 @@ async function handle(origin: string, incoming: IncomingMessage, outgoing: Serve
 }
 
 async function waitForTransport(origin: string) {
-  for (let attempt = 0; attempt < 12; attempt++) {
+  let status: number | undefined;
+  let errorType: string | undefined;
+  for (let attempt = 0; attempt < 18; attempt++) {
     try {
-      const reply = await fetch(origin + "/", { redirect: "error", signal: AbortSignal.timeout(3000) });
-      if (reply.status === 204) return;
-    } catch {}
+      const reply = await fetch(origin + "/", { redirect: "error", signal: AbortSignal.timeout(4000) });
+      status = reply.status;
+      if (status === 204) return;
+    } catch (error) {
+      errorType = error instanceof Error && /^[A-Za-z]{1,40}$/.test(error.name) ? error.name : "Unknown";
+    }
     await delay(2000);
   }
+  console.log(JSON.stringify({ layer: "polar_temporary_https", status: "FAIL", stage: "https_transport_verified",
+    http_status: status, error_type: errorType }));
   throw new Blocked("temporary_https_transport_not_verified");
 }
 
@@ -131,7 +138,7 @@ await summarize("polar_temporary_https", async () => {
   await catalog.validateCatalog().catch((error: unknown) => providerFailure("sandbox_catalog", error));
   console.log(JSON.stringify({ layer: "polar_temporary_https", status: "PASS", stage: "sandbox_catalog" }));
   const sdk = createPolar({ accessToken: setup, environment: "sandbox", timeout: 10 });
-  const tunnel = spawn(required("B2C_CLOUDFLARED"), ["tunnel", "--no-autoupdate", "--url",
+  const tunnel = spawn(required("B2C_CLOUDFLARED"), ["tunnel", "--no-autoupdate", "--protocol", "http2", "--url",
     "http://127.0.0.1:" + localPort], { env: { PATH: process.env.PATH }, stdio: ["ignore", "pipe", "pipe"] });
   let endpoint: string | undefined;
   let server: ReturnType<typeof createServer> | undefined;
