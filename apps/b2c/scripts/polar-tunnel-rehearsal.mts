@@ -68,18 +68,27 @@ async function handle(origin: string, incoming: IncomingMessage, outgoing: Serve
 async function waitForTransport(origin: string) {
   let status: number | undefined;
   let errorType: string | undefined;
-  for (let attempt = 0; attempt < 18; attempt++) {
+  let networkCode: string | undefined;
+  const allowedNetworkCodes = new Set(["ENOTFOUND", "EAI_AGAIN", "ECONNREFUSED", "ECONNRESET", "ETIMEDOUT",
+    "ENETUNREACH", "UND_ERR_CONNECT_TIMEOUT", "CERT_HAS_EXPIRED", "ERR_TLS_CERT_ALTNAME_INVALID"]);
+  const deadline = Date.now() + 90_000;
+  let attempts = 0;
+  while (Date.now() < deadline) {
+    attempts++;
     try {
       const reply = await fetch(origin + "/", { redirect: "error", signal: AbortSignal.timeout(4000) });
       status = reply.status;
       if (status === 204) return;
     } catch (error) {
       errorType = error instanceof Error && /^[A-Za-z]{1,40}$/.test(error.name) ? error.name : "Unknown";
+      const cause = error instanceof Error ? error.cause : undefined;
+      if (cause && typeof cause === "object" && "code" in cause && typeof cause.code === "string" &&
+          allowedNetworkCodes.has(cause.code)) networkCode = cause.code;
     }
     await delay(2000);
   }
   console.log(JSON.stringify({ layer: "polar_temporary_https", status: "FAIL", stage: "https_transport_verified",
-    http_status: status, error_type: errorType }));
+    http_status: status, error_type: errorType, network_code: networkCode, attempts }));
   throw new Blocked("temporary_https_transport_not_verified");
 }
 
