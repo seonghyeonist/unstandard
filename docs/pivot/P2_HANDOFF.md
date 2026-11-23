@@ -1,5 +1,22 @@
 # UNSTANDARD B2C P2 인수인계
 
+## 2026-11-23 최신 결과
+
+**Local Synthetic PASS · GitHub 임시 HTTPS 및 앱 Checkout PASS · Polar Sandbox E2E / Vercel Preview / Neon Remote BLOCKED.**
+
+- 검증 소스 `5e470ca856b5740118b7d286151d550b97c3a467`, [최종 원격 실행](https://github.com/seonghyeonist/unstandard/actions/runs/45107543288/attempts/1). 시작 HEAD `3b6f5ad9def0d0f426f4d5553f9077b418a3a9fb`.
+- 로컬 lint/typecheck/build, 단위 12/12, 격리 PG17 migration 2회, 통합 12/12 PASS.
+- HTTPS는 할당 후 약 61초에 연결됐다. 카탈로그, Basic 401, 앱 페이지 200, 미서명 웹훅 401, 미결제 카드 401, Checkout 201, 구매자 정보 사전 입력, 카드 입력, 결제 버튼 클릭까지 확인했다.
+- 버튼 클릭 후 `open` / `absent` / `pay_button_available`. Stripe·Polar 확인 응답은 관측되지 않았고 대시보드상 결제 시도 및 주문은 0건이다. 90초 뒤 `sandbox_checkout_not_confirmed`. Polar 상세의 결제 시도와 Orders 목록은 0건이다. 임시 웹훅 비활성화와 러너 DB 컨테이너 삭제를 확인했다.
+- Vercel P2는 브라우저상 Hobby에서 확인된다. 정확한 ID도 API 404/403이며 Git 미연결, Root Directory 빈 값, Node 기본 26.x다. Neon Launch 전용 PG17은 식별됐고 idle이다. 계량 과금 때문에 migration을 보류했다. 스키마 조회 뒤 마지막 활동 시각이 갱신됐으며 청구액은 미확정이다.
+- 호스팅은 단기 GitHub 임시 HTTPS, 상용 파일럿 전용 Render $7/월부터, Vercel 재사용이 우선이면 Pro $20/월부터를 검토한다. Hobby에서 이 사업용 Sandbox를 허용하는 명시적 근거를 확인할 수 없어 배포를 보류했다.
+
+12:44 KST의 기존 open Sandbox Checkout 상세와 Orders부터 재대조한다. 신규 주문 생성 전에 통제된 헤디드 Chromium에서 Stripe iframe의 폼 완료·검증 상태 및 Polar/Stripe 확인 요청을 확인할 수 있는 진단을 준비한다. 기존 Checkout에서 원래 앱 구매자 세션은 종료됐으므로 결제는 제출하지 않는다. 실패 원인 또는 안전한 수정이 확보된 뒤 새 앱 Checkout으로 같은 세션 E2E를 한 번 실행한다.
+
+[재개 프롬프트](P2_POLAR_RESUME_PROMPT.md) · [활성 런북](POLAR_SANDBOX_RUNBOOK.md)
+
+## 이전 기록
+
 2026-11-21 KST 갱신. P2의 결제사와 활성 런북은 [Polar Sandbox](POLAR_SANDBOX_RUNBOOK.md)로 교체됐다. 아래 2026-11-20 기록의 Paddle 배치와 초기 판정은 이전 구현의 증거다.
 
 2026-11-20 KST 기준. 갈등 후 재연락 시점 조율 제품이다. EN/KO, 무료 6축 영수증, USD $8.99 단건, 결제자 1명과 상대 1명 무료, 결제 capture 이후 최대 14일 접근을 계약으로 한다. 무료 답변은 브라우저 메모리에 있다. 결제에는 별도 페이지와 CSP를 적용한다.

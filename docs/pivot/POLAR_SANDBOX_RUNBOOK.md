@@ -32,3 +32,9 @@ Apply migrations in the approved database with its dedicated migrator credential
 The E2E script checks unpaid access, the application-backed checkout, paid order, the same browser's buyer session, successful full refund, and the same session's denial. Provider-only checkout and synthetic PostgreSQL results each have their own verdict. Declare P2 PASS after the signed event and buyer session have been verified through the intended hosted HTTPS runtime.
 
 [Polar Sandbox](https://polar.sh/docs/integrate/sandbox) · [Checkout API](https://polar.sh/docs/api-reference/checkouts/create-session) · [Refund API](https://polar.sh/docs/api-reference/refunds/create)
+
+## 2026-11-23 remote evidence
+
+[Run 45107543288, attempt 1](https://github.com/seonghyeonist/unstandard/actions/runs/45107543288/attempts/1) used `5e470ca856b5740118b7d286151d550b97c3a467`. The standard runner and disposable PostgreSQL reached HTTPS after about 61 seconds from origin assignment. The app created the checkout, applied synthetic buyer and billing details, verified the card input in the browser and clicked Pay. Polar still reported open checkout and no order. Provider dashboard confirmed zero payment attempts. The workflow stopped at `sandbox_checkout_not_confirmed` and disabled the temporary webhook. Signed paid/refund ledger validation and same-session access remain blocked.
+
+Before tunnel creation, the runner reconciles the latest product checkout against Polar Orders. The workflow permits the explicitly reconciled prior unsubmitted candidate only within its recorded timestamp window. Do not carry that exception forward without checking Payment Attempts, order history and the status of the original browser. Temporary ledger reads are restricted to the disposable loopback database. The runner uses browser-key input and logs only allowlisted state and HTTP codes. Resume with the linked [handoff](P2_POLAR_RESUME_PROMPT.md).
