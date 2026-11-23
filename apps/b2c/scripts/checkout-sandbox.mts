@@ -29,10 +29,15 @@ async function checkoutScreen(page: Page, appOrigin: string, providerOrigin: str
   const visibleError = await alerts.evaluateAll((elements) => elements.some((element) =>
     element.getClientRects().length > 0 && Boolean(element.textContent?.trim())));
   const invalidFields = await page.locator('input:invalid, select:invalid, [aria-invalid="true"]').evaluateAll((elements) => {
-    const allowed = ["email", "country", "line1", "postal_code", "city", "state", "name", "tax_id"];
+    const allowed = ["customer_email", "customer_name", "customer_billing_name", "customer_tax_id",
+      "country", "line1", "line2", "postal_code", "city", "state"];
     return [...new Set(elements.filter((element) => element.getClientRects().length > 0).map((element) => {
-      const field = element.getAttribute("name")?.split(".").at(-1) ?? "";
-      return allowed.includes(field) ? field : "other";
+      const name = element.getAttribute("name") ?? "";
+      const field = name.split(".").at(-1) ?? "";
+      if (allowed.includes(field)) return field;
+      if (name.startsWith("custom_field_data.")) return "custom_field";
+      if (element instanceof HTMLInputElement && element.type === "email") return "email_input";
+      return "other";
     }))].sort();
   });
   if (invalidFields.length) return "invalid_form:" + invalidFields.join(",");
@@ -49,6 +54,12 @@ async function cardField(page: Page, label: RegExp) {
       if (await field.isVisible()) return field;
     }
   }, 15_000, "sandbox_test_card_field_unavailable");
+}
+
+async function enterCardField(page: Page, label: RegExp, digits: string, code: string) {
+  const field = await cardField(page, label);
+  await field.pressSequentially(digits, { delay: 55 });
+  if ((await field.inputValue()).replace(/\D/g, "") !== digits) throw new Blocked(code);
 }
 
 await summarize("polar_sandbox_checkout_refund", async () => {
@@ -117,34 +128,44 @@ await summarize("polar_sandbox_checkout_refund", async () => {
     }
     stage("polar_checkout_opened");
     // Polar can require a full US address even when checkout creation requests country only.
-    // Seed billing only for this app-created Sandbox checkout, then use the hosted form for the card.
+    // Seed the synthetic purchaser details for this checkout, then use the hosted form for the card.
+    const email = `p2-smoke-${randomUUID()}@example.com`;
     const billing = await provider.client.checkouts.update(transactionId, {
+      customer_email: email, customer_name: "Sandbox Buyer",
       customer_billing_address: {
         country: "US", line1: "476 5th Avenue", postal_code: "10018", city: "New York", state: "NY",
       },
     });
     if (billing.id !== transactionId || billing.status !== "open" ||
-        billing.customer_billing_address?.country !== "US" || !billing.customer_billing_address.postal_code) {
+        billing.customer_billing_address?.country !== "US" || !billing.customer_billing_address.postal_code ||
+        billing.customer_email !== email || billing.customer_name !== "Sandbox Buyer") {
       throw new Error("sandbox_billing_fixture_not_applied");
     }
     stage("sandbox_billing_fixture_applied");
     await page.reload({ timeout: 20_000 }).catch(() => {
       throw new Blocked("sandbox_hosted_checkout_reload_failed");
     });
-    const email = `p2-smoke-${randomUUID()}@example.com`;
-    await page.getByRole("textbox", { name: "Email", exact: true }).fill(email);
-    await (await cardField(page, /Card number/i)).fill("4242424242424242");
+    if (await page.getByRole("textbox", { name: "Email", exact: true }).inputValue() !== email ||
+        await page.getByRole("textbox", { name: "Cardholder name" }).inputValue() !== "Sandbox Buyer") {
+      throw new Blocked("sandbox_checkout_prefill_not_rendered");
+    }
+    await enterCardField(page, /Card number/i, "4242424242424242", "sandbox_test_card_number_not_entered");
     const year = String(new Date().getUTCFullYear() + 3).slice(-2);
-    await (await cardField(page, /Expir/i)).fill("12" + year);
-    await (await cardField(page, /Security code|CVC/i)).fill("123");
-    await page.getByRole("textbox", { name: "Cardholder name" }).fill("Sandbox Buyer");
-    let confirmStatus: number | undefined;
+    await enterCardField(page, /Expir/i, "12" + year, "sandbox_test_card_expiry_not_entered");
+    await enterCardField(page, /Security code|CVC/i, "123", "sandbox_test_card_security_code_not_entered");
+    await (await cardField(page, /Security code|CVC/i)).press("Tab");
+    stage("sandbox_browser_card_input_verified");
+    let stripeStatus: number | undefined;
+    let polarStatus: number | undefined;
     page.on("response", (response) => {
       if (response.request().method() !== "POST") return;
       const { hostname, pathname } = new URL(response.url());
       if (hostname === "api.stripe.com" &&
-          /^\/v1\/(?:payment_intents|setup_intents)\/[^/]+\/confirm$/.test(pathname)) {
-        confirmStatus = response.status();
+          /^\/v1\/(?:confirmation_tokens|(?:payment_intents|setup_intents)\/[^/]+\/confirm)$/.test(pathname)) {
+        stripeStatus = response.status();
+      }
+      if (hostname.endsWith(".polar.sh") && /\/checkouts\/[^/]+\/confirm\/?$/.test(pathname)) {
+        polarStatus = response.status();
       }
     });
     try {
@@ -166,7 +187,8 @@ await summarize("polar_sandbox_checkout_refund", async () => {
         checkout_status: checkout.status,
         order_state: order ? (order.paid ? "paid" : "unpaid") : "absent",
         screen,
-        stripe_confirm_http_status: confirmStatus,
+        stripe_confirmation_http_status: stripeStatus,
+        polar_confirmation_http_status: polarStatus,
       });
       if (observation !== previousObservation) {
         console.log(JSON.stringify({ layer: "polar_sandbox_checkout", stage: "provider_checkout_observed",
