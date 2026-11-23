@@ -1,6 +1,9 @@
 import { randomUUID } from "node:crypto";
 import { chromium, type Page } from "@playwright/test";
 import { createPolar } from "@polar-sh/sdk/2026-10";
+import { and, eq } from "drizzle-orm";
+import { connectDatabase, databaseTarget, type Database } from "../db/client.mts";
+import { orders, paymentEvents, rooms } from "../db/schema.mts";
 import { loadPaymentConfig } from "../server/payment-config.mts";
 import { cookieName } from "../server/session.mts";
 import { hostedSandboxCheckout } from "../server/polar-provider.mts";
@@ -62,6 +65,19 @@ async function enterCardField(page: Page, label: RegExp, digits: string, code: s
   if ((await field.inputValue()).replace(/\D/g, "") !== digits) throw new Blocked(code);
 }
 
+async function verifyLedger(db: Database, orderId: string, checkoutId: string, state: "paid" | "refunded") {
+  const eventType = state === "paid" ? "transaction.completed" : "adjustment.updated";
+  const [entry] = await db.select({ state: orders.state, revokedAt: rooms.revokedAt })
+    .from(orders).innerJoin(rooms, eq(rooms.orderId, orders.id))
+    .innerJoin(paymentEvents, and(eq(paymentEvents.orderId, orders.id),
+      eq(paymentEvents.providerTx, checkoutId), eq(paymentEvents.type, eventType)))
+    .where(and(eq(orders.id, orderId), eq(orders.providerTx, checkoutId), eq(orders.paymentMode, "sandbox"))).limit(1);
+  if (!entry || entry.state !== state || Boolean(entry.revokedAt) !== (state === "refunded")) {
+    throw new Error("sandbox_signed_webhook_ledger_mismatch");
+  }
+  stage(state === "paid" ? "signed_paid_webhook_ledger" : "signed_refund_webhook_ledger");
+}
+
 await summarize("polar_sandbox_checkout_refund", async () => {
   allowWrites("checkout-b2c-polar-sandbox");
   const { origin, provider } = loadPaymentConfig(process.env, true);
@@ -81,9 +97,12 @@ await summarize("polar_sandbox_checkout_refund", async () => {
   }
   await provider.validateCatalog();
   stage("sandbox_catalog");
+  const verifyLocalLedger = process.env.B2C_E2E_VERIFY_LOCAL_LEDGER === "1";
+  if (verifyLocalLedger && !databaseTarget().local) throw new Error("sandbox_ledger_probe_requires_local_database");
   const browser = await chromium.launch({ executablePath: process.env.B2C_BROWSER })
     .catch(() => { throw new Blocked("sandbox_browser_launch_failed"); });
   stage("browser_launched");
+  const ledger = verifyLocalLedger ? connectDatabase() : undefined;
   try {
     const context = await browser.newContext({ locale: "en-US",
       httpCredentials: accessKey ? { username: "b2c", password: accessKey, origin } : undefined });
@@ -96,13 +115,13 @@ await summarize("polar_sandbox_checkout_refund", async () => {
     stage("unpaid_card_api", before.status() === 401 ? "PASS" : "FAIL", before.status());
     if (before.status() !== 401) throw new Error("unpaid_card_access_expected_401");
     const orderPath = origin + "/api/b2c/orders";
-    let order: { status: number; transactionId?: string; checkoutUrl?: string } | undefined;
+    let order: { status: number; orderId?: string; transactionId?: string; checkoutUrl?: string } | undefined;
     await page.route(orderPath, async (route) => {
       if (route.request().method() !== "POST") return route.continue();
       // Read from the proxied API response before the app leaves this document.
       const response = await route.fetch({ maxRedirects: 0 });
       const status = response.status();
-      const data = status === 201 ? await response.json() as { transactionId?: string; checkoutUrl?: string } : {};
+      const data = status === 201 ? await response.json() as { orderId?: string; transactionId?: string; checkoutUrl?: string } : {};
       order = { status, ...data };
       await route.fulfill({ response });
     }, { times: 1 });
@@ -110,8 +129,10 @@ await summarize("polar_sandbox_checkout_refund", async () => {
     const result = await waitFor(async () => order, 20_000, "sandbox_app_order_response_not_captured");
     stage("app_create_checkout", result.status === 201 ? "PASS" : "FAIL", result.status);
     if (result.status !== 201) throw new Error("sandbox_order_create_failed");
-    if (!result.checkoutUrl || !result.transactionId) throw new Error("sandbox_order_missing_hosted_checkout");
-    const { transactionId } = result;
+    if (!result.checkoutUrl || !result.transactionId || !result.orderId) {
+      throw new Error("sandbox_order_missing_hosted_checkout");
+    }
+    const { transactionId, orderId } = result;
     let destination: URL;
     try {
       destination = new URL(hostedSandboxCheckout(result.checkoutUrl));
@@ -123,18 +144,24 @@ await summarize("polar_sandbox_checkout_refund", async () => {
     const providerCheckout = await provider.client.checkouts.get(transactionId);
     if (providerCheckout.id !== transactionId || providerCheckout.organization_id !== organizationId ||
         providerCheckout.product_id !== required("B2C_POLAR_PRODUCT_ID") ||
-        !providerCheckout.metadata.b2c_order_id || providerCheckout.status !== "open") {
+        providerCheckout.metadata.b2c_order_id !== orderId || providerCheckout.status !== "open") {
       throw new Error("sandbox_checkout_mapping_mismatch");
     }
     stage("polar_checkout_opened");
     // Polar can require a full US address even when checkout creation requests country only.
     // Seed the synthetic purchaser details for this checkout, then use the hosted form for the card.
-    const email = `p2-smoke-${randomUUID()}@example.com`;
+    // Polar validates DNS deliverability. Gmail has MX records, but cannot assign hyphenated usernames.
+    const email = `p2-smoke-${randomUUID()}@gmail.com`;
     const billing = await provider.client.checkouts.update(transactionId, {
       customer_email: email, customer_name: "Sandbox Buyer",
       customer_billing_address: {
         country: "US", line1: "476 5th Avenue", postal_code: "10018", city: "New York", state: "NY",
       },
+    }).catch((error: unknown) => {
+      const httpStatus = error instanceof Error && "statusCode" in error && typeof error.statusCode === "number"
+        ? error.statusCode : undefined;
+      stage("sandbox_checkout_prefill", "FAIL", httpStatus);
+      throw new Blocked("sandbox_checkout_prefill_rejected");
     });
     if (billing.id !== transactionId || billing.status !== "open" ||
         billing.customer_billing_address?.country !== "US" || !billing.customer_billing_address.postal_code ||
@@ -213,6 +240,7 @@ await summarize("polar_sandbox_checkout_refund", async () => {
     const buyerSession = (await context.cookies(origin)).find((cookie) => cookie.name === cookieName)?.value;
     if (!buyerSession) throw new Error("sandbox_buyer_session_cookie_missing");
     stage("same_browser_access_granted");
+    if (ledger) await verifyLedger(ledger.db, orderId, transactionId, "paid");
     const existingRefunds = await provider.client.refunds.list({ order_id: paid.id, limit: 1 });
     if (existingRefunds.items.length !== 0) throw new Blocked("sandbox_order_already_has_refund");
     const refund = await refundClient.refunds.create({
@@ -234,6 +262,9 @@ await summarize("polar_sandbox_checkout_refund", async () => {
       }
       return undefined;
     }, 90_000, "sandbox_same_browser_access_not_revoked");
+    if (ledger) await verifyLedger(ledger.db, orderId, transactionId, "refunded");
     return { checkout: "paid", refund: "succeeded", same_browser_card_status: revoked };
-  } finally { await browser.close(); }
+  } finally {
+    try { await browser.close(); } finally { await ledger?.pool.end(); }
+  }
 });
