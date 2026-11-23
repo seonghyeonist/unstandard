@@ -28,9 +28,14 @@ async function checkoutScreen(page: Page, appOrigin: string, providerOrigin: str
   const alerts = page.getByRole("alert");
   const visibleError = await alerts.evaluateAll((elements) => elements.some((element) =>
     element.getClientRects().length > 0 && Boolean(element.textContent?.trim())));
-  const invalidField = await page.locator('input:invalid, [aria-invalid="true"]').evaluateAll((elements) =>
-    elements.some((element) => element.getClientRects().length > 0));
-  if (invalidField) return "invalid_form";
+  const invalidFields = await page.locator('input:invalid, select:invalid, [aria-invalid="true"]').evaluateAll((elements) => {
+    const allowed = ["email", "country", "line1", "postal_code", "city", "state", "name", "tax_id"];
+    return [...new Set(elements.filter((element) => element.getClientRects().length > 0).map((element) => {
+      const field = element.getAttribute("name")?.split(".").at(-1) ?? "";
+      return allowed.includes(field) ? field : "other";
+    }))].sort();
+  });
+  if (invalidFields.length) return "invalid_form:" + invalidFields.join(",");
   if (visibleError) return "visible_alert";
   if (await checkout.isVisible()) return await checkout.isEnabled() ? "pay_button_available" : "pay_button_disabled";
   return "provider_screen_other";
@@ -111,6 +116,21 @@ await summarize("polar_sandbox_checkout_refund", async () => {
       throw new Error("sandbox_checkout_mapping_mismatch");
     }
     stage("polar_checkout_opened");
+    // Polar can require a full US address even when checkout creation requests country only.
+    // Seed billing only for this app-created Sandbox checkout, then use the hosted form for the card.
+    const billing = await provider.client.checkouts.update(transactionId, {
+      customer_billing_address: {
+        country: "US", line1: "476 5th Avenue", postal_code: "10018", city: "New York", state: "NY",
+      },
+    });
+    if (billing.id !== transactionId || billing.status !== "open" ||
+        billing.customer_billing_address?.country !== "US" || !billing.customer_billing_address.postal_code) {
+      throw new Error("sandbox_billing_fixture_not_applied");
+    }
+    stage("sandbox_billing_fixture_applied");
+    await page.reload({ timeout: 20_000 }).catch(() => {
+      throw new Blocked("sandbox_hosted_checkout_reload_failed");
+    });
     const email = `p2-smoke-${randomUUID()}@example.com`;
     await page.getByRole("textbox", { name: "Email", exact: true }).fill(email);
     await (await cardField(page, /Card number/i)).fill("4242424242424242");
@@ -118,17 +138,6 @@ await summarize("polar_sandbox_checkout_refund", async () => {
     await (await cardField(page, /Expir/i)).fill("12" + year);
     await (await cardField(page, /Security code|CVC/i)).fill("123");
     await page.getByRole("textbox", { name: "Cardholder name" }).fill("Sandbox Buyer");
-    const street = page.getByRole("textbox", { name: "Street address", exact: true });
-    if (await street.isVisible()) {
-      await street.fill("123 Test Street");
-      await page.getByRole("textbox", { name: "Postal code" }).fill("10001");
-      await page.getByRole("textbox", { name: "City" }).fill("New York");
-      const state = page.locator('button[role=combobox]').filter({ hasText: /^State$/ });
-      if (await state.isVisible()) {
-        await state.click();
-        await page.getByRole("option", { name: "New York", exact: true }).click();
-      }
-    }
     let confirmStatus: number | undefined;
     page.on("response", (response) => {
       if (response.request().method() !== "POST") return;

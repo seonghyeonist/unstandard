@@ -137,6 +137,23 @@ await summarize("polar_temporary_https", async () => {
     webhookSecret: "unused-before-provider-configuration", origin: "https://p2.example.test" });
   await catalog.validateCatalog().catch((error: unknown) => providerFailure("sandbox_catalog", error));
   console.log(JSON.stringify({ layer: "polar_temporary_https", status: "PASS", stage: "sandbox_catalog" }));
+  const latest = await catalog.client.checkouts.list({
+    organization_id: organizationId, product_id: productId, sorting: ["-created_at"], limit: 1,
+  });
+  const [prior] = latest.items;
+  if (prior) {
+    const expectedUnsubmitted = process.env.B2C_POLAR_PREVIOUS_UNSUBMITTED_CHECKOUT_UTC;
+    const orders = await catalog.client.orders.list({ organization_id: organizationId, checkout_id: prior.id, limit: 1 });
+    const terminalUnpaid = prior.status === "expired" || prior.status === "failed";
+    // This override is scoped to the prior checkout whose Payment Attempts table was empty.
+    const observedUnsubmitted = prior.status === "open" && expectedUnsubmitted !== undefined &&
+      Math.abs(Date.parse(prior.created_at) - Date.parse(expectedUnsubmitted)) < 5000;
+    if (orders.items.length || (!terminalUnpaid && !observedUnsubmitted)) {
+      throw new Blocked("previous_sandbox_checkout_requires_reconciliation");
+    }
+    console.log(JSON.stringify({ layer: "polar_temporary_https", status: "PASS", stage: "prior_checkout_reconciled",
+      checkout_status: prior.status, order_state: "absent" }));
+  }
   const sdk = createPolar({ accessToken: setup, environment: "sandbox", timeout: 10 });
   const tunnel = spawn(required("B2C_CLOUDFLARED"), ["tunnel", "--no-autoupdate", "--protocol", "http2", "--url",
     "http://127.0.0.1:" + localPort], { env: { PATH: process.env.PATH }, stdio: ["ignore", "pipe", "pipe"] });

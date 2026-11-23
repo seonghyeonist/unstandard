@@ -58,7 +58,7 @@ jobs:
           B2C_DATABASE_URL: postgresql://b2c_runner:local-fixture-only@127.0.0.1:${{ job.services.pg.ports[5432] }}/unstandard_b2c
           B2C_MIGRATE_CONFIRM: local-b2c
         run: npm run db:migrate
-      - name: Observe Polar checkout, then verify refund and session revocation
+      - name: Reconcile prior checkout, fill Sandbox billing, and verify refund
         env:
           B2C_DATABASE_URL: postgresql://b2c_runner:local-fixture-only@127.0.0.1:${{ job.services.pg.ports[5432] }}/unstandard_b2c
           B2C_POLAR_ORGANIZATION_ID: e9d6161a-1711-4571-837b-05996cc8bd43
@@ -66,5 +66,6 @@ jobs:
           B2C_POLAR_ACCESS_TOKEN: ${{ secrets.B2C_POLAR_ACCESS_TOKEN }}
           B2C_POLAR_E2E_REFUND_TOKEN: ${{ secrets.B2C_POLAR_E2E_REFUND_TOKEN }}
           B2C_POLAR_E2E_WEBHOOK_TOKEN: ${{ secrets.B2C_POLAR_E2E_WEBHOOK_TOKEN }}
+          B2C_POLAR_PREVIOUS_UNSUBMITTED_CHECKOUT_UTC: '2026-11-23T03:19:51Z'
           B2C_SANDBOX_WRITE_CONFIRM: checkout-b2c-polar-sandbox
         run: B2C_CLOUDFLARED="$RUNNER_TEMP/cloudflared" node scripts/polar-tunnel-rehearsal.mts
