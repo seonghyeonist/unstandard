@@ -203,7 +203,7 @@ await summarize("polar_sandbox_checkout_refund", async () => {
           /^\/v1\/(?:confirmation_tokens|payment_methods|(?:payment_intents|setup_intents)\/[^/]+\/confirm)$/.test(pathname)) {
         return "stripe";
       }
-      if (hostname.endsWith(".polar.sh") && /\/checkouts\/[^/]+\/confirm\/?$/.test(pathname)) return "polar";
+      if (hostname.endsWith(".polar.sh") && /\/checkouts\/(?:client\/)?[^/]+\/confirm\/?$/.test(pathname)) return "polar";
     }
     page.on("response", (response) => {
       const provider = confirmationProvider(response.request().method(), response.url());
@@ -221,7 +221,8 @@ await summarize("polar_sandbox_checkout_refund", async () => {
       const code = request.failure()?.errorText;
       const allowedCodes = ["net::ERR_ABORTED", "net::ERR_CONNECTION_RESET", "net::ERR_CONNECTION_REFUSED",
         "net::ERR_NAME_NOT_RESOLVED", "net::ERR_TIMED_OUT", "net::ERR_NETWORK_CHANGED", "net::ERR_BLOCKED_BY_CLIENT"];
-      networkFailures.add(provider + ":" + (code && allowedCodes.includes(code) ? code : "other"));
+      const attempt = confirmationProvider(request.method(), request.url()) ? ":confirmation" : ":other_request";
+      networkFailures.add(provider + attempt + ":" + (code && allowedCodes.includes(code) ? code : "other"));
     });
     page.on("pageerror", () => { pageErrors++; });
     const beforeSubmit = await checkoutScreen(page, origin, destination.origin);
