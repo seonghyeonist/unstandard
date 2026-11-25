@@ -1,6 +1,53 @@
 # UNSTANDARD B2C P2 인수인계
 
-## 2026-11-23 최신 결과
+## 2026-11-25 KST 실행 기준
+
+| 범위 | 판정 | 이번 실행 증거 |
+|---|---|---|
+| 저장소 | PASS | `main` `30d0c78ee19d652fed2bedcae7271931f8f04b31`에서 분기한 기존 스택을 확인했다. 아래 표의 각 PR은 Draft이며 현재 작업은 #100 head에만 반영했다. 복구 ZIP의 `5a6ec521`·`37b94fa1`은 시작 원격 트리에 없었다. 컨테이너와 진단 코드를 검토해 반영했다. |
+| 로컬 현재 코드 | PASS | Node 24.22.3, B2C lint·typecheck·build, 단위 12/12. PG 17.12 일회용 클러스터에서 migration 두 번 및 HTTP·DB 통합 12/12. 루트 Alpha 검사 및 405/405. 클러스터 종료. |
+| 원격 빌드 | PASS | [일반 push 실행](https://github.com/seonghyeonist/unstandard/actions/runs/45532393376)에서 비밀 없는 검사만 실행했다. [컨테이너 실행](https://github.com/seonghyeonist/unstandard/actions/runs/45533615635)에서 `e9da5bf25efe20af686e6c1bdff9009f624d526a`의 Docker build, revision, 접근 게이트, 미서명 웹훅 검사 통과. 앞선 실행은 이미지 build 완료 직후 초기 연결 reset에 실패했다. 재검증에는 네트워크 초기화 대기와 컨테이너 종료 로그를 추가했다. |
+| Polar 임시 HTTPS | PASS | [실행 45532584590](https://github.com/seonghyeonist/unstandard/actions/runs/45532584590), SHA `01d7d1407003c15ceea9b9667e9551d6cbe8e9b0`. 이전 Checkout 만료·연결 주문 없음, 임시 HTTPS, Basic 게이트 401, 앱 화면 200, 미결제 카드 401, 신규 앱 Checkout 201, 테스트 카드 필드 입력까지 확인했다. |
+| Polar 결제·환불 E2E | BLOCKED | 11:26 KST의 새 Checkout은 버튼 클릭 뒤에도 `open`, 주문 없음, Dashboard Payment Attempts 0건. 관측된 네트워크 오류는 Polar 요청의 `ERR_ABORTED` 한 건이며 실패 요청의 용도와 원인은 미확정이다. 기존 수집기가 공식 confirm 경로의 `client/` 세그먼트를 놓치는 문제는 수정했다. 승인, 유효 서명, 899센트 주문 대조, 전체 환불과 동일 구매자 세션 철회는 원격 미검증이다. |
+| 정리 | PASS / 일부 미검증 | Polar 임시 웹훅 비활성화 로그와 GitHub DB 컨테이너 종료를 확인했다. 러너는 종료됐고 Checkout은 공급자 만료를 기다린다. 독립 외부 터널 재탐침은 미실행이다. |
+| Render | PASS · 격리 HTTPS/fixture | [Render 서비스](https://dashboard.render.com/web/srv-dc34i43rjlhs73eo21bg) · 초기 배포 `dep-dc34i4jrjlhs73eo22c0`, exact SHA `e9da5bf25efe20af686e6c1bdff9009f624d526a`. HTTPS 204+SHA, 익명 Checkout 401, 인증 Checkout 200, 미서명 웹훅 401 확인. 전용 placeholder 설정이며 실제 DB·결제는 연결하지 않았다. 콜드 스타트의 실제 Polar 전달과 원격 롤백은 미검증이다. |
+| Neon | 메타데이터 PASS · 원격 미검증 | `small-moon-39523909`, `p2-sandbox` `br-empty-sunset-beglwunj`, `unstandard_b2c`, `b2c_p2_owner`, `ep-delicate-brook-beo1qukm`, Ohio, PG17, Launch, idle. 조회에 separate runtime/migration 역할은 나타나지 않았다. 추가 비용 0을 증명할 수 없어 compute 기동과 SQL은 보류했다. |
+| Vercel | BLOCKED | Alpha `unstandard-m9qj`는 팀 목록에 있었다. 브라우저의 P2 Hobby 프로젝트 `prj_dd0wFhYrOLg6LPt9LMLoYCxowZcV`는 팀 범위를 명시한 상세 API에서 404였다. 상업 운영에 Hobby를 선택하지 않았다. [Vercel Hobby](https://vercel.com/docs/plans/hobby) |
+| Google Cloud | BLOCKED | 현재 세션에서 Build History에 접근할 수 없어 빌드 주체, 거절 권한, 연결 저장소와 청구 상태를 확인할 수 없었다. 계정 소유자가 콘솔 읽기 접근을 제공하면 원래 Build의 리전·ref·service account와 실패한 호출을 확인하는 단계에서 재개한다. |
+
+| PR | Base | 작업 시작 Head | 당시 실제 diff |
+|---|---|---|---|
+| #98 | `f5b3843494e6cfb6a87ef21339243e68d28151b9` | `f92df39ca08b200806c0b9b50787eddea4fc7850` | 15파일, 6축 브라우저 계산·정적 B2C |
+| #99 | #98 head | `48cf2886f4cc50f5e3cdecc7a9e1c779b3bd1726` | 22파일, 독립 DB·세션과 소유권 |
+| #100 | #99 head | `59f2ebea7a4d7292860dfcca5b619703f29cd18c` | 43파일, Polar 결제·복구·검증. 11월 23일 검증 소스는 `5e470ca856b5740118b7d286151d550b97c3a467` |
+
+| 앱 진입점 | 명령 또는 계약 |
+|---|---|
+| Node·lockfile | 24.x, `apps/b2c/package-lock.json`, `npm --prefix apps/b2c ci` |
+| 정적 빌드·시작 | `npm --prefix apps/b2c run build`로 `dist` 생성. `npm --prefix apps/b2c start` → `server/start.mts` |
+| 포트·health | 기본 `127.0.0.1:4173`. 격리 Sandbox의 Node 컨테이너는 `0.0.0.0`와 플랫폼 `PORT` 사용. `GET /healthz` 204 및 `X-B2C-Revision`. 프로세스 상태와 리비전을 나타낸다. |
+| DB migration | `npm --prefix apps/b2c run db:migrate`. loopback은 `B2C_MIGRATE_CONFIRM=local-b2c`. 원격에서는 전용 대상 확인, 직접 endpoint, 별도 migrator 역할과 동의값 필요. 런타임 권한은 별도로 확인한다. |
+| 결제·웹훅 | 활성 공급자는 Polar Sandbox. `POST /api/b2c/webhooks/polar`만 Basic 게이트 예외이며 서명을 확인한다. Finance/Production 연결은 적용하지 않았다. |
+| 공유 구성 | 루트 `tsconfig.json`은 Alpha 빌드에 B2C 타입을 포함하지 않는다. 루트 `vercel.json`은 세 P2 스택 브랜치의 Alpha 자동 배포를 비활성화한다. B2C는 자체 Node 빌드를 사용한다. |
+| Paddle 참조 | 브랜치명과 기존 SQL migration 파일명·저널 식별자는 호환성 보존용. Paddle 런북은 역사 자료. 활성 결제 코드는 Polar SDK를 사용한다. |
+
+### 호스팅 판단과 반복 실행
+
+Render Free를 $0 **격리 HTTPS**로 선택했다. 소유자가 워크스페이스에 결제수단이 없다고 확인했다. 무료 플랜은 유휴 15분 후 중지하고 다시 시작하는 데 약 1분이 필요할 수 있다. 고정 HTTPS 도달성, 서명 웹훅 전달 및 콜드 스타트 재시도는 개별 검증 항목이다. Render Starter 월 $7은 향후 검토 가격이다. Cloud Run은 무료 제공량 이후 계량 과금이며 Build·Registry·네트워크를 함께 판단해야 한다. 이 실행에서 해당 계정의 $0 및 접근 조건은 확인할 수 없었다. [Render Free](https://render.com/docs/free) · [Render 초과 사용](https://render.com/docs/faq) · [Cloud Run 가격](https://cloud.google.com/run/pricing) · [Cloud Build 가격](https://cloud.google.com/build/pricing)
+
+- 로컬은 `npm --prefix apps/b2c ci --no-audit --no-fund`, `npm --prefix apps/b2c run check`, `B2C_PG_BIN=/path/to/pg17/bin python3 apps/b2c/scripts/test-postgres.py` 순으로 실행한다.
+- GitHub push는 저장소와 정확한 P2 ref를 검사한다. 일반 push는 비밀 없는 검증만 실행한다. 기본 브랜치의 workflow 파일을 전제로 하는 `workflow_dispatch` 제약 때문에 최종 커밋 메시지 줄로 명시적으로 선택한다. `P2-Polar-Sandbox: run`과 `P2-Render-Sandbox: deploy`는 별개 선택이다. 재실행 attempt에서는 외부 변경 작업을 건너뛴다. [GitHub Actions](https://docs.github.com/en/actions/how-tos/manage-workflow-runs/manually-run-a-workflow)
+- Polar는 이전 Checkout의 무주문 만료·실패 또는 대조된 전액 환불 확인 이후 진행한다. 세 토큰은 기존 `p2-polar-sandbox` Environment를 사용한다. 원격 카드가 아직 생성되지 않는 P2 단계에서는 실제 paid 웹훅·원장을 확인한 뒤 일회용 DB에 개인 카드 fixture만 추가해 같은 세션의 200을 검사한다. fixture 표시는 결제 승인이나 P3 생성 증거와 별개다. 버튼 다음에는 미리 허용한 메서드·경로 분류와 HTTP 상태만 기록한다. 전체 URL, 주소, 카드 값, 토큰, 쿠키는 기록하지 않는다. [Polar Confirm API](https://polar.sh/docs/api-reference/2026-10/checkouts/confirm-checkout-session-from-client)
+- Render는 Free·Ohio·동일 Git ref·Docker context `apps/b2c`·`/healthz`·자동 배포 off를 사용한다. GitHub의 `p2-render-sandbox` Environment에는 해당 작업공간 scoped 배포/읽기 권한과 필요 시 rollback/suspend 권한을 가진 `B2C_RENDER_API_TOKEN`, 서비스 ID, `B2C_RENDER_DEPLOY_CONFIRM=p2-free-no-payment-method`가 필요하다. 현재 구성에서 Actions로 토큰이 전달되는 경로는 미검증이다. 이미 같은 SHA가 live면 검증만 하고, 진행 중 배포나 같은 SHA의 실패 기록이 있으면 중복 요청을 차단한다.
+- 롤백은 기존 정상 revision을 먼저 대조하고 실패 시 보존된 Deploy ID를 사용한다. 이전 정상 배포가 없는 실패는 해당 격리 서비스 중단으로 정리한다. 승인된 배포 중 타임아웃이 나면 동일 요청을 재전송하기 전에 Render Deploy ID 상태를 조회한다. 성공·기존 정상 보존·롤백·첫 배포 중단·중복·대상 오류의 제어 흐름은 합성 API 응답으로 검증했다. [Render Rollbacks](https://render.com/docs/rollbacks)
+
+### Google Cloud 공지와 자료 보존
+
+Gmail 공지의 시행일은 **2027-01-01**이다. 공식 General Service Terms §17은 승인된 활성 작업에 필요한 기술정보 처리, 30일 이내 보존, 도구 연결 해제 또는 접근 철회 시 보존 종료, 필요 이상의 체계적 탐색 금지를 규정한다. 조회값뿐 아니라 파생 진단에도 적용한다. GCP 작업을 나중에 자동화할 경우 실행별로 접근을 한정하고, 삭제 가능한 임시 저장소의 원본·파생본·백업을 함께 관리하며, 작업 종료 시 삭제하고 철회 시 즉시 제거한다. 이 삭제를 집행할 수 없는 채팅·장기 Git 로그·자동화 실행 로그에 기술정보를 출력하지 않는다. 이번 작업은 GCP 작업 로그를 추가 수집하거나 Git에 보존하지 않았다. [Google Cloud 약관](https://cloud.google.com/terms/service-terms)
+
+다른 Gmail은 2026-11-16부터 $300 체험 크레딧의 Gemini 적용이 변경된다고 알렸고, 11월 7일 KST 메일은 체험이 30일 남았다고 알렸다. 정확한 종료일과 현재 잔액·청구 유형은 콘솔에서 확인해야 한다. Gemini 변경은 호스팅 비용 증거와 별개다.
+
+## 2026-11-23 이전 검증 기록
 
 **Local Synthetic PASS · GitHub 임시 HTTPS 및 앱 Checkout PASS · Polar Sandbox E2E / Vercel Preview / Neon Remote BLOCKED.**
 
