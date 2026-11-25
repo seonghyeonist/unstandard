@@ -34,7 +34,7 @@ async function api<T>(path: string, payload?: object): Promise<T> {
     signal: AbortSignal.timeout(15_000),
   });
   if (!response.ok) throw new Error("Render API status " + response.status);
-  return (response.status === 204 ? undefined : await response.json()) as T;
+  return (response.status === 202 || response.status === 204 ? undefined : await response.json()) as T;
 }
 
 async function probe(origin: string, sha: string) {
@@ -115,7 +115,11 @@ if (previous?.commit?.id === commit) {
       console.info("render_previous_revision_healthy", previousSha);
     } else {
       await api(servicePath + "/suspend", {});
-      const stopped = await api<Service>(servicePath);
+      let stopped = await api<Service>(servicePath);
+      for (let attempt = 0; attempt < 5 && stopped.suspended !== "suspended"; attempt++) {
+        await delay(2_000);
+        stopped = await api<Service>(servicePath);
+      }
       if (stopped.suspended !== "suspended") throw new Error("Initial Render service suspension unverified");
       console.info("render_initial_service_suspended");
     }
