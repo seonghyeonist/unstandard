@@ -75,6 +75,33 @@ jobs:
           test "$(curl --silent -o /dev/null -w '%{http_code}' "$origin/checkout")" = 401
           test "$(curl --silent -o /dev/null -w '%{http_code}' --user "b2c:$SMOKE_KEY" "$origin/checkout")" = 200
           curl --silent --request POST "$origin/api/b2c/webhooks/polar" | jq -e '.error == "invalid_signature"'
+  checkout-status:
+    if: >-
+      github.repository == 'seonghyeonist/unstandard' &&
+      github.ref == 'refs/heads/pivot/b2c-v4-p2-paddle' &&
+      endsWith(github.event.head_commit.message, 'P2-Polar-Sandbox: status')
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    environment: p2-polar-sandbox
+    defaults:
+      run:
+        working-directory: apps/b2c
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24.x
+      - name: Read latest checkout, order and refund status
+        env:
+          B2C_POLAR_ORGANIZATION_ID: e9d6161a-1711-4571-837b-05996cc8bd43
+          B2C_POLAR_PRODUCT_ID: 903bf4e5-61c0-4fe0-9325-9364c8b52754
+          B2C_POLAR_ACCESS_TOKEN: ${{ secrets.B2C_POLAR_ACCESS_TOKEN }}
+        run: |
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          npm ci --no-audit --no-fund
+          node scripts/polar-tunnel-rehearsal.mts --checkout-status
   rehearsal:
     needs: checks
     if: >-

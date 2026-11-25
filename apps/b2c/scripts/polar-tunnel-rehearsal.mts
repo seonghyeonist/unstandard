@@ -138,51 +138,65 @@ function providerFailure(stage: string, error: unknown): never {
   throw new Error(stage + "_failed");
 }
 
-await summarize("polar_temporary_https", async () => {
+async function priorCheckout(catalog: PolarSandboxProvider, organizationId: string, productId: string) {
+  const latest = await catalog.client.checkouts.list({
+    organization_id: organizationId, product_id: productId, sorting: ["-created_at"], limit: 1,
+  });
+  const [prior] = latest.items;
+  if (!prior) {
+    return { checkout_status: "absent", order_state: "absent", ready_for_rehearsal: true };
+  }
+  const orders = await catalog.client.orders.list({
+    organization_id: organizationId, checkout_id: prior.id, limit: 2,
+  });
+  let orderState = "absent";
+  const [order] = orders.items;
+  if (order) {
+    const refunds = await catalog.client.refunds.list({ order_id: order.id, limit: 2 });
+    const [refund] = refunds.items;
+    if (orders.items.length !== 1 || refunds.items.length !== 1 ||
+        order.checkout_id !== prior.id || order.product_id !== productId ||
+        typeof prior.metadata.b2c_order_id !== "string" ||
+        prior.metadata.b2c_order_id !== order.metadata.b2c_order_id ||
+        order.currency.toUpperCase() !== "USD" || order.net_amount !== 899 ||
+        !refund || refund.status !== "succeeded" ||
+        refund.amount !== order.net_amount || refund.tax_amount !== order.tax_amount) {
+      orderState = "requires_reconciliation";
+    } else {
+      orderState = "fully_refunded";
+    }
+  }
+  return {
+    checkout_status: prior.status,
+    order_state: orderState,
+    checkout_expires_utc: new Date(prior.expires_at).toISOString(),
+    ready_for_rehearsal: orderState === "fully_refunded" ||
+      (orderState === "absent" && (prior.status === "expired" || prior.status === "failed")),
+  };
+}
+
+const statusOnly = process.argv[2] === "--checkout-status";
+await summarize(statusOnly ? "polar_sandbox_checkout_status" : "polar_temporary_https", async () => {
+  const runtime = required("B2C_POLAR_ACCESS_TOKEN");
+  const organizationId = required("B2C_POLAR_ORGANIZATION_ID");
+  const productId = required("B2C_POLAR_PRODUCT_ID");
+  const catalog = new PolarSandboxProvider({ accessToken: runtime, organizationId, productId,
+    webhookSecret: "unused-before-provider-configuration", origin: "https://p2.example.test" });
+  if (statusOnly) return priorCheckout(catalog, organizationId, productId);
+
   allowWrites("checkout-b2c-polar-sandbox");
   if (!databaseTarget().local) throw new Error("temporary_https_requires_disposable_loopback_database");
   const setup = required("B2C_POLAR_E2E_WEBHOOK_TOKEN");
-  const runtime = required("B2C_POLAR_ACCESS_TOKEN");
   const refund = required("B2C_POLAR_E2E_REFUND_TOKEN");
   if (new Set([setup, runtime, refund]).size !== 3 ||
       [setup, runtime, refund].some((value) => !/^polar_oat_[a-z0-9_-]+$/i.test(value))) {
     throw new Error("three_separate_sandbox_tokens_required");
   }
-  const organizationId = required("B2C_POLAR_ORGANIZATION_ID");
-  const productId = required("B2C_POLAR_PRODUCT_ID");
-  const catalog = new PolarSandboxProvider({ accessToken: runtime, organizationId, productId,
-    webhookSecret: "unused-before-provider-configuration", origin: "https://p2.example.test" });
   await catalog.validateCatalog().catch((error: unknown) => providerFailure("sandbox_catalog", error));
   console.log(JSON.stringify({ layer: "polar_temporary_https", status: "PASS", stage: "sandbox_catalog" }));
-  const latest = await catalog.client.checkouts.list({
-    organization_id: organizationId, product_id: productId, sorting: ["-created_at"], limit: 1,
-  });
-  const [prior] = latest.items;
-  if (prior) {
-    const orders = await catalog.client.orders.list({
-      organization_id: organizationId, checkout_id: prior.id, limit: 2,
-    });
-    let orderState = "absent";
-    const [order] = orders.items;
-    if (order) {
-      const refunds = await catalog.client.refunds.list({ order_id: order.id, limit: 2 });
-      const [refund] = refunds.items;
-      if (orders.items.length !== 1 || refunds.items.length !== 1 ||
-          order.checkout_id !== prior.id || order.product_id !== productId ||
-          typeof prior.metadata.b2c_order_id !== "string" ||
-          prior.metadata.b2c_order_id !== order.metadata.b2c_order_id ||
-          order.currency.toUpperCase() !== "USD" || order.net_amount !== 899 ||
-          !refund || refund.status !== "succeeded" ||
-          refund.amount !== order.net_amount || refund.tax_amount !== order.tax_amount) {
-        throw new Blocked("previous_sandbox_checkout_requires_reconciliation");
-      }
-      orderState = "fully_refunded";
-    } else if (prior.status !== "expired" && prior.status !== "failed") {
-      throw new Blocked("previous_sandbox_checkout_requires_reconciliation");
-    }
-    console.log(JSON.stringify({ layer: "polar_temporary_https", status: "PASS", stage: "prior_checkout_reconciled",
-      checkout_status: prior.status, order_state: orderState }));
-  }
+  const previous = await priorCheckout(catalog, organizationId, productId);
+  console.log(JSON.stringify({ layer: "polar_temporary_https", stage: "prior_checkout_reconciliation", ...previous }));
+  if (!previous.ready_for_rehearsal) throw new Blocked("previous_sandbox_checkout_requires_reconciliation");
   const sdk = createPolar({ accessToken: setup, environment: "sandbox", timeout: 10 });
   const tunnel = spawn(required("B2C_CLOUDFLARED"), ["tunnel", "--no-autoupdate", "--protocol", "http2", "--url",
     "http://127.0.0.1:" + localPort], { env: { PATH: process.env.PATH }, stdio: ["ignore", "pipe", "pipe"] });
