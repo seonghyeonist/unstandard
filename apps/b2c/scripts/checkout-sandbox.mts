@@ -3,7 +3,7 @@ import { chromium, type Page } from "@playwright/test";
 import { createPolar } from "@polar-sh/sdk/2026-10";
 import { and, eq } from "drizzle-orm";
 import { connectDatabase, databaseTarget, type Database } from "../db/client.mts";
-import { orders, paymentEvents, rooms } from "../db/schema.mts";
+import { cards, members, orders, paymentEvents, rooms } from "../db/schema.mts";
 import { loadPaymentConfig } from "../server/payment-config.mts";
 import { cookieName } from "../server/session.mts";
 import { hostedSandboxCheckout } from "../server/polar-provider.mts";
@@ -265,15 +265,37 @@ await summarize("polar_sandbox_checkout_refund", async () => {
     }
     console.log(JSON.stringify({ layer: "polar_sandbox_checkout", status: "PASS", stage: "provider_order_paid",
       principal_cents: paid.net_amount, tax_cents: paid.tax_amount, total_cents: paid.total_amount }));
-    await waitFor(async () => {
+    const grantedStatus = await waitFor(async () => {
       if (new URL(page.url()).origin !== origin) return undefined;
       const card = await context.request.get(origin + "/api/b2c/me/card");
       return card.status() === 202 || card.status() === 200 ? card.status() : undefined;
     }, 90_000, "sandbox_signed_webhook_or_claim_not_confirmed");
     const buyerSession = (await context.cookies(origin)).find((cookie) => cookie.name === cookieName)?.value;
     if (!buyerSession) throw new Error("sandbox_buyer_session_cookie_missing");
-    stage("same_browser_access_granted");
+    stage("same_browser_access_granted", "PASS", grantedStatus);
     if (ledger) await verifyLedger(ledger.db, orderId, transactionId, "paid");
+    let cardResult: "generated" | "fixture" | "pending" | "fixture_failed" =
+      grantedStatus === 200 ? "generated" : "pending";
+    if (ledger && grantedStatus === 202) {
+      // P3 generates cards. Seed only the card on this disposable database after real paid evidence.
+      try {
+        const [buyer] = await ledger.db.select({ roomId: rooms.id, ownerMemberId: members.id })
+          .from(rooms).innerJoin(members, eq(members.roomId, rooms.id))
+          .where(and(eq(rooms.orderId, orderId), eq(members.role, "buyer"))).limit(1);
+        if (!buyer) throw new Error("fixture_buyer_missing");
+        const payload = { text: "Synthetic P2 card for access testing." };
+        await ledger.db.insert(cards).values({ ...buyer, kind: "personal", revision: 0, payload });
+        const reply = await context.request.get(origin + "/api/b2c/me/card");
+        if (reply.status() !== 200 || (await reply.json()).payload?.text !== payload.text) {
+          throw new Error("fixture_card_not_returned");
+        }
+        cardResult = "fixture";
+        stage("same_browser_fixture_card_read", "PASS", 200);
+      } catch {
+        cardResult = "fixture_failed";
+        stage("same_browser_fixture_card_read", "FAIL");
+      }
+    }
     const existingRefunds = await provider.client.refunds.list({ order_id: paid.id, limit: 1 });
     if (existingRefunds.items.length !== 0) throw new Blocked("sandbox_order_already_has_refund");
     const refund = await refundClient.refunds.create({
@@ -296,7 +318,9 @@ await summarize("polar_sandbox_checkout_refund", async () => {
       return undefined;
     }, 90_000, "sandbox_same_browser_access_not_revoked");
     if (ledger) await verifyLedger(ledger.db, orderId, transactionId, "refunded");
-    return { checkout: "paid", refund: "succeeded", same_browser_card_status: revoked };
+    stage("same_browser_access_revoked", "PASS", revoked);
+    if (cardResult === "fixture_failed") throw new Error("sandbox_fixture_card_verification_failed");
+    return { checkout: "paid", refund: "succeeded", card_read: cardResult, same_browser_card_status: revoked };
   } finally {
     try { await browser.close(); } finally { await ledger?.pool.end(); }
   }
