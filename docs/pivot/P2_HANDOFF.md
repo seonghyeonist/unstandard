@@ -1,5 +1,12 @@
 # UNSTANDARD B2C P2 인수인계
 
+## 2026-11-25 KST Neon·Render 연결
+
+- 허가된 전용 Neon `small-moon-39523909` / `p2-sandbox` / `unstandard_b2c`에 커밋된 Drizzle SQL 두 건을 적용했다. 로컬 직접 연결에서 DNS `EAI_AGAIN`이 발생해 Neon 트랜잭션에서 같은 잠금 ID, SQL, 마이그레이션 해시와 타임스탬프를 사용했다. 원격 원장 두 건, 앱 테이블 13개, 미적용 0건, 주문 0건을 별도 확인했다.
+- DB 소유자와 Render용 `b2c_p2_runtime`을 분리했다. 런타임은 앱 테이블 13개에 SELECT·INSERT·UPDATE·DELETE가 있으며 TRUNCATE, DDL 및 마이그레이션 스키마 접근은 제외했다. 원격 합성 rate-limit 행을 생성·수정·삭제했고 남은 행은 0건이다.
+- Render Free의 [격리 서비스](https://dashboard.render.com/web/srv-dc34i43rjlhs73eo21bg)에서 원격 DB를 연결한 배포 `dep-dc3d5hp9n9bc73d0p8s0`가 live. 배포 SHA `6288feca55194566c7fc7c74f4d6ff55e997d544`, `/healthz` 204, 인증 Checkout HTML 200, 무작위 합성 세션의 DB 조회 후 401, 미서명 웹훅 401을 확인했다. Render의 Polar 설정은 fixture이며 실제 결제 흐름은 별도 Actions Sandbox에서 검증한다. 이후 Blueprint 동기화에서 연결값을 덮어쓰지 않도록 해당 변수는 `sync: false`로 정의한다.
+- [Polar 상태 조회 재실행](https://github.com/seonghyeonist/unstandard/actions/runs/45535181380/job/139199801801)에서 `open`, 주문 없음, 재실행 불가를 확인했다. 만료 예정은 2026-11-26 11:26:28 KST다. [GitHub Render 배포 환경](https://github.com/seonghyeonist/unstandard/settings/environments/28466542833/edit)의 `B2C_RENDER_API_TOKEN`은 비어 있다.
+
 ## 2026-11-25 KST 실행 기준
 
 | 범위 | 판정 | 이번 실행 증거 |
