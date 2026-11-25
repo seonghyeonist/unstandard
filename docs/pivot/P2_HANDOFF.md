@@ -47,6 +47,13 @@ Gmail 공지의 시행일은 **2027-01-01**이다. 공식 General Service Terms 
 
 다른 Gmail은 2026-11-16부터 $300 체험 크레딧의 Gemini 적용이 변경된다고 알렸고, 11월 7일 KST 메일은 체험이 30일 남았다고 알렸다. 정확한 종료일과 현재 잔액·청구 유형은 콘솔에서 확인해야 한다. Gemini 변경은 호스팅 비용 증거와 별개다.
 
+### 2026-11-25 KST 재개 결과
+
+- [Polar 읽기 전용 조회](https://github.com/seonghyeonist/unstandard/actions/runs/45535181380/job/138939926356)에서 최신 Checkout 상태 `open`, 주문 `absent`, `ready_for_rehearsal=false`를 확인했다. 공급자 만료 시각은 2026-11-26 11:26:28 KST다. 이 실행의 일반 CI도 통과했고, 결제와 배포 잡은 스킵됐다.
+- P2 ref의 커밋 메시지 마지막 줄 `P2-Polar-Sandbox: status`로 상태만 조회할 수 있다. 기존 Sandbox 접근 토큰만 쓰며 Checkout·환불·웹훅을 변경하지 않는다. 만료 시각 이후 서버 상태가 `expired`이고 주문이 없음을 확인한 뒤 `P2-Polar-Sandbox: run`을 선택한다. 같은 상태·조건에서 결제를 재제출하지 않는다.
+- [GitHub Render 배포 환경](https://github.com/seonghyeonist/unstandard/settings/environments/28466542833/edit)을 생성했다. 허용 브랜치 `pivot/b2c-v4-p2-paddle`, 변수 `B2C_RENDER_SERVICE_ID`와 `B2C_RENDER_DEPLOY_CONFIRM`을 확인했다. 남은 자격증명은 `B2C_RENDER_API_TOKEN`이다. 연결 후 `P2-Render-Sandbox: deploy`에서 종료와 SHA를 대조한다. 기존 live 배포의 정확한 SHA는 `f20a15909a945ef9d52a811245445efe74183c49`다.
+- 기존 Neon P2 계정의 Launch 요금은 compute 사용량에 따라 과금된다. $0이 보장되는 근거가 없어 일회용 PG17 검증을 유지했다. [Neon Launch 요금](https://neon.com/docs/introduction/plans)
+
 ## 2026-11-23 이전 검증 기록
 
 **Local Synthetic PASS · GitHub 임시 HTTPS 및 앱 Checkout PASS · Polar Sandbox E2E / Vercel Preview / Neon Remote BLOCKED.**
