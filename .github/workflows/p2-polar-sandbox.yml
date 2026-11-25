@@ -3,7 +3,6 @@ name: P2 Polar Sandbox rehearsal
 on:
   push:
     branches: [pivot/b2c-v4-p2-paddle]
-    paths: [.github/workflows/p2-polar-sandbox.yml]
 
 permissions:
   contents: read
@@ -13,8 +12,48 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  checks:
+    if: github.repository == 'seonghyeonist/unstandard' && github.ref == 'refs/heads/pivot/b2c-v4-p2-paddle' && !github.event.deleted
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: apps/b2c
+    services:
+      pg:
+        image: postgres:17
+        env:
+          POSTGRES_USER: b2c_runner
+          POSTGRES_PASSWORD: local-fixture-only
+          POSTGRES_DB: unstandard_b2c
+        ports: [5432]
+        options: >-
+          --health-cmd "pg_isready -U b2c_runner -d unstandard_b2c"
+          --health-interval 3s --health-timeout 3s --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24.x
+      - name: Build and test without provider credentials
+        env:
+          B2C_DATABASE_URL: postgresql://b2c_runner:local-fixture-only@127.0.0.1:${{ job.services.pg.ports[5432] }}/unstandard_b2c
+          B2C_MIGRATE_CONFIRM: local-b2c
+          B2C_DB_FIXTURES: disposable-loopback
+        run: |
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          npm ci --no-audit --no-fund
+          npm run check
+          npm run db:migrate
+          npm run db:migrate
+          npm run test:db
   rehearsal:
-    if: github.repository == 'seonghyeonist/unstandard' && github.ref == 'refs/heads/pivot/b2c-v4-p2-paddle'
+    needs: checks
+    if: >-
+      github.run_attempt == '1' &&
+      endsWith(github.event.head_commit.message, 'P2-Polar-Sandbox: run')
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     environment: p2-polar-sandbox
@@ -40,10 +79,9 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 24.x
-      - name: Install and verify B2C
+      - name: Install headed Chromium
         run: |
           npm ci --no-audit --no-fund
-          npm run check
           npx playwright install --with-deps chromium
       - name: Install verified Cloudflare tunnel client
         shell: bash
@@ -58,7 +96,7 @@ jobs:
           B2C_DATABASE_URL: postgresql://b2c_runner:local-fixture-only@127.0.0.1:${{ job.services.pg.ports[5432] }}/unstandard_b2c
           B2C_MIGRATE_CONFIRM: local-b2c
         run: npm run db:migrate
-      - name: Verify tunnel readiness before the DNS-corrected Sandbox checkout
+      - name: Rehearse the explicitly selected Sandbox checkout
         env:
           B2C_DATABASE_URL: postgresql://b2c_runner:local-fixture-only@127.0.0.1:${{ job.services.pg.ports[5432] }}/unstandard_b2c
           B2C_POLAR_ORGANIZATION_ID: e9d6161a-1711-4571-837b-05996cc8bd43
@@ -66,7 +104,7 @@ jobs:
           B2C_POLAR_ACCESS_TOKEN: ${{ secrets.B2C_POLAR_ACCESS_TOKEN }}
           B2C_POLAR_E2E_REFUND_TOKEN: ${{ secrets.B2C_POLAR_E2E_REFUND_TOKEN }}
           B2C_POLAR_E2E_WEBHOOK_TOKEN: ${{ secrets.B2C_POLAR_E2E_WEBHOOK_TOKEN }}
-          B2C_POLAR_PREVIOUS_UNSUBMITTED_CHECKOUT_UTC: '2026-11-23T03:33:54Z'
+          B2C_BROWSER_HEADED: '1'
           B2C_E2E_VERIFY_LOCAL_LEDGER: '1'
           B2C_SANDBOX_WRITE_CONFIRM: checkout-b2c-polar-sandbox
-        run: B2C_CLOUDFLARED="$RUNNER_TEMP/cloudflared" node scripts/polar-tunnel-rehearsal.mts
+        run: B2C_CLOUDFLARED="$RUNNER_TEMP/cloudflared" xvfb-run -a node scripts/polar-tunnel-rehearsal.mts

@@ -68,9 +68,19 @@ async function handle(origin: string, incoming: IncomingMessage, outgoing: Serve
 async function waitForTransport(origin: string) {
   let status: number | undefined;
   let errorType: string | undefined;
-  let networkCode: string | undefined;
+  const networkCodes = new Set<string>();
   const allowedNetworkCodes = new Set(["ENOTFOUND", "EAI_AGAIN", "ECONNREFUSED", "ECONNRESET", "ETIMEDOUT",
-    "ENETUNREACH", "UND_ERR_CONNECT_TIMEOUT", "CERT_HAS_EXPIRED", "ERR_TLS_CERT_ALTNAME_INVALID"]);
+    "ENETUNREACH", "EHOSTUNREACH", "ABORT_ERR", "UND_ERR_SOCKET", "UND_ERR_CONNECT_TIMEOUT", "CERT_HAS_EXPIRED", "ERR_TLS_CERT_ALTNAME_INVALID"]);
+  function collectNetworkCodes(error: unknown, depth = 0) {
+    if (depth >= 5 || !error || typeof error !== "object") return;
+    if ("code" in error && typeof error.code === "string" && allowedNetworkCodes.has(error.code)) {
+      networkCodes.add(error.code);
+    }
+    if (error instanceof AggregateError) {
+      for (const nested of error.errors.slice(0, 8)) collectNetworkCodes(nested, depth + 1);
+    }
+    if ("cause" in error) collectNetworkCodes(error.cause, depth + 1);
+  }
   const deadline = Date.now() + 90_000;
   let attempts = 0;
   while (Date.now() < deadline) {
@@ -81,14 +91,12 @@ async function waitForTransport(origin: string) {
       if (status === 204) return;
     } catch (error) {
       errorType = error instanceof Error && /^[A-Za-z]{1,40}$/.test(error.name) ? error.name : "Unknown";
-      const cause = error instanceof Error ? error.cause : undefined;
-      if (cause && typeof cause === "object" && "code" in cause && typeof cause.code === "string" &&
-          allowedNetworkCodes.has(cause.code)) networkCode = cause.code;
+      collectNetworkCodes(error);
     }
     await delay(2000);
   }
   console.log(JSON.stringify({ layer: "polar_temporary_https", status: "FAIL", stage: "https_transport_verified",
-    http_status: status, error_type: errorType, network_code: networkCode, attempts }));
+    http_status: status, error_type: errorType, network_codes: [...networkCodes].sort(), attempts }));
   throw new Blocked("temporary_https_transport_not_verified");
 }
 
@@ -210,7 +218,8 @@ await summarize("polar_temporary_https", async () => {
     await waitForGates(origin);
     console.log(JSON.stringify({ layer: "polar_temporary_https", status: "PASS", stage: "origin_and_gates" }));
     const result = await new Promise<number | null>((resolve, reject) => {
-      const { B2C_POLAR_E2E_WEBHOOK_TOKEN: _setupToken, ...env } = process.env;
+      const env = { ...process.env };
+      delete env.B2C_POLAR_E2E_WEBHOOK_TOKEN;
       const checkout = spawn(process.execPath, [new URL("./checkout-sandbox.mts", import.meta.url).pathname],
         { env, stdio: ["ignore", "inherit", "inherit"] });
       checkout.once("error", reject).once("exit", resolve);

@@ -45,6 +45,14 @@ async function checkoutScreen(page: Page, appOrigin: string, providerOrigin: str
   });
   if (invalidFields.length) return "invalid_form:" + invalidFields.join(",");
   if (visibleError) return "visible_alert";
+  for (const frame of page.frames()) {
+    if (new URL(frame.url() || "about:blank").origin !== "https://js.stripe.com") continue;
+    const invalid = await frame.locator('input:invalid, [aria-invalid="true"]').evaluateAll((fields) =>
+      fields.some((field) => field.getClientRects().length > 0));
+    if (invalid) return "invalid_stripe_field";
+    const challenge = await frame.getByText(/authenticate|verification code|3D Secure/i).first().isVisible();
+    if (challenge) return "stripe_authentication_visible";
+  }
   if (await checkout.isVisible()) return await checkout.isEnabled() ? "pay_button_available" : "pay_button_disabled";
   return "provider_screen_other";
 }
@@ -99,7 +107,10 @@ await summarize("polar_sandbox_checkout_refund", async () => {
   stage("sandbox_catalog");
   const verifyLocalLedger = process.env.B2C_E2E_VERIFY_LOCAL_LEDGER === "1";
   if (verifyLocalLedger && !databaseTarget().local) throw new Error("sandbox_ledger_probe_requires_local_database");
-  const browser = await chromium.launch({ executablePath: process.env.B2C_BROWSER })
+  const browser = await chromium.launch({
+    executablePath: process.env.B2C_BROWSER,
+    headless: process.env.B2C_BROWSER_HEADED !== "1",
+  })
     .catch(() => { throw new Blocked("sandbox_browser_launch_failed"); });
   stage("browser_launched");
   const ledger = verifyLocalLedger ? connectDatabase() : undefined;
@@ -182,19 +193,40 @@ await summarize("polar_sandbox_checkout_refund", async () => {
     await enterCardField(page, /Security code|CVC/i, "123", "sandbox_test_card_security_code_not_entered");
     await (await cardField(page, /Security code|CVC/i)).press("Tab");
     stage("sandbox_browser_card_input_verified");
-    let stripeStatus: number | undefined;
-    let polarStatus: number | undefined;
-    page.on("response", (response) => {
-      if (response.request().method() !== "POST") return;
-      const { hostname, pathname } = new URL(response.url());
+    const confirmation: Record<string, number> = {};
+    const networkFailures = new Set<string>();
+    let pageErrors = 0;
+    function confirmationProvider(method: string, requestUrl: string) {
+      if (method !== "POST") return undefined;
+      const { hostname, pathname } = new URL(requestUrl);
       if (hostname === "api.stripe.com" &&
-          /^\/v1\/(?:confirmation_tokens|(?:payment_intents|setup_intents)\/[^/]+\/confirm)$/.test(pathname)) {
-        stripeStatus = response.status();
+          /^\/v1\/(?:confirmation_tokens|payment_methods|(?:payment_intents|setup_intents)\/[^/]+\/confirm)$/.test(pathname)) {
+        return "stripe";
       }
-      if (hostname.endsWith(".polar.sh") && /\/checkouts\/[^/]+\/confirm\/?$/.test(pathname)) {
-        polarStatus = response.status();
-      }
+      if (hostname.endsWith(".polar.sh") && /\/checkouts\/[^/]+\/confirm\/?$/.test(pathname)) return "polar";
+    }
+    page.on("response", (response) => {
+      const provider = confirmationProvider(response.request().method(), response.url());
+      if (provider) confirmation[provider + "_http_status"] = response.status();
     });
+    page.on("request", (request) => {
+      const provider = confirmationProvider(request.method(), request.url());
+      if (provider) confirmation[provider + "_requests"] = (confirmation[provider + "_requests"] ?? 0) + 1;
+    });
+    page.on("requestfailed", (request) => {
+      const { hostname } = new URL(request.url());
+      const provider = hostname === "stripe.com" || hostname.endsWith(".stripe.com") ? "stripe"
+        : hostname === "polar.sh" || hostname.endsWith(".polar.sh") ? "polar" : undefined;
+      if (!provider) return;
+      const code = request.failure()?.errorText;
+      const allowedCodes = ["net::ERR_ABORTED", "net::ERR_CONNECTION_RESET", "net::ERR_CONNECTION_REFUSED",
+        "net::ERR_NAME_NOT_RESOLVED", "net::ERR_TIMED_OUT", "net::ERR_NETWORK_CHANGED", "net::ERR_BLOCKED_BY_CLIENT"];
+      networkFailures.add(provider + ":" + (code && allowedCodes.includes(code) ? code : "other"));
+    });
+    page.on("pageerror", () => { pageErrors++; });
+    const beforeSubmit = await checkoutScreen(page, origin, destination.origin);
+    console.log(JSON.stringify({ layer: "polar_sandbox_checkout", stage: "checkout_before_submit", screen: beforeSubmit }));
+    if (beforeSubmit !== "pay_button_available") throw new Blocked("sandbox_checkout_form_not_ready");
     try {
       await page.getByRole("button", { name: "Pay now", exact: true }).click({ timeout: 15_000 });
     } catch {
@@ -214,8 +246,9 @@ await summarize("polar_sandbox_checkout_refund", async () => {
         checkout_status: checkout.status,
         order_state: order ? (order.paid ? "paid" : "unpaid") : "absent",
         screen,
-        stripe_confirmation_http_status: stripeStatus,
-        polar_confirmation_http_status: polarStatus,
+        confirmation,
+        network_failures: [...networkFailures].sort(),
+        browser_page_errors: pageErrors,
       });
       if (observation !== previousObservation) {
         console.log(JSON.stringify({ layer: "polar_sandbox_checkout", stage: "provider_checkout_observed",

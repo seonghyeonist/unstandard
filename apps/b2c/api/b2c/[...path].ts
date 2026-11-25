@@ -1,8 +1,7 @@
-import { timingSafeEqual } from "node:crypto";
 import { createFetchAdapter } from "../../server/fetch-adapter.mts";
 import { createRuntime } from "../../server/runtime.mts";
 
-const webhookPath = "/api/b2c/webhooks/polar";
+import { hasSandboxAccess, polarWebhookPath, sandboxAuthChallenge } from "../../server/sandbox-access.mts";
 let fetchRequest: ReturnType<typeof createFetchAdapter> | undefined;
 
 function response(status: number, error: string, extra: Record<string, string> = {}) {
@@ -16,13 +15,11 @@ const handler = {
     try {
       const url = new URL(request.url);
       if (url.origin !== process.env.B2C_ORIGIN) return response(404, "not_found");
-      if (url.pathname !== webhookPath) {
+      if (url.pathname !== polarWebhookPath) {
         const token = process.env.B2C_SANDBOX_ACCESS_KEY ?? "";
         if (!/^[a-f0-9]{64}$/i.test(token)) return response(503, "sandbox_access_unavailable");
-        const expected = Buffer.from("Basic " + Buffer.from("b2c:" + token).toString("base64"));
-        const received = Buffer.from(request.headers.get("authorization") ?? "");
-        if (received.length !== expected.length || !timingSafeEqual(received, expected)) {
-          return response(401, "sandbox_access_required", { "WWW-Authenticate": 'Basic realm="UNSTANDARD Sandbox"' });
+        if (!hasSandboxAccess(token, request.headers.get("authorization") ?? undefined)) {
+          return response(401, "sandbox_access_required", { "WWW-Authenticate": sandboxAuthChallenge });
         }
       }
       fetchRequest ??= createFetchAdapter(createRuntime(process.env, (req) => {
