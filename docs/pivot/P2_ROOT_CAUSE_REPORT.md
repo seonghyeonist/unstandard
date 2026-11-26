@@ -1,5 +1,12 @@
 # P2 Polar Sandbox 장애 조사 · 2026-11-26 KST
 
+## 2026-11-26 15:20 KST Hosted Checkout 실측
+
+- [기존 Checkout 읽기 전용 실측](https://github.com/seonghyeonist/unstandard/actions/runs/45767429114/job/139731613423)에서 Checkout `d0aafaf7-4b83-4035-8b2f-10196d50a367`은 검사 전후 `open`, 연결 주문 없음, `ready_for_rehearsal=false`였다. Polar API의 만료 예정은 2026-11-27 13:29:17.454 KST다. Sandbox 대시보드 Payment Attempts에 표시된 항목은 0건이다.
+- 실제 Hosted Checkout의 카드번호·만료일·보안코드 세 필드 모두 비어 있을 때 `aria-invalid="false"`였다. 형식·유효 기간이 잘못된 입력은 입력값이 화면에 그대로 반영된 상태에서 모두 `true`로 바뀌었고, 올바른 테스트 값과 blur 이후에는 모두 `false`로 돌아왔다.
+- 새 리허설은 Pay 직전 세 필드의 기대값과 공개 유효성 신호를 함께 확인한다. 읽기 전용 실측은 비읽기 요청을 가로챘으며 Pay 클릭 0회였다. 청구 정보 제출 및 Polar 승인 경로는 별도 검증 대상이다.
+- 만료 예정 이후 새 결제보다 먼저 상태 조회를 실행하고 동일 ID의 공급자 종료 상태, 연결 주문, Payment Attempts 및 진행 중인 실행을 다시 대조한다. 새 Checkout에는 제출 전 필드·폼·HTTPS·웹훅 및 격리 DB 검사를 적용한다. 진행 중이거나 불명확한 거래가 있으면 추가 제출을 하지 않는다.
+
 **PARTIAL PASS / BLOCKED.** 13:29 KST에 생성된 [Checkout](https://sandbox.polar.sh/dashboard/unstandard/sales/checkouts/d0aafaf7-4b83-4035-8b2f-10196d50a367)은 대시보드에서 Open, Payment Attempts 0건이었다. [Sandbox Orders](https://sandbox.polar.sh/dashboard/unstandard/sales)는 0건을 표시했다. 정확한 만료 시각은 대시보드에서 확인하지 못했다. 연결 도구의 404는 대시보드에서 확인된 Checkout의 상태 판단에 사용하지 않았다.
 
 ## 조사 기준
@@ -33,6 +40,6 @@ B2C check는 lint, typecheck, 단위 14개 및 build를 통과했다. 일회용 
 
 상태 조회에는 Checkout ID와 생성·만료 시각이 포함된다. 기존 Checkout이 Open 또는 Confirmed인 동안 결제는 보류한다. 주문이 paid여도 카드 read가 입증되기 전 정상 E2E 환불 단계는 진행하지 않는다. 늦게 생긴 주문은 별도 대조한다.
 
-현재 Stripe 필드의 공개 `aria-invalid="false"`가 양성 신호이며 실제 Hosted Checkout이 세 필드에 이를 제공하는지는 미검증이다. 확인되지 않으면 별도의 비결제 관측으로 신호를 검증할 때까지 재시도 조건이 충족되지 않는다.
+Stripe 카드 필드 공개 신호의 양성·음성 대조를 상단의 15:20 KST 실측에 기록했다. 실제 결제 제출 및 승인 경로는 미검증이다.
 
 공식 계약: [Polar Checkout 상태](https://polar.sh/docs/api-reference/checkouts/create-session), [Stripe 테스트 카드](https://docs.stripe.com/testing). SDK는 저장소 잠금 기준 `@polar-sh/sdk 1.3.2`, API namespace `2026-10`. Checkout 상태를 주문 paid로 해석하지 않는다. 금액은 프로젝트 계약에 맞춰 수량 1, USD 세전 899센트 및 세금·총액을 확인한다.

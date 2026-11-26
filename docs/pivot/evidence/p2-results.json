@@ -49,7 +49,16 @@
     "last_rehearsal_run": 45755155609,
     "checkout_id": "d0aafaf7-4b83-4035-8b2f-10196d50a367",
     "provider_status": "open",
-    "provider_expiry_utc": null,
+    "provider_expiry_utc": "2026-11-27T04:29:17.454Z",
+    "hosted_card_field_inspection": {
+      "status": "PASS",
+      "run_id": 45767429114,
+      "job_id": 139731613423,
+      "verified_sha": "e742fafbc97a3236ba997962125bd68b2bcfeb22",
+      "public_field_controls_passed": 3,
+      "pay_clicks": 0,
+      "blocked_non_read_requests": 42
+    },
     "dashboard_payment_attempts": 0,
     "dashboard_orders": 0,
     "real_e2e": "BLOCKED",
