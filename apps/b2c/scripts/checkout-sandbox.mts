@@ -192,18 +192,20 @@ await summarize("polar_sandbox_checkout_refund", async () => {
         await page.getByRole("textbox", { name: "Cardholder name" }).inputValue() !== "Sandbox Buyer") {
       throw new Blocked("sandbox_checkout_prefill_not_rendered");
     }
-    const cardNumber = await enterCardField(page, /Card number/i, "4242424242424242", "sandbox_test_card_number_not_entered");
-    const year = String(new Date().getUTCFullYear() + 3).slice(-2);
-    const expiry = await enterCardField(page, /Expir/i, "12" + year, "sandbox_test_card_expiry_not_entered");
-    const cvc = await enterCardField(page, /Security code|CVC/i, "123", "sandbox_test_card_security_code_not_entered");
+    const cardDigits = "4242424242424242";
+    const expiryDigits = "12" + String(new Date().getUTCFullYear() + 3).slice(-2);
+    const cvcDigits = "123";
+    const cardNumber = await enterCardField(page, /Card number/i, cardDigits, "sandbox_test_card_number_not_entered");
+    const expiry = await enterCardField(page, /Expir/i, expiryDigits, "sandbox_test_card_expiry_not_entered");
+    const cvc = await enterCardField(page, /Security code|CVC/i, cvcDigits, "sandbox_test_card_security_code_not_entered");
     await cvc.press("Tab");
     stage("sandbox_browser_card_input_values_observed");
     const beforeSubmit = await checkoutScreen(page, origin, destination.origin);
     console.log(JSON.stringify({ layer: "polar_sandbox_checkout", stage: "checkout_before_submit", screen: beforeSubmit }));
     const stripeFields = {
-      number: await stripeFieldState(cardNumber),
-      expiry: await stripeFieldState(expiry),
-      security_code: await stripeFieldState(cvc),
+      number: await stripeFieldState(cardNumber, cardDigits),
+      expiry: await stripeFieldState(expiry, expiryDigits),
+      security_code: await stripeFieldState(cvc, cvcDigits),
     };
     observation.record("form_state", { screen: beforeSubmit, stripe_fields: stripeFields });
     if (beforeSubmit !== "pay_button_available") throw new Blocked("sandbox_checkout_form_not_ready");

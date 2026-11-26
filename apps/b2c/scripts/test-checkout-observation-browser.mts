@@ -23,12 +23,15 @@ try {
   const page = await context.newPage();
   await page.goto(origin);
   const field = page.frameLocator("iframe").getByRole("textbox", { name: "Card" });
-  await field.fill(marker);
-  assert.equal(await stripeFieldState(field), "invalid");
+  await field.fill("123");
+  assert.equal(await stripeFieldState(field, "123"), "invalid");
   await field.evaluate((element) => element.removeAttribute("aria-invalid"));
-  assert.equal(await stripeFieldState(field), "unverified");
+  assert.equal(await stripeFieldState(field, "123"), "unverified");
   await field.evaluate((element) => element.setAttribute("aria-invalid", "false"));
-  assert.equal(await stripeFieldState(field), "publicly_valid");
+  assert.equal(await stripeFieldState(field, "123"), "publicly_valid");
+  assert.equal(await stripeFieldState(field, "1234"), "unverified");
+  await field.clear();
+  assert.equal(await stripeFieldState(field, "123"), "unverified");
 
   const pay = page.getByRole("button", { name: "Pay now" });
   const readPayEvents = await observePayControl(pay);

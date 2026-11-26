@@ -33,14 +33,15 @@ export function classifyCheckoutRequest(method: string, url: string, appOrigin: 
   return { host, route, method: methods.has(method) ? method : "other" };
 }
 
-export async function stripeFieldState(field: Locator) {
-  return field.evaluate((element) => {
+export async function stripeFieldState(field: Locator, expectedDigits: string) {
+  return field.evaluate((element, expected) => {
     if (!(element instanceof HTMLInputElement) || !element.value) return "unverified";
     const invalid = element.getAttribute("aria-invalid");
     if (invalid === "true" || !element.validity.valid) return "invalid";
     // Native validity alone can be true even when the provider has not validated the field.
+    if (element.value.replace(/\D/g, "") !== expected) return "unverified";
     return invalid === "false" ? "publicly_valid" : "unverified";
-  }, undefined, { timeout: 2_000 }).catch(() => "unverified" as const);
+  }, expectedDigits, { timeout: 2_000 }).catch(() => "unverified" as const);
 }
 
 export async function observePayControl(button: Locator) {

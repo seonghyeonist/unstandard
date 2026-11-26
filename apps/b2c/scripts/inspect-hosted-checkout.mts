@@ -49,7 +49,8 @@ export async function inspectHostedCheckout(checkoutUrl: string) {
     }
     const fields = [
       ["number", /Card number/i, "4242424242424242", "4242424242424241"],
-      ["expiry", /Expir/i, "12" + String(new Date().getUTCFullYear() + 3).slice(-2), "1329"],
+      ["expiry", /Expir/i, "12" + String(new Date().getUTCFullYear() + 3).slice(-2),
+        "12" + String(new Date().getUTCFullYear() - 1).slice(-2)],
       ["security_code", /Security code|CVC/i, "123", "12"],
     ] as const;
     const results: Record<string, unknown> = {};
