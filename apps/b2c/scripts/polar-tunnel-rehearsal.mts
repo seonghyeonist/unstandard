@@ -167,11 +167,14 @@ async function priorCheckout(catalog: PolarSandboxProvider, organizationId: stri
     }
   }
   return {
+    checkout_id: prior.id,
+    checkout_created_utc: new Date(prior.created_at).toISOString(),
     checkout_status: prior.status,
     order_state: orderState,
     checkout_expires_utc: new Date(prior.expires_at).toISOString(),
-    ready_for_rehearsal: orderState === "fully_refunded" ||
-      (orderState === "absent" && (prior.status === "expired" || prior.status === "failed")),
+    ready_for_rehearsal: prior.status !== "open" && prior.status !== "confirmed" &&
+      (orderState === "fully_refunded" ||
+        (orderState === "absent" && (prior.status === "expired" || prior.status === "failed"))),
   };
 }
 

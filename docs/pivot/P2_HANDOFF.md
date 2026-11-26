@@ -1,5 +1,11 @@
 # UNSTANDARD B2C P2 인수인계
 
+## 2026-11-26 KST 진단 개선 및 재개 보류
+
+- [장애 조사](P2_ROOT_CAUSE_REPORT.md)와 [진단 매트릭스](P2_DIAGNOSTIC_MATRIX.md)에 실행 비교 및 검증 근거를 기록했다.
+- 최신 Checkout `d0aafaf7-4b83-4035-8b2f-10196d50a367`은 Polar에서 Open, Payment Attempts 0건, Orders 0건으로 확인했다. 이전 `expired` 결과로 대체할 수 없다.
+- 신규 결제·환불·배포 0건. 실제 결제 승인부터 접근 철회까지는 미검증이다.
+
 ## 2026-11-26 KST Polar Sandbox 재개 1회
 
 **이전 Checkout 만료·무주문 확인 · 일반 CI 통과 · Polar 결제 및 환불 E2E 차단.**

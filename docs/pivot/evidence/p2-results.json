@@ -36,5 +36,25 @@
     "real_sandbox_checkout_and_refund": { "status": "BLOCKED", "exit": 78, "reason": "missing_B2C_SANDBOX_WRITE_CONFIRM" },
     "payment_jobs": { "status": "BLOCKED", "exit": 78, "reason": "missing_B2C_SANDBOX_WRITE_CONFIRM" },
     "vercel_https": { "status": "BLOCKED", "reason": "no_dedicated_b2c_preview_linked" }
+  },
+  "polar_recovery_2026_11_26": {
+    "verified_on_kst": "2026-11-26",
+    "local_unit_passed": 14,
+    "local_postgres_integration_passed": 12,
+    "local_alpha_passed": 405,
+    "synthetic_chromium": "PASS",
+    "baseline_head_sha": "14dc57794eb2f19ea6d8abf625897a612f7a0f02",
+    "provider": "Polar Sandbox",
+    "last_rehearsal_sha": "60cfe79d3da3ab91a689a3966fb624869b1eef8b",
+    "last_rehearsal_run": 45755155609,
+    "checkout_id": "d0aafaf7-4b83-4035-8b2f-10196d50a367",
+    "provider_status": "open",
+    "provider_expiry_utc": null,
+    "dashboard_payment_attempts": 0,
+    "dashboard_orders": 0,
+    "real_e2e": "BLOCKED",
+    "new_payment_submissions": 0,
+    "new_refunds": 0,
+    "new_deployments": 0
   }
 }

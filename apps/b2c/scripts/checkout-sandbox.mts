@@ -7,20 +7,21 @@ import { cards, members, orders, paymentEvents, rooms } from "../db/schema.mts";
 import { loadPaymentConfig } from "../server/payment-config.mts";
 import { cookieName } from "../server/session.mts";
 import { hostedSandboxCheckout } from "../server/polar-provider.mts";
+import { observeCheckout, observePayControl, stripeFieldState } from "./checkout-observation.mts";
 import { allowWrites, Blocked, delay, required, summarize } from "./sandbox-helpers.mts";
 
 function stage(name: string, status = "PASS", httpStatus?: number) {
   console.log(JSON.stringify({ layer: "polar_sandbox_checkout", status, stage: name, http_status: httpStatus }));
 }
 
-async function waitFor<T>(read: () => Promise<T | undefined>, timeout: number, reason: string) {
+async function waitFor<T>(read: () => Promise<T | undefined>, timeout: number, reason: string | (() => string)) {
   const until = Date.now() + timeout;
   while (Date.now() < until) {
     const result = await read();
     if (result !== undefined) return result;
     await delay(2000);
   }
-  throw new Blocked(reason);
+  throw new Blocked(typeof reason === "string" ? reason : reason());
 }
 
 async function checkoutScreen(page: Page, appOrigin: string, providerOrigin: string) {
@@ -71,6 +72,7 @@ async function enterCardField(page: Page, label: RegExp, digits: string, code: s
   const field = await cardField(page, label);
   await field.pressSequentially(digits, { delay: 55 });
   if ((await field.inputValue()).replace(/\D/g, "") !== digits) throw new Blocked(code);
+  return field;
 }
 
 async function verifyLedger(db: Database, orderId: string, checkoutId: string, state: "paid" | "refunded") {
@@ -114,9 +116,12 @@ await summarize("polar_sandbox_checkout_refund", async () => {
     .catch(() => { throw new Blocked("sandbox_browser_launch_failed"); });
   stage("browser_launched");
   const ledger = verifyLocalLedger ? connectDatabase() : undefined;
+  let diagnostics: ReturnType<typeof observeCheckout> | undefined;
   try {
     const context = await browser.newContext({ locale: "en-US",
       httpCredentials: accessKey ? { username: "b2c", password: accessKey, origin } : undefined });
+    const observation = observeCheckout(context, origin);
+    diagnostics = observation;
     const page = await context.newPage();
     const pageReply = await page.goto(origin + "/checkout", { timeout: 15_000 })
       .catch(() => { throw new Blocked("sandbox_checkout_page_not_reachable"); });
@@ -187,54 +192,45 @@ await summarize("polar_sandbox_checkout_refund", async () => {
         await page.getByRole("textbox", { name: "Cardholder name" }).inputValue() !== "Sandbox Buyer") {
       throw new Blocked("sandbox_checkout_prefill_not_rendered");
     }
-    await enterCardField(page, /Card number/i, "4242424242424242", "sandbox_test_card_number_not_entered");
+    const cardNumber = await enterCardField(page, /Card number/i, "4242424242424242", "sandbox_test_card_number_not_entered");
     const year = String(new Date().getUTCFullYear() + 3).slice(-2);
-    await enterCardField(page, /Expir/i, "12" + year, "sandbox_test_card_expiry_not_entered");
-    await enterCardField(page, /Security code|CVC/i, "123", "sandbox_test_card_security_code_not_entered");
-    await (await cardField(page, /Security code|CVC/i)).press("Tab");
-    stage("sandbox_browser_card_input_verified");
-    const confirmation: Record<string, number> = {};
-    const networkFailures = new Set<string>();
-    let pageErrors = 0;
-    function confirmationProvider(method: string, requestUrl: string) {
-      if (method !== "POST") return undefined;
-      const { hostname, pathname } = new URL(requestUrl);
-      if (hostname === "api.stripe.com" &&
-          /^\/v1\/(?:confirmation_tokens|payment_methods|(?:payment_intents|setup_intents)\/[^/]+\/confirm)$/.test(pathname)) {
-        return "stripe";
-      }
-      if (hostname.endsWith(".polar.sh") && /\/checkouts\/(?:client\/)?[^/]+\/confirm\/?$/.test(pathname)) return "polar";
-    }
-    page.on("response", (response) => {
-      const provider = confirmationProvider(response.request().method(), response.url());
-      if (provider) confirmation[provider + "_http_status"] = response.status();
-    });
-    page.on("request", (request) => {
-      const provider = confirmationProvider(request.method(), request.url());
-      if (provider) confirmation[provider + "_requests"] = (confirmation[provider + "_requests"] ?? 0) + 1;
-    });
-    page.on("requestfailed", (request) => {
-      const { hostname } = new URL(request.url());
-      const provider = hostname === "stripe.com" || hostname.endsWith(".stripe.com") ? "stripe"
-        : hostname === "polar.sh" || hostname.endsWith(".polar.sh") ? "polar" : undefined;
-      if (!provider) return;
-      const code = request.failure()?.errorText;
-      const allowedCodes = ["net::ERR_ABORTED", "net::ERR_CONNECTION_RESET", "net::ERR_CONNECTION_REFUSED",
-        "net::ERR_NAME_NOT_RESOLVED", "net::ERR_TIMED_OUT", "net::ERR_NETWORK_CHANGED", "net::ERR_BLOCKED_BY_CLIENT"];
-      const attempt = confirmationProvider(request.method(), request.url()) ? ":confirmation" : ":other_request";
-      networkFailures.add(provider + attempt + ":" + (code && allowedCodes.includes(code) ? code : "other"));
-    });
-    page.on("pageerror", () => { pageErrors++; });
+    const expiry = await enterCardField(page, /Expir/i, "12" + year, "sandbox_test_card_expiry_not_entered");
+    const cvc = await enterCardField(page, /Security code|CVC/i, "123", "sandbox_test_card_security_code_not_entered");
+    await cvc.press("Tab");
+    stage("sandbox_browser_card_input_values_observed");
     const beforeSubmit = await checkoutScreen(page, origin, destination.origin);
     console.log(JSON.stringify({ layer: "polar_sandbox_checkout", stage: "checkout_before_submit", screen: beforeSubmit }));
+    const stripeFields = {
+      number: await stripeFieldState(cardNumber),
+      expiry: await stripeFieldState(expiry),
+      security_code: await stripeFieldState(cvc),
+    };
+    observation.record("form_state", { screen: beforeSubmit, stripe_fields: stripeFields });
     if (beforeSubmit !== "pay_button_available") throw new Blocked("sandbox_checkout_form_not_ready");
+    if (Object.values(stripeFields).some((state) => state === "invalid")) {
+      throw new Blocked("sandbox_stripe_component_invalid");
+    }
+    if (Object.values(stripeFields).some((state) => state === "unverified")) {
+      throw new Blocked("sandbox_stripe_component_completion_unverified");
+    }
+    const payButton = page.getByRole("button", { name: "Pay now", exact: true });
+    const readPayEvents = await observePayControl(payButton).catch(() => {
+      throw new Blocked("sandbox_pay_control_observation_unavailable");
+    });
+    observation.beforeClick();
     try {
-      await page.getByRole("button", { name: "Pay now", exact: true }).click({ timeout: 15_000 });
+      await payButton.click({ timeout: 15_000 });
     } catch {
       throw new Blocked("sandbox_checkout_control_unavailable");
+    } finally {
+      observation.record("pay_control_events", await readPayEvents());
     }
+    observation.record("pay_click_completed");
     stage("test_pay_button_clicked");
     let previousObservation: string | undefined;
+    let lastScreen = beforeSubmit;
+    let lastCheckout = "unobserved";
+    let lastOrder = "unobserved";
     const paid = await waitFor(async () => {
       const [checkout, orders] = await Promise.all([
         provider.client.checkouts.get(transactionId),
@@ -243,21 +239,19 @@ await summarize("polar_sandbox_checkout_refund", async () => {
       if (orders.items.length > 1) throw new Error("duplicate_sandbox_order");
       const [order] = orders.items;
       const screen = await checkoutScreen(page, origin, destination.origin).catch(() => "screen_unavailable");
-      const observation = JSON.stringify({
-        checkout_status: checkout.status,
-        order_state: order ? (order.paid ? "paid" : "unpaid") : "absent",
-        screen,
-        confirmation,
-        network_failures: [...networkFailures].sort(),
-        browser_page_errors: pageErrors,
-      });
-      if (observation !== previousObservation) {
+      lastScreen = screen;
+      lastCheckout = checkout.status;
+      lastOrder = order ? (order.paid ? "paid" : "unpaid") : "absent";
+      const providerState = { checkout_status: lastCheckout, order_state: lastOrder, screen };
+      const serialized = JSON.stringify(providerState);
+      if (serialized !== previousObservation) {
+        observation.record("provider_state", providerState);
         console.log(JSON.stringify({ layer: "polar_sandbox_checkout", stage: "provider_checkout_observed",
-          observed: JSON.parse(observation) }));
-        previousObservation = observation;
+          observed: providerState }));
+        previousObservation = serialized;
       }
       return order?.paid ? order : undefined;
-    }, 90_000, "sandbox_checkout_not_confirmed");
+    }, 90_000, () => observation.timeoutReason(lastScreen, lastCheckout, lastOrder));
     if (paid.checkout_id !== transactionId || paid.metadata.b2c_order_id !== providerCheckout.metadata.b2c_order_id ||
         paid.product_id !== providerCheckout.product_id || (paid.units ?? 1) !== 1 ||
         paid.currency.toUpperCase() !== "USD" || paid.subtotal_amount !== 899 || paid.discount_amount !== 0 ||
@@ -297,6 +291,9 @@ await summarize("polar_sandbox_checkout_refund", async () => {
         stage("same_browser_fixture_card_read", "FAIL");
       }
     }
+    if (cardResult === "fixture_failed" || cardResult === "pending") {
+      throw new Blocked("sandbox_card_read_requires_reconciliation_before_refund");
+    }
     const existingRefunds = await provider.client.refunds.list({ order_id: paid.id, limit: 1 });
     if (existingRefunds.items.length !== 0) throw new Blocked("sandbox_order_already_has_refund");
     const refund = await refundClient.refunds.create({
@@ -320,9 +317,10 @@ await summarize("polar_sandbox_checkout_refund", async () => {
     }, 90_000, "sandbox_same_browser_access_not_revoked");
     if (ledger) await verifyLedger(ledger.db, orderId, transactionId, "refunded");
     stage("same_browser_access_revoked", "PASS", revoked);
-    if (cardResult === "fixture_failed") throw new Error("sandbox_fixture_card_verification_failed");
     return { checkout: "paid", refund: "succeeded", card_read: cardResult, same_browser_card_status: revoked };
   } finally {
+    if (diagnostics) console.log(JSON.stringify({ layer: "polar_sandbox_checkout", stage: "browser_diagnostics",
+      ...diagnostics.snapshot() }));
     try { await browser.close(); } finally { await ledger?.pool.end(); }
   }
 });

@@ -1,5 +1,13 @@
 # UNSTANDARD B2C P2 Polar Sandbox
 
+## 2026-11-26 KST 진단 개선 및 재개 보류
+
+- [장애 조사](P2_ROOT_CAUSE_REPORT.md)와 [진단 매트릭스](P2_DIAGNOSTIC_MATRIX.md)에 실행 비교 및 검증 근거를 기록했다.
+- 최신 Checkout `d0aafaf7-4b83-4035-8b2f-10196d50a367`은 Polar에서 Open, Payment Attempts 0건, Orders 0건으로 확인했다. 이전 `expired` 결과로 대체할 수 없다.
+- 신규 결제·환불·배포 0건. 실제 결제 승인부터 접근 철회까지는 미검증이다.
+
+재개 시 PR 최신 SHA와 진행 중인 잡을 다시 조회한다. 먼저 읽기 전용 상태 조회로 Checkout ID, 공급자 만료 시각과 연결 주문을 대조하고 대시보드에서 Payment Attempts 및 미대조 주문을 확인한다. Open·Confirmed·진행 중 시도·불일치 발생 시 결제를 보류한다. 기존 마지막 결제 실행은 `45755155609` / `60cfe79`이다. 진단이 적용된 SHA의 CI, 비결제 폼 관측, Sandbox 카탈로그·임시 HTTPS·격리 DB, 중복 방지와 정리 경로가 모두 확인된 후에만 Pay 1회가 허용된다.
+
 This is the active P2 runbook. It applies to the isolated Sandbox organization and the dedicated B2C runtime. The former Paddle runbook and evidence describe the earlier implementation.
 
 ## Configuration
