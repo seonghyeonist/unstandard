@@ -1,5 +1,25 @@
 # UNSTANDARD B2C P2 인수인계
 
+## 2026-11-26 KST Polar Sandbox 재개 1회
+
+**이전 Checkout 만료·무주문 확인 · 일반 CI 통과 · Polar 결제 및 환불 E2E 차단.**
+
+- [읽기 전용 조회 Attempt 3](https://github.com/seonghyeonist/unstandard/actions/runs/45535181380/attempts/3)에서 13:25:11 KST에 공급자 상태 `expired`, 연결 주문 `absent`, `ready_for_rehearsal=true`를 확인했다. 공급자 만료 예정 시각은 11:26:28 KST였다. 이후 같은 목적의 진행 중 또는 성공 작업이 없음을 Actions 잡에서 확인했다.
+- Draft #100의 `pivot/b2c-v4-p2-paddle` HEAD `0a935d1d2b290bb6bef699172b5c4114b8b3063a`와 같은 Git tree의 [실행 커밋](https://github.com/seonghyeonist/unstandard/commit/60cfe79d3da3ab91a689a3966fb624869b1eef8b)을 강제 갱신 없이 올렸다. [Actions Attempt 1](https://github.com/seonghyeonist/unstandard/actions/runs/45755155609/attempts/1)은 13:31 KST 종료됐다. `checks` 성공, `rehearsal` 실패, `deploy` 스킵. 기존 P2 Environment 시크릿과 합성 자료를 사용했고 추가 과금 요청은 $0이었다.
+
+| 검증 항목 | 관측 결과 |
+|---|---|
+| 임시 HTTPS 및 앱 Checkout | 통과. HTTPS와 접근 게이트 확인, 앱 Checkout 201, 테스트 입력 및 Pay 버튼 클릭 확인. |
+| 실제 Sandbox 결제 승인 | 차단. Pay 클릭 후 약 90초간 공급자 상태 `open`, 연결 주문 `absent`. 종료 코드 `sandbox_checkout_not_confirmed`. Polar 요청 중단 `net::ERR_ABORTED` 한 건의 용도와 원인은 미확정. |
+| USD 899센트 주문 | 미검증. Sandbox 카탈로그 검사는 통과했으나 대조할 결제 주문은 없었다. |
+| 서명 웹훅 | 결제 및 환불 이벤트 모두 미검증. |
+| 원장 | 결제·환불 원장 반영 미검증. |
+| 같은 구매자 세션의 카드 읽기 | 미검증. 미결제 카드 API 401만 확인. |
+| 전액 환불 및 같은 세션 접근 철회 | 미검증. 연결 주문이 없어 환불 단계에 도달하지 않았다. |
+| 임시 자원 정리 | 임시 웹훅 비활성화 및 러너 PostgreSQL 컨테이너 제거 확인. 브라우저·서버·터널은 종료 경로를 거쳤으며, 터널 외부 종료 확인은 미실시. |
+
+[리허설 잡](https://github.com/seonghyeonist/unstandard/actions/runs/45755155609/job/139692211031)의 마지막 공급자 관측에서 이번 Checkout은 `open`·무주문이었다. 새 결제 재시도는 하지 않았다. 이후 재개 시 이번 Checkout을 먼저 읽기 전용으로 대조한다. 같은 조건에서 결제 제출을 반복하지 않는다.
+
 ## 2026-11-25 KST Neon·Render 연결
 
 - 허가된 전용 Neon `small-moon-39523909` / `p2-sandbox` / `unstandard_b2c`에 커밋된 Drizzle SQL 두 건을 적용했다. 로컬 직접 연결에서 DNS `EAI_AGAIN`이 발생해 Neon 트랜잭션에서 같은 잠금 ID, SQL, 마이그레이션 해시와 타임스탬프를 사용했다. 원격 원장 두 건, 앱 테이블 13개, 미적용 0건, 주문 0건을 별도 확인했다.
