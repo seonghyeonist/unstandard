@@ -1,4 +1,4 @@
-import { spawn, type ChildProcess } from "node:child_process";
+import { execFileSync, spawn, type ChildProcess } from "node:child_process";
 import { randomBytes, randomUUID } from "node:crypto";
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 import { isIP } from "node:net";
@@ -185,7 +185,30 @@ await summarize(statusOnly ? "polar_sandbox_checkout_status" : "polar_temporary_
   const productId = required("B2C_POLAR_PRODUCT_ID");
   const catalog = new PolarSandboxProvider({ accessToken: runtime, organizationId, productId,
     webhookSecret: "unused-before-provider-configuration", origin: "https://p2.example.test" });
-  if (statusOnly) return priorCheckout(catalog, organizationId, productId);
+  if (statusOnly) {
+    const prior = await priorCheckout(catalog, organizationId, productId);
+    const message = process.env.GITHUB_ACTIONS === "true"
+      ? execFileSync("git", ["log", "-1", "--format=%B"], { encoding: "utf8" }) : "";
+    const inspectionId = /^Inspect-Hosted-Fields: ([a-f0-9-]{36})$/m.exec(message)?.[1];
+    if (!inspectionId) return prior;
+    console.log(JSON.stringify({ layer: "polar_sandbox_checkout_status", stage: "before_inspection", ...prior }));
+    if (inspectionId !== prior.checkout_id || prior.checkout_status !== "open" || prior.order_state !== "absent") {
+      throw new Blocked("hosted_inspection_requires_exact_open_checkout_without_order");
+    }
+    const checkout = await catalog.client.checkouts.get(inspectionId);
+    if (checkout.status !== "open" || checkout.expires_at <= new Date().toISOString() ||
+        checkout.organization_id !== organizationId || checkout.product_id !== productId ||
+        typeof checkout.metadata.b2c_order_id !== "string") {
+      throw new Blocked("hosted_inspection_checkout_changed");
+    }
+    const { inspectHostedCheckout } = await import("./inspect-hosted-checkout.mts");
+    const result = await inspectHostedCheckout(checkout.url);
+    const after = await priorCheckout(catalog, organizationId, productId);
+    if (after.checkout_id !== inspectionId || after.checkout_status !== "open" || after.order_state !== "absent") {
+      throw new Blocked("hosted_inspection_provider_state_changed");
+    }
+    return { ...after, ...result };
+  }
 
   allowWrites("checkout-b2c-polar-sandbox");
   if (!databaseTarget().local) throw new Error("temporary_https_requires_disposable_loopback_database");
