@@ -1,3 +1,7 @@
+## Mandate v2 재개 기준
+
+[최신 대조와 절차](P2_AUTONOMOUS_EXECUTION_20261127.md). 11월 27일 14:18:47 KST 기준 대상 Checkout Open, 연결 주문 없음, Payment Attempts API 403. 기존 Checkout의 종료와 Sandbox의 `payments:read` 조회가 모두 확인된 뒤에만 후속 결제 리허설을 실행한다. 상태·결제 표식에는 정확한 `Prior-Checkout:`도 포함한다.
+
 ## 2026-11-27 KST 최신 재개 기준
 
 [최신 인수인계와 실행 프롬프트](P2_AGENT_HANDOFF_20261127.md). 새 Checkout `76e2d82a-a4eb-4a96-bc07-c938fb373d59`의 API 상태는 `open`, 무주문이다. 공급자 만료 예정 2026-11-28 13:55:32.313 KST 이후 동일 ID를 재대조한다. [실제 리허설의 결제 직후 증거](https://github.com/seonghyeonist/unstandard/actions/runs/45942446362/job/140319790558)와 [새 거래의 상태 조회](https://github.com/seonghyeonist/unstandard/actions/runs/45942956882/job/140321166059)를 기준으로 재개한다.

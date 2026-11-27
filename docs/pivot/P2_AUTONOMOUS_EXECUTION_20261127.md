@@ -1,5 +1,27 @@
 # P2 independent audit and autonomous execution mandate — 2026-11-27 KST
 
+## 2026-11-27 KST · Mandate v2 실행 결과
+
+**PARTIAL PASS / BLOCKED.** 정확한 Checkout `76e2d82a-a4eb-4a96-bc07-c938fb373d59`은 14:18:47 KST API에서 `open`, `order_state=absent`다. 조직·상품 일치, 상품 Checkout 11건, 주문 0건, 미해결 Checkout 1건을 확인했다. Payment Attempts API는 기존 런타임 토큰에 403을 반환했다. 같은 Checkout의 Sandbox 대시보드는 Payment Attempts에 항목을 표시하지 않았다. API 판정은 `unverified`, `ready_for_rehearsal=false`다. 만료 예정 **2026-11-28 13:55:32.313 KST**. [실제 조회](https://github.com/seonghyeonist/unstandard/actions/runs/45945032904/job/140327660114) · [Sandbox Checkout](https://sandbox.polar.sh/dashboard/unstandard/sales/checkouts/76e2d82a-a4eb-4a96-bc07-c938fb373d59)
+
+- 기준 HEAD `a13ae7c` 및 `2d8e759`, `8f8cebe` 체크 성공. 기존 실제 결제 잡은 `45942446362/140319790558`이다. Pay 시작 +752ms 시점 Polar main-frame POST, HTTP 응답 관측 없이 약 3,000ms 후 `ERR_ABORTED`, 최종 Open·무주문. 기존 DOM 리스너의 false/false와 종료 시 940개 타임라인 누락을 직접 대조했다. 이 POST의 역할과 중단 원인은 미확정이다.
+- 명시한 직전 Checkout의 ID·조직·상품과 페이지네이션으로 읽은 Checkout·주문·환불·결제 이력을 대조한다. 같은 Checkout의 여러 주문, 미대조 주문, 대기 중 결제, 세금 포함 전액 환불 불일치, 페이지 변화 또는 조회 실패는 차단한다. 동일 GitHub workflow concurrency group은 상태/결제 실행을 직렬화한다. 리허설 전에 GitHub push 실행 목록의 진행 중·대기 중 잡도 확인한다. 결제 리허설 코드에서 Checkout 생성 직전 공급자 상태를 한 번 더 읽는다.
+- CI에서 실제 Chromium으로 네이티브 제출, 버튼 교체, 무관한 버튼, JS 전용 버튼, 문서 이동, child-frame 트래픽 포화 및 비밀 비노출을 검증한다. 첫 CI 실패는 포화 이후 바운드된 타임라인에 시작 이벤트가 남아 있을 것으로 가정한 테스트였다. 시작 이벤트와 요청 포화 결과를 각각 올바른 시점의 스냅샷으로 검증하도록 수정했다.
+- 구매자 카드 200 이후 별도 브라우저 컨텍스트가 앱의 `unauthenticated` 응답을 받는지 확인한다. Basic Auth 실패는 별도 세션 차단 성공으로 집계하지 않는다. 기존 통합 테스트는 동일 이벤트 재처리, 소유권, 서명, 환불 선도착 및 롤백을 다룬다.
+- Render Free 최근 배포 `0a935d1` live, Neon `p2-sandbox` ready. 이전 실제 잡에서 웹훅 disable, Docker DB 및 네트워크 정리를 확인했다. 외부 터널 종료를 독립적으로 재검증한 기록은 없다. 이번 신규 리허설, Checkout, Pay 호출, 승인, 환불, 배포 0회. 추가 지출 $0.
+
+### 다음 실행의 정확한 진입점
+
+1. 두 차단 조건을 풀어야 한다. 기존 Checkout의 종료·주문 대조와 Sandbox 조직의 Payment Attempts 읽기다. 운영 런타임 권한을 확대할 필요 없이 격리된 GitHub Environment `p2-polar-sandbox`의 선택 입력 `B2C_POLAR_PAYMENT_READ_TOKEN`에 해당 Sandbox 조직의 `payments:read` 전용 자격증명을 사용할 수 있다. 토큰은 상태 대조에서만 사용하고 자식 브라우저 프로세스에는 전달하지 않는다. 미구성 시 기존 토큰으로 읽고 403은 차단한다.
+2. 만료 예정 이후 커밋 메시지의 독립된 줄 `Prior-Checkout: 76e2d82a-a4eb-4a96-bc07-c938fb373d59`와 마지막 줄 `P2-Polar-Sandbox: status`로 API 조회한다. 최종 상태, 결제 시도, 연결 주문과 진행 중 Actions를 직접 확인한다. 새로운 Checkout ID가 나타나면 이력과 정확한 대상부터 재대조한다. Dashboard 0건은 API 권한 오류의 대체 증거로 쓰지 않는다.
+3. 모든 대조가 통과하고 해당 SHA의 일반 CI가 성공하면 같은 `Prior-Checkout:` 줄과 마지막 줄 `P2-Polar-Sandbox: run`으로 한 번 실행한다. `post_pay_main_polar_writes`의 ID, 가린 경로, `next_action`, HTTP, 브라우저 오류, 프레임을 공급자 상태와 함께 대조한다. 헤더 존재는 요청 형태의 단서다. 결제 확인 역할은 추가 증거로 판별한다. 기존과 동일한 조건의 반복 실행은 금지한다.
+4. 승인 시 USD 899센트, 수량·세금·주문 매핑, 서명 지급 웹훅·원장, 구매자 카드 200·별도 세션 차단, 같은 주문의 전액 환불·서명 웹훅·원장·같은 구매자 세션 철회, 정리를 연결해 증명한다. 산출물과 증거는 Draft PR #100에 남긴다.
+
+### 미발송 Polar 지원 문의 초안
+
+> Sandbox Hosted Checkout request aborted before an order appeared. Checkout ID 76e2d82a-a4eb-4a96-bc07-c938fb373d59, created 2026-11-27 04:55:32.313 UTC, product USD 8.99 before tax. One Playwright Pay call completed after all three card fields passed public validation. A main-frame Polar POST started about 752 ms after the call began and was aborted about 3,000 ms later without an observed HTTP response. The Checkout remained Open and no order appeared. Could you check whether Polar received a confirmation or other request near 04:55:40 UTC and whether that checkout recorded a payment attempt? We can provide a redacted route shape and the observed Server Action header presence after the next gated run.
+
+
 ## Evidence and scope
 - Draft PR #100 base pivot/b2c-v4-p1-data-session, head branch pivot/b2c-v4-p2-paddle.
 - Original audit head 9facb8e1e9979bfdcd55181dd4802d07dc5ddc2e. d925ddd CI run 45800966350 checks succeeded; status/rehearsal/deploy skipped.

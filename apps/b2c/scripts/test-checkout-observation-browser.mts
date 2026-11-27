@@ -46,6 +46,9 @@ try {
     trusted_click: true, native_submit: true, document_trusted_click: true,
     replacement_control_click: false, original_control_detached: false,
   });
+  const startup = JSON.stringify(diagnostics.snapshot());
+  for (const expected of ["page_error", "frame_navigated"]) assert.ok(startup.includes(expected), expected);
+  assert.ok(!startup.includes(marker));
   // Replacement before the locator acts, as can happen during a component re-render.
   await page.setContent('<form onsubmit="event.preventDefault()"><button>Pay now</button><button>Other</button></form>');
   const readReplacement = await observePayControl(pay);
@@ -98,7 +101,7 @@ try {
   assert.equal(action.frame, "main");
   assert.ok(action.duration_ms !== undefined);
   const output = JSON.stringify(snapshot);
-  for (const expected of ["page_error", "frame_navigated", "request_failed", "net::ERR_ABORTED", "422"]) {
+  for (const expected of ["request_failed", "net::ERR_ABORTED", "422"]) {
     assert.ok(output.includes(expected), expected);
   }
   assert.ok(!output.includes(marker));

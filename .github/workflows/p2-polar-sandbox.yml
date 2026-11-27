@@ -102,6 +102,7 @@ jobs:
           B2C_POLAR_ORGANIZATION_ID: e9d6161a-1711-4571-837b-05996cc8bd43
           B2C_POLAR_PRODUCT_ID: 903bf4e5-61c0-4fe0-9325-9364c8b52754
           B2C_POLAR_ACCESS_TOKEN: ${{ secrets.B2C_POLAR_ACCESS_TOKEN }}
+          B2C_POLAR_PAYMENT_READ_TOKEN: ${{ secrets.B2C_POLAR_PAYMENT_READ_TOKEN }}
         run: |
           test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
           npm ci --no-audit --no-fund
@@ -159,6 +160,7 @@ jobs:
           B2C_POLAR_ORGANIZATION_ID: e9d6161a-1711-4571-837b-05996cc8bd43
           B2C_POLAR_PRODUCT_ID: 903bf4e5-61c0-4fe0-9325-9364c8b52754
           B2C_POLAR_ACCESS_TOKEN: ${{ secrets.B2C_POLAR_ACCESS_TOKEN }}
+          B2C_POLAR_PAYMENT_READ_TOKEN: ${{ secrets.B2C_POLAR_PAYMENT_READ_TOKEN }}
           B2C_POLAR_E2E_REFUND_TOKEN: ${{ secrets.B2C_POLAR_E2E_REFUND_TOKEN }}
           B2C_POLAR_E2E_WEBHOOK_TOKEN: ${{ secrets.B2C_POLAR_E2E_WEBHOOK_TOKEN }}
           B2C_BROWSER_HEADED: '1'

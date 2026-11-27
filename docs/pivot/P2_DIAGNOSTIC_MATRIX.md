@@ -1,3 +1,13 @@
+## 2026-11-27 KST · Mandate v2
+
+| 단계 | 판정 | 근거 |
+| --- | --- | --- |
+| 정확한 Checkout 및 상품 이력 | BLOCKED | 11건, 미해결 1건, 주문 0건. 대상 Open | 
+| 결제 시도 읽기 | BLOCKED | API 403, Sandbox UI 동일 ID에는 0건 표시 |
+| 결제·환불·철회 | NOT RUN | 이번 작업의 신규 Checkout 및 Pay 0회 |
+
+[구현·CI·후속 실행 근거](P2_AUTONOMOUS_EXECUTION_20261127.md)
+
 # P2 진단 검증 매트릭스 · 2026-11-26 KST
 
 | 검증 항목 | 기대 결과 | 실제 결과 | 증거 |

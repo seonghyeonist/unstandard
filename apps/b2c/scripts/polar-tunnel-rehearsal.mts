@@ -150,7 +150,15 @@ await summarize(statusOnly ? "polar_sandbox_checkout_status" : "polar_temporary_
     ? execFileSync("git", ["log", "-1", "--format=%B"], { encoding: "utf8" }) : "";
   const priorCheckoutId = /^Prior-Checkout: ([a-f0-9-]{36})$/m.exec(message)?.[1];
   await catalog.validateCatalog().catch((error: unknown) => providerFailure("sandbox_catalog", error));
-  const reconcile = () => reconcileSandboxHistory(catalog.client, organizationId, productId, priorCheckoutId);
+  const readToken = process.env.B2C_POLAR_PAYMENT_READ_TOKEN;
+  if (readToken && !/^polar_oat_[a-z0-9_-]+$/i.test(readToken)) throw new Blocked("sandbox_payment_read_token_invalid");
+  const paymentReader = readToken
+    ? createPolar({ accessToken: readToken, environment: "sandbox", timeout: 10 }).payments
+    : catalog.client.payments;
+  const reconcile = () => reconcileSandboxHistory({
+    checkouts: catalog.client.checkouts, orders: catalog.client.orders, refunds: catalog.client.refunds,
+    payments: paymentReader,
+  }, organizationId, productId, priorCheckoutId);
   if (statusOnly) {
     const prior = await reconcile();
     const inspectionId = /^Inspect-Hosted-Fields: ([a-f0-9-]{36})$/m.exec(message)?.[1];
@@ -239,6 +247,7 @@ await summarize(statusOnly ? "polar_sandbox_checkout_status" : "polar_temporary_
     const result = await new Promise<number | null>((resolve, reject) => {
       const env = { ...process.env };
       delete env.B2C_POLAR_E2E_WEBHOOK_TOKEN;
+      delete env.B2C_POLAR_PAYMENT_READ_TOKEN;
       const checkout = spawn(process.execPath, [new URL("./checkout-sandbox.mts", import.meta.url).pathname],
         { env, stdio: ["ignore", "inherit", "inherit"] });
       checkout.once("error", reject).once("exit", resolve);
