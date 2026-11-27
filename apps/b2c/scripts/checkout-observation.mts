@@ -72,16 +72,36 @@ export async function stripeFieldState(field: Locator, expectedDigits: string) {
 
 export async function observePayControl(button: Locator) {
   const state = await button.evaluateHandle((control) => {
-    const observed = { trusted_click: false, native_submit: false };
-    control.addEventListener("click", (event) => { observed.trusted_click ||= event.isTrusted; },
-      { capture: true, once: true });
-    control.closest("form")?.addEventListener("submit", () => { observed.native_submit = true; },
-      { capture: true, once: true });
-    return observed;
+    const observed = { trusted_click: false, native_submit: false, document_trusted_click: false,
+      replacement_control_click: false };
+    const doc = control.ownerDocument;
+    const label = (control.textContent ?? "").trim();
+    const matches = (node: EventTarget | null) => node instanceof Element &&
+      (node === control || (node.tagName === control.tagName && label.length > 0 &&
+        (node.textContent ?? "").trim() === label));
+    const click = (event: Event) => {
+      observed.document_trusted_click ||= event.isTrusted;
+      const match = event.composedPath().find(matches);
+      if (match && event.isTrusted) {
+        observed.trusted_click = true;
+        observed.replacement_control_click ||= match !== control;
+      }
+    };
+    const submit = (event: Event) => {
+      const submitter = event instanceof SubmitEvent ? event.submitter : null;
+      if (matches(submitter) || event.target === control.closest("form")) observed.native_submit = true;
+    };
+    doc.addEventListener("click", click, true);
+    doc.addEventListener("submit", submit, true);
+    return { observed, readAndDetach: () => {
+      doc.removeEventListener("click", click, true);
+      doc.removeEventListener("submit", submit, true);
+      return { ...observed, original_control_detached: !control.isConnected };
+    } };
   }, undefined, { timeout: 2_000 });
   return async () => {
     try {
-      return await state.evaluate((value) => ({ ...value }));
+      return await state.evaluate((value) => value.readAndDetach());
     } catch {
       // The provider may navigate before the DOM observation can be read.
       return { trusted_click: "unverified", native_submit: "unverified" } as const;
@@ -102,6 +122,9 @@ export function observeCheckout(context: BrowserContext, appOrigin: string) {
   };
   const active = new WeakMap<Request, { metadata: Metadata; startedAt: number; write?: ProviderWrite }>();
   const providerWrites: ProviderWrite[] = [];
+  // Independent buffer: high-volume child-frame telemetry must not hide the main-frame POST.
+  const mainPolarWrites: ProviderWrite[] = [];
+  let omittedMainPolarWrites = 0;
   let omittedProviderWrites = 0;
   let nextProviderWriteId = 0;
   const timeline: object[] = [];
@@ -140,15 +163,19 @@ export function observeCheckout(context: BrowserContext, appOrigin: string) {
       if (providerWrite) {
         unknownProviderWrite ||= metadata.route === "unclassified";
         const requestId = ++nextProviderWriteId;
-        if (providerWrites.length < 40) {
+        const isMainPolar = metadata.host === "polar" && metadata.frame === "main";
+        const keepGeneral = providerWrites.length < 40;
+        const keepMain = isMainPolar && mainPolarWrites.length < 40;
+        if (keepGeneral || keepMain) {
           write = {
             ...metadata, ...providerWriteTarget(request),
             request_id: requestId, started_ms: Math.round(startedAt - started),
           };
-          providerWrites.push(write);
-        } else {
-          omittedProviderWrites++;
+          if (keepGeneral) providerWrites.push(write);
+          if (keepMain) mainPolarWrites.push(write);
         }
+        if (!keepGeneral) omittedProviderWrites++;
+        if (isMainPolar && !keepMain) omittedMainPolarWrites++;
       }
     }
     active.set(request, { metadata, startedAt, write });
@@ -197,6 +224,8 @@ export function observeCheckout(context: BrowserContext, appOrigin: string) {
       timeline: [...timeline], omitted,
       post_pay_provider_writes: providerWrites.map((write) => ({ ...write })),
       omitted_provider_writes: omittedProviderWrites,
+      post_pay_main_polar_writes: mainPolarWrites.map((write) => ({ ...write })),
+      omitted_main_polar_writes: omittedMainPolarWrites,
     }),
     timeoutReason(screen: string, checkout: string, order: string) {
       if (checkout !== "open" || order !== "absent") return "sandbox_provider_state_unresolved";
