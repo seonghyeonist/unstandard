@@ -153,12 +153,16 @@ await summarize(statusOnly ? "polar_sandbox_checkout_status" : "polar_temporary_
   const readToken = process.env.B2C_POLAR_PAYMENT_READ_TOKEN;
   if (readToken && !/^polar_oat_[a-z0-9_-]+$/i.test(readToken)) throw new Blocked("sandbox_payment_read_token_invalid");
   const paymentReader = readToken
-    ? createPolar({ accessToken: readToken, environment: "sandbox", timeout: 10 }).payments
-    : catalog.client.payments;
-  const reconcile = () => reconcileSandboxHistory({
-    checkouts: catalog.client.checkouts, orders: catalog.client.orders, refunds: catalog.client.refunds,
-    payments: paymentReader,
-  }, organizationId, productId, priorCheckoutId);
+    ? createPolar({ accessToken: readToken, environment: "sandbox", timeout: 10 })
+    : undefined;
+  const reconcile = () => reconcileSandboxHistory(
+    {
+      checkouts: catalog.client.checkouts, orders: catalog.client.orders, refunds: catalog.client.refunds,
+      payments: paymentReader?.payments ?? catalog.client.payments,
+    },
+    organizationId, productId, priorCheckoutId,
+    paymentReader ? (checkoutId) => paymentReader.checkouts.get(checkoutId) : undefined,
+  );
   if (statusOnly) {
     const prior = await reconcile();
     const inspectionId = /^Inspect-Hosted-Fields: ([a-f0-9-]{36})$/m.exec(message)?.[1];

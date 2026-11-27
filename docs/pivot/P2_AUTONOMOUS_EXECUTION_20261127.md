@@ -14,7 +14,7 @@
 
 ### 다음 실행의 정확한 진입점
 
-1. 두 차단 조건을 풀어야 한다. 기존 Checkout의 종료·주문 대조와 Sandbox 조직의 Payment Attempts 읽기다. 운영 런타임 권한을 확대할 필요 없이 격리된 GitHub Environment `p2-polar-sandbox`의 선택 입력 `B2C_POLAR_PAYMENT_READ_TOKEN`에 해당 Sandbox 조직의 `payments:read` 전용 자격증명을 사용할 수 있다. 토큰은 상태 대조에서만 사용하고 자식 브라우저 프로세스에는 전달하지 않는다. 미구성 시 기존 토큰으로 읽고 403은 차단한다.
+1. 두 차단 조건을 풀어야 한다. 기존 Checkout의 종료·주문 대조와 Sandbox 조직의 Payment Attempts 읽기다. 운영 런타임 권한을 확대할 필요 없이 격리된 GitHub Environment `p2-polar-sandbox`의 선택 입력 `B2C_POLAR_PAYMENT_READ_TOKEN`에 해당 Sandbox 조직의 읽기 전용 자격증명(`payments:read`, `checkouts:read`)을 사용할 수 있다. 두 번째 범위는 같은 토큰으로 정확한 Checkout·조직·상품을 확인하는 데 사용한다. 토큰은 상태 대조에서만 사용하고 자식 브라우저 프로세스에는 전달하지 않는다. 미구성 시 기존 토큰으로 읽고 403은 차단한다.
 2. 만료 예정 이후 커밋 메시지의 독립된 줄 `Prior-Checkout: 76e2d82a-a4eb-4a96-bc07-c938fb373d59`와 마지막 줄 `P2-Polar-Sandbox: status`로 API 조회한다. 최종 상태, 결제 시도, 연결 주문과 진행 중 Actions를 직접 확인한다. 새로운 Checkout ID가 나타나면 이력과 정확한 대상부터 재대조한다. Dashboard 0건은 API 권한 오류의 대체 증거로 쓰지 않는다.
 3. 모든 대조가 통과하고 해당 SHA의 일반 CI가 성공하면 같은 `Prior-Checkout:` 줄과 마지막 줄 `P2-Polar-Sandbox: run`으로 한 번 실행한다. `post_pay_main_polar_writes`의 ID, 가린 경로, `next_action`, HTTP, 브라우저 오류, 프레임을 공급자 상태와 함께 대조한다. 헤더 존재는 요청 형태의 단서다. 결제 확인 역할은 추가 증거로 판별한다. 기존과 동일한 조건의 반복 실행은 금지한다.
 4. 승인 시 USD 899센트, 수량·세금·주문 매핑, 서명 지급 웹훅·원장, 구매자 카드 200·별도 세션 차단, 같은 주문의 전액 환불·서명 웹훅·원장·같은 구매자 세션 철회, 정리를 연결해 증명한다. 산출물과 증거는 Draft PR #100에 남긴다.

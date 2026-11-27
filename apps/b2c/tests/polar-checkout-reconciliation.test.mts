@@ -22,7 +22,7 @@ const payment = (status: string, order_id?: string) => ({
 function sandbox({
   sessions = [checkout("expected")], exact = sessions[0], orders = [] as ReturnType<typeof order>[],
   refunds = [] as ReturnType<typeof refund>[], payments = [] as ReturnType<typeof payment>[],
-  paymentFailure, mutatedPagination = false,
+  paymentFailure, paymentReaderAnchor, mutatedPagination = false,
 }: {
   sessions?: ReturnType<typeof checkout>[];
   exact?: ReturnType<typeof checkout>;
@@ -30,6 +30,7 @@ function sandbox({
   refunds?: ReturnType<typeof refund>[];
   payments?: ReturnType<typeof payment>[];
   paymentFailure?: number;
+  paymentReaderAnchor?: ReturnType<typeof checkout> | 404;
   mutatedPagination?: boolean;
 } = {}) {
   function list<T>(rows: T[], page: number, limit: number, mutates = false) {
@@ -63,7 +64,12 @@ function sandbox({
     } },
   };
   return () => reconcileSandboxHistory(client as unknown as Parameters<typeof reconcileSandboxHistory>[0],
-    org, product, "expected");
+    org, product, "expected",
+    paymentReaderAnchor == null ? undefined : (async (id: string) => {
+      assert.equal(id, "expected");
+      if (paymentReaderAnchor === 404) throw Object.assign(new Error("private"), { statusCode: 404 });
+      return paymentReaderAnchor;
+    }) as unknown as Parameters<typeof reconcileSandboxHistory>[4]);
 }
 
 test("requires the exact prior checkout and checks earlier pages", async () => {
@@ -95,6 +101,18 @@ test("blocks hidden payment history, pending attempts and payments without match
     assert.equal((await sandbox({ payments: [payment(status)] })()).ready_for_rehearsal, false);
   }
   assert.equal((await sandbox({ payments: [payment("failed")] })()).ready_for_rehearsal, true);
+});
+
+test("checks the exact Checkout with the separate payment-read token before trusting empty results", async () => {
+  assert.equal((await sandbox({ paymentReaderAnchor: checkout("expected") })()).ready_for_rehearsal, true);
+  for (const paymentReaderAnchor of [
+    404 as const, checkout("wrong"), { ...checkout("expected"), organization_id: "wrong-org" },
+    { ...checkout("expected"), product_id: "wrong-product" },
+  ]) {
+    const state = await sandbox({ paymentReaderAnchor })();
+    assert.equal(state.payment_attempts, "unverified");
+    assert.equal(state.ready_for_rehearsal, false);
+  }
 });
 
 test("requires matching order, payment, and finalized principal plus tax refund", async () => {

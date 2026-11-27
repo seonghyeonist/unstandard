@@ -34,6 +34,7 @@ type Client = Pick<PolarSandboxProvider["client"], "checkouts" | "orders" | "ref
 
 export async function reconcileSandboxHistory(
   client: Client, organizationId: string, productId: string, expectedCheckoutId?: string,
+  verifyPaymentScope?: Client["checkouts"]["get"],
 ) {
   const scope = { organization_id: organizationId, product_id: productId };
   const checkouts = await readAll((page, limit) => client.checkouts.list({
@@ -99,6 +100,13 @@ export async function reconcileSandboxHistory(
   let attempts = 0;
   const paidCheckouts = new Set<string>();
   try {
+    if (verifyPaymentScope) {
+      if (!exact) throw new Blocked("sandbox_payment_reader_scope_unverified");
+      const anchor = await verifyPaymentScope(exact.id);
+      if (anchor.id !== exact.id || anchor.organization_id !== organizationId || anchor.product_id !== productId) {
+        throw new Blocked("sandbox_payment_reader_scope_unverified");
+      }
+    }
     const payments = await readAll((page, limit) => client.payments.list({ organization_id: organizationId, page, limit }));
     for (const payment of payments.values()) {
       const order = payment.order_id ? orders.get(payment.order_id) : undefined;

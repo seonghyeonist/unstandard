@@ -1,6 +1,6 @@
 ## Mandate v2 재개 기준
 
-[최신 대조와 절차](P2_AUTONOMOUS_EXECUTION_20261127.md). 11월 27일 14:18:47 KST 기준 대상 Checkout Open, 연결 주문 없음, Payment Attempts API 403. 기존 Checkout의 종료와 Sandbox의 `payments:read` 조회가 모두 확인된 뒤에만 후속 결제 리허설을 실행한다. 상태·결제 표식에는 정확한 `Prior-Checkout:`도 포함한다.
+[최신 대조와 절차](P2_AUTONOMOUS_EXECUTION_20261127.md). 11월 27일 14:18:47 KST 기준 대상 Checkout Open, 연결 주문 없음, Payment Attempts API 403. 기존 Checkout의 종료와 동일 Sandbox 조직의 `payments:read` 조회와 정확한 Checkout 소유 범위가 모두 확인된 뒤에만 후속 결제 리허설을 실행한다. 상태·결제 표식에는 정확한 `Prior-Checkout:`도 포함한다.
 
 ## 2026-11-27 KST 최신 재개 기준
 
