@@ -51,3 +51,7 @@
 
 8. Draft PR #100과 P2_HANDOFF, P2_TEST_MATRIX, P2_DIAGNOSTIC_MATRIX, P2_ROOT_CAUSE_REPORT, P2_POLAR_RESUME_PROMPT, evidence/p2-results.json 중 변경된 사실을 갱신한다. 최신 SHA, run/attempt/job, 신규 제출·환불 횟수, 단계별 실제/합성 증거, 정리 결과와 다음 행동을 남긴다. 토큰·쿠키·카드 데이터·비밀 Checkout URL·원문 네트워크 본문은 보존하지 않는다. 모든 실제 단계가 입증되면 VERIFIED PASS, 외부 상태나 접근 때문에 막히면 PARTIAL PASS / BLOCKED, 확인된 미수정 결함은 FAIL로 보고한다. P3 착수는 P2 판정 이후다.
 ```
+
+## 2026-11-27 KST 대조 시작
+
+Sandbox 대시보드에서 11월 26일 13:29 Checkout 행 `Expired`, 해당 상세의 Payment Attempts 0건 및 조직 Orders 0건을 확인했다. 아래 상태 조회는 같은 Sandbox 조직·상품을 지정한 읽기 전용 API 재대조다.
