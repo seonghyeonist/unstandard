@@ -55,3 +55,5 @@
 ## 2026-11-27 KST 대조 시작
 
 Sandbox 대시보드에서 11월 26일 13:29 Checkout 행 `Expired`, 해당 상세의 Payment Attempts 0건 및 조직 Orders 0건을 확인했다. 아래 상태 조회는 같은 Sandbox 조직·상품을 지정한 읽기 전용 API 재대조다.
+
+13:51:58 KST [동일 ID의 API 대조](https://github.com/seonghyeonist/unstandard/actions/runs/45942361391/job/140319305762)에서 `expired`, `order_state=absent`, `ready_for_rehearsal=true`. 기존 진단 코드와 워크플로를 유지한 문서 변경으로 이 대조 이후의 새 Sandbox 리허설 1회를 명시적으로 선택한다.
