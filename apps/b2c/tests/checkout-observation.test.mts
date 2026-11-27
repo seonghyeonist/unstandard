@@ -71,3 +71,30 @@ test("captures startup and submission failures without serializing browser data"
   ]);
   assert.ok(!JSON.stringify(diagnostic.snapshot()).includes(privateMarker));
 });
+
+test("retains main-frame Polar request and outcome after child-frame traffic fills the general buffer", () => {
+  const context = new EventEmitter();
+  const diagnostic = observeCheckout(context as unknown as BrowserContext, origin);
+  diagnostic.beforeClick();
+  const request = (host: string, child: boolean) => ({
+    method: () => "POST",
+    resourceType: () => "fetch",
+    url: () => "https://" + host + "/checkout/" + privateMarker + "?private=" + privateMarker,
+    headers: () => ({ "next-action": privateMarker }),
+    frame: () => ({ parentFrame: () => child ? {} : null }),
+    failure: () => ({ errorText: "net::ERR_ABORTED" }),
+  });
+  for (let i = 0; i < 50; i++) context.emit("request", request("js.stripe.com", true));
+  const main = request("sandbox.polar.sh", false);
+  context.emit("request", main);
+  context.emit("requestfailed", main);
+  const snapshot = diagnostic.snapshot();
+  assert.equal(snapshot.post_pay_provider_writes.length, 40);
+  assert.equal(snapshot.omitted_provider_writes, 11);
+  assert.equal(snapshot.omitted_main_polar_writes, 0);
+  assert.equal(snapshot.post_pay_main_polar_writes.length, 1);
+  assert.equal(snapshot.post_pay_main_polar_writes[0].request_id, 51);
+  assert.equal(snapshot.post_pay_main_polar_writes[0].error, "net::ERR_ABORTED");
+  assert.equal(snapshot.post_pay_main_polar_writes[0].path_shape, "/checkout/[redacted]");
+  assert.ok(!JSON.stringify(snapshot).includes(privateMarker));
+});
