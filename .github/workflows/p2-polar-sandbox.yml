@@ -49,6 +49,10 @@ jobs:
           npm run db:migrate
           npm run db:migrate
           npm run test:db
+      - name: Verify checkout diagnostics in synthetic Chromium
+        run: |
+          npx playwright install --with-deps chromium
+          node scripts/test-checkout-observation-browser.mts
       - name: Build and smoke-test the B2C container
         env:
           SMOKE_KEY: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
@@ -93,7 +97,7 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 24.x
-      - name: Read latest checkout, order and refund status
+      - name: Read Sandbox checkout, order, refund and payment history
         env:
           B2C_POLAR_ORGANIZATION_ID: e9d6161a-1711-4571-837b-05996cc8bd43
           B2C_POLAR_PRODUCT_ID: 903bf4e5-61c0-4fe0-9325-9364c8b52754

@@ -76,20 +76,28 @@ export async function observePayControl(button: Locator) {
       replacement_control_click: false };
     const doc = control.ownerDocument;
     const label = (control.textContent ?? "").trim();
+    const form = control.closest("form");
+    const parent = control.parentElement;
+    let clickedForm: Element | null = null;
     const matches = (node: EventTarget | null) => node instanceof Element &&
       (node === control || (node.tagName === control.tagName && label.length > 0 &&
-        (node.textContent ?? "").trim() === label));
+        (node.textContent ?? "").trim() === label &&
+        (form?.isConnected ? node.closest("form") === form :
+          !parent?.isConnected || node.parentElement === parent)));
     const click = (event: Event) => {
       observed.document_trusted_click ||= event.isTrusted;
       const match = event.composedPath().find(matches);
       if (match && event.isTrusted) {
         observed.trusted_click = true;
+        clickedForm = (match as Element).closest("form");
         observed.replacement_control_click ||= match !== control;
       }
     };
     const submit = (event: Event) => {
       const submitter = event instanceof SubmitEvent ? event.submitter : null;
-      if (matches(submitter) || event.target === control.closest("form")) observed.native_submit = true;
+      if (submitter ? matches(submitter) : clickedForm !== null && event.target === clickedForm) {
+        observed.native_submit = true;
+      }
     };
     doc.addEventListener("click", click, true);
     doc.addEventListener("submit", submit, true);

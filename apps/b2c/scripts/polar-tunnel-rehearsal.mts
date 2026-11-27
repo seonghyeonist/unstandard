@@ -7,6 +7,7 @@ import { createPolar } from "@polar-sh/sdk/2026-10";
 import { databaseTarget } from "../db/client.mts";
 import handler from "../api/b2c/[...path].ts";
 import { PolarSandboxProvider, polarEvents } from "../server/polar-provider.mts";
+import { reconcileSandboxHistory } from "./polar-checkout-reconciliation.mts";
 import { allowWrites, Blocked, delay, required, summarize } from "./sandbox-helpers.mts";
 
 const localPort = 4173;
@@ -138,46 +139,6 @@ function providerFailure(stage: string, error: unknown): never {
   throw new Error(stage + "_failed");
 }
 
-async function priorCheckout(catalog: PolarSandboxProvider, organizationId: string, productId: string) {
-  const latest = await catalog.client.checkouts.list({
-    organization_id: organizationId, product_id: productId, sorting: ["-created_at"], limit: 1,
-  });
-  const [prior] = latest.items;
-  if (!prior) {
-    return { checkout_status: "absent", order_state: "absent", ready_for_rehearsal: true };
-  }
-  const orders = await catalog.client.orders.list({
-    organization_id: organizationId, checkout_id: prior.id, limit: 2,
-  });
-  let orderState = "absent";
-  const [order] = orders.items;
-  if (order) {
-    const refunds = await catalog.client.refunds.list({ order_id: order.id, limit: 2 });
-    const [refund] = refunds.items;
-    if (orders.items.length !== 1 || refunds.items.length !== 1 ||
-        order.checkout_id !== prior.id || order.product_id !== productId ||
-        typeof prior.metadata.b2c_order_id !== "string" ||
-        prior.metadata.b2c_order_id !== order.metadata.b2c_order_id ||
-        order.currency.toUpperCase() !== "USD" || order.net_amount !== 899 ||
-        !refund || refund.status !== "succeeded" ||
-        refund.amount !== order.net_amount || refund.tax_amount !== order.tax_amount) {
-      orderState = "requires_reconciliation";
-    } else {
-      orderState = "fully_refunded";
-    }
-  }
-  return {
-    checkout_id: prior.id,
-    checkout_created_utc: new Date(prior.created_at).toISOString(),
-    checkout_status: prior.status,
-    order_state: orderState,
-    checkout_expires_utc: new Date(prior.expires_at).toISOString(),
-    ready_for_rehearsal: prior.status !== "open" && prior.status !== "confirmed" &&
-      (orderState === "fully_refunded" ||
-        (orderState === "absent" && (prior.status === "expired" || prior.status === "failed"))),
-  };
-}
-
 const statusOnly = process.argv[2] === "--checkout-status";
 await summarize(statusOnly ? "polar_sandbox_checkout_status" : "polar_temporary_https", async () => {
   const runtime = required("B2C_POLAR_ACCESS_TOKEN");
@@ -185,10 +146,13 @@ await summarize(statusOnly ? "polar_sandbox_checkout_status" : "polar_temporary_
   const productId = required("B2C_POLAR_PRODUCT_ID");
   const catalog = new PolarSandboxProvider({ accessToken: runtime, organizationId, productId,
     webhookSecret: "unused-before-provider-configuration", origin: "https://p2.example.test" });
+  const message = process.env.GITHUB_ACTIONS === "true"
+    ? execFileSync("git", ["log", "-1", "--format=%B"], { encoding: "utf8" }) : "";
+  const priorCheckoutId = /^Prior-Checkout: ([a-f0-9-]{36})$/m.exec(message)?.[1];
+  await catalog.validateCatalog().catch((error: unknown) => providerFailure("sandbox_catalog", error));
+  const reconcile = () => reconcileSandboxHistory(catalog.client, organizationId, productId, priorCheckoutId);
   if (statusOnly) {
-    const prior = await priorCheckout(catalog, organizationId, productId);
-    const message = process.env.GITHUB_ACTIONS === "true"
-      ? execFileSync("git", ["log", "-1", "--format=%B"], { encoding: "utf8" }) : "";
+    const prior = await reconcile();
     const inspectionId = /^Inspect-Hosted-Fields: ([a-f0-9-]{36})$/m.exec(message)?.[1];
     if (!inspectionId) return prior;
     console.log(JSON.stringify({ layer: "polar_sandbox_checkout_status", stage: "before_inspection", ...prior }));
@@ -203,7 +167,7 @@ await summarize(statusOnly ? "polar_sandbox_checkout_status" : "polar_temporary_
     }
     const { inspectHostedCheckout } = await import("./inspect-hosted-checkout.mts");
     const result = await inspectHostedCheckout(checkout.url);
-    const after = await priorCheckout(catalog, organizationId, productId);
+    const after = await reconcile();
     if (after.checkout_id !== inspectionId || after.checkout_status !== "open" || after.order_state !== "absent") {
       throw new Blocked("hosted_inspection_provider_state_changed");
     }
@@ -218,9 +182,9 @@ await summarize(statusOnly ? "polar_sandbox_checkout_status" : "polar_temporary_
       [setup, runtime, refund].some((value) => !/^polar_oat_[a-z0-9_-]+$/i.test(value))) {
     throw new Error("three_separate_sandbox_tokens_required");
   }
-  await catalog.validateCatalog().catch((error: unknown) => providerFailure("sandbox_catalog", error));
+  if (!priorCheckoutId) throw new Blocked("sandbox_exact_prior_checkout_required");
   console.log(JSON.stringify({ layer: "polar_temporary_https", status: "PASS", stage: "sandbox_catalog" }));
-  const previous = await priorCheckout(catalog, organizationId, productId);
+  const previous = await reconcile();
   console.log(JSON.stringify({ layer: "polar_temporary_https", stage: "prior_checkout_reconciliation", ...previous }));
   if (!previous.ready_for_rehearsal) throw new Blocked("previous_sandbox_checkout_requires_reconciliation");
   const sdk = createPolar({ accessToken: setup, environment: "sandbox", timeout: 10 });
@@ -269,6 +233,9 @@ await summarize(statusOnly ? "polar_sandbox_checkout_status" : "polar_temporary_
     }
     await waitForGates(origin);
     console.log(JSON.stringify({ layer: "polar_temporary_https", status: "PASS", stage: "origin_and_gates" }));
+    const fresh = await reconcile();
+    console.log(JSON.stringify({ layer: "polar_temporary_https", stage: "pre_checkout_reconciliation", ...fresh }));
+    if (!fresh.ready_for_rehearsal) throw new Blocked("sandbox_checkout_state_changed_before_submit");
     const result = await new Promise<number | null>((resolve, reject) => {
       const env = { ...process.env };
       delete env.B2C_POLAR_E2E_WEBHOOK_TOKEN;

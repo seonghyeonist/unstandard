@@ -269,7 +269,7 @@ await summarize("polar_sandbox_checkout_refund", async () => {
     }, 90_000, "sandbox_signed_webhook_or_claim_not_confirmed");
     const buyerSession = (await context.cookies(origin)).find((cookie) => cookie.name === cookieName)?.value;
     if (!buyerSession) throw new Error("sandbox_buyer_session_cookie_missing");
-    stage("same_browser_access_granted", "PASS", grantedStatus);
+    stage(grantedStatus === 200 ? "same_browser_card_read" : "same_browser_card_pending", "PASS", grantedStatus);
     if (ledger) await verifyLedger(ledger.db, orderId, transactionId, "paid");
     let cardResult: "generated" | "fixture" | "pending" | "fixture_failed" =
       grantedStatus === 200 ? "generated" : "pending";
@@ -295,6 +295,19 @@ await summarize("polar_sandbox_checkout_refund", async () => {
     }
     if (cardResult === "fixture_failed" || cardResult === "pending") {
       throw new Blocked("sandbox_card_read_requires_reconciliation_before_refund");
+    }
+    const unrelated = await browser.newContext({
+      httpCredentials: accessKey ? { username: "b2c", password: accessKey, origin } : undefined,
+    });
+    try {
+      const reply = await unrelated.request.get(origin + "/api/b2c/me/card");
+      if (reply.status() !== 401 || reply.headers()["www-authenticate"] ||
+          (await reply.json()).error !== "unauthenticated") {
+        throw new Blocked("sandbox_unrelated_card_access_not_denied");
+      }
+      stage("unrelated_browser_card_access_denied", "PASS", 401);
+    } finally {
+      await unrelated.close();
     }
     const existingRefunds = await provider.client.refunds.list({ order_id: paid.id, limit: 1 });
     if (existingRefunds.items.length !== 0) throw new Blocked("sandbox_order_already_has_refund");
