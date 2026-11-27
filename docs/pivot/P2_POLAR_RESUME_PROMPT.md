@@ -1,3 +1,32 @@
+# Current restart point — 2026-11-27 KST, after credential cleanup
+
+This section supersedes conflicting historical restart instructions below.
+
+## Completed and retained
+- PR #100, branch `pivot/b2c-v4-p2-paddle`, base `pivot/b2c-v4-p1-data-session`. Read current remote SHA first.
+- Correct Polar Sandbox organization: `e9d6161a-1711-4571-837b-05996cc8bd43`; product: `903bf4e5-61c0-4fe0-9325-9364c8b52754`.
+- Registered token: **UNSTANDARD P2 payment reconciliation read only v2**, only `payments:read` and `checkouts:read`, expires **2026-12-27**. It is already stored in GitHub Environment `p2-polar-sandbox`, Secret `B2C_POLAR_PAYMENT_READ_TOKEN`. Use the environment injection; do not fetch, print, ask the user to copy, or reissue the secret.
+- The first token without the `v2` suffix was exposed in a tool screen-state output during reauthentication. With explicit user approval it has now been permanently revoked. A fresh provider token list confirms its absence and retention of v2 and the four pre-existing tokens. Never reuse the exposed value or revoke v2 as cleanup.
+- Payment-history 403 is resolved. Exact ID/org/product validation passed. At 2026-11-27 19:50:13 KST, Checkout below was open, linked order absent, 11 scoped Checkouts, 0 orders, 1 unresolved Checkout, 0 payment attempts, 0 pending org payments and 0 unresolved payments. `ready_for_rehearsal=false`.
+- SHA `00995a296ef0165387be2ae1d66668d160d5e9a2`, run `45985383049`: checks `140459546369` PASS; status `140459546378` PASS. Lint, typecheck, build, 21 unit, 12 PG integration, Chromium and Docker build/smoke passed. This cleanup commit requests a fresh read-only status and checks; verify its final results directly.
+- Added pre-Pay main-frame write preservation. The original log includes a pre-Pay Polar POST that also aborted after 3 seconds. Request roles and cancellation cause remain unknown. Synthetic comparison shows passive response-body loss during immediate app navigation; retain the exact one-time app orders proxy.
+- Support draft `r-3105449313664746486` saved and updated, **not sent**. No new Checkout, Pay, refund, deployment or additional spending in the credential recovery/cleanup work.
+
+## Remaining work, in required order
+1. **Actual terminal reconciliation is still blocking.** Prior Checkout: `76e2d82a-a4eb-4a96-bc07-c938fb373d59`. Recorded expiry: **2026-11-28 13:55:32.313 KST**. Expiry passing is not proof of termination. Query exact Checkout and all scoped Checkout/order/refund/payment pages, verify correct org/product, no pending/unknown payment, unresolved order, duplicates or competing rehearsal.
+2. Use the current workflow's read-only commit selection first: exact independent `Prior-Checkout: 76e2d82a-a4eb-4a96-bc07-c938fb373d59` line and final `P2-Polar-Sandbox: status` line. Existing status runs can be reused only after validating their source SHA and actual attempt. Do not rerun an old failed experiment and mistake that result for current code.
+3. Only when terminal reconciliation, complete read access, latest code checks, and concurrency gates all pass, execute one controlled Sandbox rehearsal with the exact prior ID and final `P2-Polar-Sandbox: run`. Pay exactly once. No guard removal and no inference that an API failure means zero records.
+4. In that same real Sandbox transaction verify: app order → Hosted Checkout → paid provider order → USD 899 cents before tax / quantity 1 / tax and total → actual signed paid webhook → DB paid ledger → buyer card 200 → unrelated-session denial → full refund including tax → actual signed refund webhook → refunded ledger → revocation for the original buyer session → verified cleanup of temporary webhook, tunnel and disposable DB. A 202 response is not card-read completion; use a synthetic P3 card only after real paid evidence and label it.
+5. If payment succeeds but a later step fails, recover that existing transaction; do not create another order. If the unclassified POST abort repeats, stop identical resubmissions and correlate redacted request IDs/path/header-presence with navigation/closure and provider payment state. Obtain Polar server-side evidence through the existing support draft; sending the draft still requires explicit authorization.
+6. Update PR #100 and evidence with exact SHA, run/job/attempt, real transaction results and cleanup. Until all same-transaction stages pass, P2 remains PARTIAL PASS / BLOCKED.
+
+## Boundaries
+Additional spending $0. No main/Alpha/Production/DNS/Polar Live/customer DB changes or merge. Credentials already exist; preserve least privilege and do not expose them. The user's authorization covers safe P2 technical execution; obey actual authentication requirements and safety gates.
+
+---
+
+## Historical restart text (superseded where conflicting)
+
 ## Mandate v2 재개 기준
 
 [최신 대조와 절차](P2_AUTONOMOUS_EXECUTION_20261127.md). 11월 27일 14:18:47 KST 기준 대상 Checkout Open, 연결 주문 없음, Payment Attempts API 403. 기존 Checkout의 종료와 동일 Sandbox 조직의 `payments:read` 조회와 정확한 Checkout 소유 범위가 모두 확인된 뒤에만 후속 결제 리허설을 실행한다. 상태·결제 표식에는 정확한 `Prior-Checkout:`도 포함한다.

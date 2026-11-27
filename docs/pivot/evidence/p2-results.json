@@ -324,8 +324,8 @@
       "name": "UNSTANDARD P2 payment reconciliation read only",
       "registered": false,
       "incident": "automatically_issued_token_appeared_in_tool_screen_state_output_after_reauthentication",
-      "revoked": false,
-      "cleanup": "exact_token_revocation_form_prepared_awaiting_action_time_confirmation_for_permanent_deletion"
+      "revoked": true,
+      "cleanup": "User-approved permanent revocation completed; refreshed provider token list excludes exact first token and retains registered v2 plus four pre-existing tokens."
     },
     "registered_token_value_printed": false,
     "read_status": {
@@ -354,6 +354,21 @@
     "deployments": 0,
     "additional_spend_usd": 0,
     "actual_payment_e2e": "NOT_RUN",
-    "next_gate": "Actual terminal Checkout with complete reconciliation and no concurrent rehearsal; elapsed expiry alone is insufficient."
+    "next_gate": "Actual terminal Checkout with complete reconciliation and no concurrent rehearsal; elapsed expiry alone is insufficient.",
+    "revocations": 1,
+    "cleanup_verified_in_browser": true,
+    "latest_head_status_before_cleanup": {
+      "sha": "00995a296ef0165387be2ae1d66668d160d5e9a2",
+      "run_id": 45985383049,
+      "job_id": 140459546378,
+      "checked_at_utc": "2026-11-27T10:50:13Z",
+      "checkout_status": "open",
+      "order_state": "absent",
+      "payment_attempts": 0,
+      "pending_org_payments": 0,
+      "ready_for_rehearsal": false,
+      "checks_job_id": 140459546369,
+      "checks": "PASS"
+    }
   }
 }
