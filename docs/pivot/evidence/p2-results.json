@@ -151,12 +151,19 @@
         "duration_ms": 3000
       },
       "browser_timeline_omitted": 940,
-      "temporary_webhook_disabled": true
+      "temporary_webhook_disabled": true,
+      "dashboard_payment_attempts": 0,
+      "dashboard_orders": 0,
+      "checkout_expires_utc": "2026-11-28T04:55:32.313Z",
+      "last_status_run_id": 45942956882,
+      "last_status_job_id": 140321166059,
+      "ready_for_rehearsal": false
     },
     "actual_webhook_ledger_access_refund_revocation": "UNVERIFIED",
     "new_checkout_count": 1,
     "confirmed_paid_orders": 0,
     "refund_count": 0,
-    "deployment_count": 0
+    "deployment_count": 0,
+    "diagnostic_regression_local_passed": 2
   }
 }

@@ -33,6 +33,32 @@ export function classifyCheckoutRequest(method: string, url: string, appOrigin: 
   return { host, route, method: methods.has(method) ? method : "other" };
 }
 
+const providerTargets: Readonly<Record<string, string | undefined>> = {
+  "sandbox.polar.sh": "polar_sandbox_checkout",
+  "sandbox-api.polar.sh": "polar_sandbox_api",
+  "api.stripe.com": "stripe_api",
+  "js.stripe.com": "stripe_js",
+};
+
+const publicRouteSegments = new Set([
+  "v1", "api", "checkout", "checkouts", "client", "confirm", "update", "payment", "payments",
+  "confirmation_tokens", "payment_methods", "payment_intents", "setup_intents",
+  "session", "sessions", "events", "analytics", "telemetry", "trpc", "ingest", "log",
+]);
+
+function providerWriteTarget(request: Request) {
+  const url = URL.parse(request.url());
+  // Emit only fixed vocabulary. Unknown segments can include a checkout secret or token.
+  const segments = (url?.pathname ?? "").split("/").filter(Boolean);
+  const shape = segments.slice(0, 8).map((part) => publicRouteSegments.has(part) ? part : "[redacted]");
+  if (segments.length > 8) shape.push("[truncated]");
+  return {
+    target: url && Object.hasOwn(providerTargets, url.hostname) ? providerTargets[url.hostname] : "other_provider_host",
+    path_shape: "/" + shape.join("/"),
+    next_action: Object.hasOwn(request.headers(), "next-action"),
+  };
+}
+
 export async function stripeFieldState(field: Locator, expectedDigits: string) {
   return field.evaluate((element, expected) => {
     if (!(element instanceof HTMLInputElement) || !element.value) return "unverified";
@@ -69,7 +95,15 @@ export function observeCheckout(context: BrowserContext, appOrigin: string) {
   const started = performance.now();
   type Metadata = ReturnType<typeof classifyCheckoutRequest> & { resource: string; frame: string; after_pay: boolean };
   type Outcome = { http?: number; error?: string; duration_ms?: number };
-  const active = new WeakMap<Request, { metadata: Metadata; startedAt: number }>();
+  type ProviderWrite = Metadata & ReturnType<typeof providerWriteTarget> & Outcome & {
+    request_id: number;
+    started_ms: number;
+    finished?: boolean;
+  };
+  const active = new WeakMap<Request, { metadata: Metadata; startedAt: number; write?: ProviderWrite }>();
+  const providerWrites: ProviderWrite[] = [];
+  let omittedProviderWrites = 0;
+  let nextProviderWriteId = 0;
   const timeline: object[] = [];
   let omitted = 0;
   let afterPay = false;
@@ -97,24 +131,44 @@ export function observeCheckout(context: BrowserContext, appOrigin: string) {
     }
     const type = request.resourceType();
     const metadata = { ...classification, resource: resourceTypes.has(type) ? type : "other", frame, after_pay: afterPay };
-    active.set(request, { metadata, startedAt: performance.now() });
+    const startedAt = performance.now();
+    let write: ProviderWrite | undefined;
     if (afterPay) {
       confirmationRequested ||= metadata.route === "confirmation";
-      unknownProviderWrite ||= ["polar", "stripe"].includes(metadata.host) &&
-        metadata.route === "unclassified" && ["POST", "PATCH", "PUT"].includes(metadata.method);
+      const providerWrite = ["polar", "stripe"].includes(metadata.host) &&
+        ["POST", "PATCH", "PUT", "DELETE"].includes(metadata.method);
+      if (providerWrite) {
+        unknownProviderWrite ||= metadata.route === "unclassified";
+        const requestId = ++nextProviderWriteId;
+        if (providerWrites.length < 40) {
+          write = {
+            ...metadata, ...providerWriteTarget(request),
+            request_id: requestId, started_ms: Math.round(startedAt - started),
+          };
+          providerWrites.push(write);
+        } else {
+          omittedProviderWrites++;
+        }
+      }
     }
-    record("request", metadata);
+    active.set(request, { metadata, startedAt, write });
+    record("request", write ? { ...metadata, request_id: write.request_id } : metadata);
   });
 
   function outcome(event: string, request: Request, data: Outcome = {}) {
     const tracked = active.get(request);
     if (!tracked) return;
-    const { metadata, startedAt } = tracked;
+    const { metadata, startedAt, write } = tracked;
+    const duration = Math.round(performance.now() - startedAt);
+    if (write) {
+      Object.assign(write, data, { duration_ms: duration });
+      if (event === "request_finished") write.finished = true;
+    }
     if (metadata.after_pay && metadata.route === "confirmation") {
       confirmationHttpError ||= (data.http ?? 0) >= 400;
       confirmationFailed ||= Boolean(data.error);
     }
-    record(event, { ...metadata, ...data, duration_ms: Math.round(performance.now() - startedAt) });
+    record(event, { ...metadata, ...data, duration_ms: duration, ...(write ? { request_id: write.request_id } : {}) });
   }
 
   context.on("response", (reply) => outcome("response", reply.request(), { http: reply.status() }));
@@ -139,7 +193,11 @@ export function observeCheckout(context: BrowserContext, appOrigin: string) {
   return {
     record,
     beforeClick() { afterPay = true; record("pay_click_started"); },
-    snapshot: () => ({ timeline: [...timeline], omitted }),
+    snapshot: () => ({
+      timeline: [...timeline], omitted,
+      post_pay_provider_writes: providerWrites.map((write) => ({ ...write })),
+      omitted_provider_writes: omittedProviderWrites,
+    }),
     timeoutReason(screen: string, checkout: string, order: string) {
       if (checkout !== "open" || order !== "absent") return "sandbox_provider_state_unresolved";
       if (screen.startsWith("invalid_form:")) return "sandbox_billing_validation_failed";

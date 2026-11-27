@@ -30,6 +30,7 @@ test("captures startup and submission failures without serializing browser data"
     method: () => "POST",
     resourceType: () => "fetch",
     url: () => "https://sandbox.polar.sh/" + path + "?private=" + privateMarker,
+    headers: () => ({ "next-action": privateMarker, authorization: privateMarker }),
     frame: () => { throw new Error(privateMarker); },
     failure: () => ({ errorText }),
   });
@@ -61,4 +62,12 @@ test("captures startup and submission failures without serializing browser data"
   for (let index = 0; index < 180; index++) page.emit("popup");
   assert.equal(diagnostic.snapshot().timeline.length, 160);
   assert.ok(diagnostic.snapshot().omitted > 0);
+  const writes = diagnostic.snapshot().post_pay_provider_writes;
+  assert.deepEqual(writes.map(({ request_id, path_shape, next_action, http, error }) =>
+    ({ request_id, path_shape, next_action, http, error })), [
+    { request_id: 1, path_shape: "/checkout/[redacted]", next_action: true, http: undefined, error: "other" },
+    { request_id: 2, path_shape: "/checkouts/[redacted]/confirm", next_action: true, http: undefined, error: "net::ERR_ABORTED" },
+    { request_id: 3, path_shape: "/checkouts/[redacted]/confirm", next_action: true, http: 422, error: undefined },
+  ]);
+  assert.ok(!JSON.stringify(diagnostic.snapshot()).includes(privateMarker));
 });
