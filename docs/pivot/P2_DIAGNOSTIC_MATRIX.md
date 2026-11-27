@@ -4,6 +4,7 @@
 | --- | --- | --- |
 | 정확한 Checkout 및 상품 이력 | BLOCKED | 11건, 미해결 1건, 주문 0건. 대상 Open | 
 | 결제 시도 읽기 | BLOCKED | API 403, Sandbox UI 동일 ID에는 0건 표시 |
+| Chromium 및 회귀 | SYNTHETIC PASS | [코드 SHA CI](https://github.com/seonghyeonist/unstandard/actions/runs/45945298686/job/140328502438) · 단위 18, PG17 통합 12, Docker smoke PASS |
 | 결제·환불·철회 | NOT RUN | 이번 작업의 신규 Checkout 및 Pay 0회 |
 
 [구현·CI·후속 실행 근거](P2_AUTONOMOUS_EXECUTION_20261127.md)

@@ -10,6 +10,8 @@
 - 구매자 카드 200 이후 별도 브라우저 컨텍스트가 앱의 `unauthenticated` 응답을 받는지 확인한다. Basic Auth 실패는 별도 세션 차단 성공으로 집계하지 않는다. 기존 통합 테스트는 동일 이벤트 재처리, 소유권, 서명, 환불 선도착 및 롤백을 다룬다.
 - Render Free 최근 배포 `0a935d1` live, Neon `p2-sandbox` ready. 이전 실제 잡에서 웹훅 disable, Docker DB 및 네트워크 정리를 확인했다. 외부 터널 종료를 독립적으로 재검증한 기록은 없다. 이번 신규 리허설, Checkout, Pay 호출, 승인, 환불, 배포 0회. 추가 지출 $0.
 
+**SYNTHETIC PASS.** 코드 기준 SHA `43c885a1d749cec32e78cf131e1068199ae6f140`의 push CI attempt 1에서 단위 18/18, PostgreSQL 통합 12/12, Chromium, Docker smoke가 모두 통과했다. P2 전용 Sandbox 설정에서 ephemeral runner runtime 토큰의 `payments:read`가 꺼져 있음을 확인했다. 조회 전용 자격증명 발급과 저장은 이 세션에서 이루어지지 않았다. [정확한 코드 SHA CI](https://github.com/seonghyeonist/unstandard/actions/runs/45945298686/job/140328502438) · [Sandbox 접근 토큰](https://sandbox.polar.sh/dashboard/unstandard/settings/access-tokens)
+
 ### 다음 실행의 정확한 진입점
 
 1. 두 차단 조건을 풀어야 한다. 기존 Checkout의 종료·주문 대조와 Sandbox 조직의 Payment Attempts 읽기다. 운영 런타임 권한을 확대할 필요 없이 격리된 GitHub Environment `p2-polar-sandbox`의 선택 입력 `B2C_POLAR_PAYMENT_READ_TOKEN`에 해당 Sandbox 조직의 `payments:read` 전용 자격증명을 사용할 수 있다. 토큰은 상태 대조에서만 사용하고 자식 브라우저 프로세스에는 전달하지 않는다. 미구성 시 기존 토큰으로 읽고 403은 차단한다.

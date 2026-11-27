@@ -195,6 +195,17 @@
     "refunds": 0,
     "deployments": 0,
     "additional_spend_usd": 0,
-    "live_sandbox_checkout_and_refund": "NOT_RUN"
+    "live_sandbox_checkout_and_refund": "NOT_RUN",
+    "verified_code_sha": "43c885a1d749cec32e78cf131e1068199ae6f140",
+    "verified_code_ci_run_id": 45945298686,
+    "verified_code_ci_job_id": 140328502438,
+    "verified_code_ci_attempt": 1,
+    "unit_passed": 18,
+    "postgres_integration_passed": 12,
+    "chromium": "SYNTHETIC_PASS",
+    "docker_smoke": "PASS",
+    "sandbox_runner_payments_read_scope": false,
+    "credential_changes": 0,
+    "support_draft_sent": false
   }
 }
