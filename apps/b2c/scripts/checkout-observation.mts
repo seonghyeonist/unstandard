@@ -136,6 +136,9 @@ export function observeCheckout(context: BrowserContext, appOrigin: string) {
   let omittedProviderWrites = 0;
   let nextProviderWriteId = 0;
   const timeline: object[] = [];
+  // Keep critical lifecycle independently of noisy network and console telemetry.
+  const postPayLifecycle: object[] = [];
+  let omittedLifecycle = 0;
   let omitted = 0;
   let afterPay = false;
   let confirmationRequested = false;
@@ -150,6 +153,15 @@ export function observeCheckout(context: BrowserContext, appOrigin: string) {
       omitted++;
     }
     timeline.push(entry);
+    if (afterPay && (event === "pay_click_started" || event === "pay_click_completed" ||
+        event === "pay_control_events" || event === "provider_state" ||
+        event === "page_created" || event === "popup" || event === "page_closed" ||
+        event === "page_crashed" || event === "context_closed" ||
+        ((event === "frame_navigated" || event === "frame_detached" || event === "frame_attached") &&
+          "frame" in data && data.frame === "main"))) {
+      if (postPayLifecycle.length < 80) postPayLifecycle.push(entry);
+      else omittedLifecycle++;
+    }
   }
 
   context.on("request", (request) => {
@@ -212,9 +224,12 @@ export function observeCheckout(context: BrowserContext, appOrigin: string) {
     const code = request.failure()?.errorText ?? "";
     outcome("request_failed", request, { error: browserErrors.has(code) ? code : "other" });
   });
+  context.on("close", () => record("context_closed"));
   context.on("page", (page) => {
     record("page_created");
     page.on("popup", () => record("popup"));
+    page.on("close", () => record("page_closed"));
+    page.on("crash", () => record("page_crashed"));
     page.on("pageerror", (error) => record("page_error", { kind: scriptErrors.has(error.name) ? error.name : "other" }));
     page.on("console", (message) => {
       if (message.type() === "error") record("console_error", { host: service(message.location().url, appOrigin) });
@@ -223,6 +238,7 @@ export function observeCheckout(context: BrowserContext, appOrigin: string) {
       record(event, { host: service(frame.url(), appOrigin), frame: frame.parentFrame() ? "child" : "main" });
     page.on("frameattached", (frame) => recordFrame("frame_attached", frame));
     page.on("framenavigated", (frame) => recordFrame("frame_navigated", frame));
+    page.on("framedetached", (frame) => recordFrame("frame_detached", frame));
   });
 
   return {
@@ -230,6 +246,7 @@ export function observeCheckout(context: BrowserContext, appOrigin: string) {
     beforeClick() { afterPay = true; record("pay_click_started"); },
     snapshot: () => ({
       timeline: [...timeline], omitted,
+      post_pay_lifecycle: [...postPayLifecycle], omitted_post_pay_lifecycle: omittedLifecycle,
       post_pay_provider_writes: providerWrites.map((write) => ({ ...write })),
       omitted_provider_writes: omittedProviderWrites,
       post_pay_main_polar_writes: mainPolarWrites.map((write) => ({ ...write })),
