@@ -134,7 +134,9 @@ await summarize("polar_sandbox_checkout_refund", async () => {
     let order: { status: number; orderId?: string; transactionId?: string; checkoutUrl?: string } | undefined;
     await page.route(orderPath, async (route) => {
       if (route.request().method() !== "POST") return route.continue();
-      // Read from the proxied API response before the app leaves this document.
+      // Preserve the body before immediate app navigation. A passive response
+      // reader lost it in the synthetic Chromium comparison. This exact app URL
+      // is intercepted once; no Hosted Checkout provider request is routed here.
       const response = await route.fetch({ maxRedirects: 0 });
       const status = response.status();
       const data = status === 201 ? await response.json() as { orderId?: string; transactionId?: string; checkoutUrl?: string } : {};

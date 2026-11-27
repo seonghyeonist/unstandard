@@ -39,7 +39,7 @@ try {
       const page = await context.newPage();
       const orderPath = origin + "/api/b2c/orders";
       let interceptions = 0;
-      let capture: Promise<{ status: number; checkoutUrl: string }>;
+      let capture: Promise<{ status: number; checkoutUrl?: string; bodyUnavailable?: true }>;
       if (mode === "proxy") {
         capture = new Promise((resolve, reject) => {
           void page.route(orderPath, async (route) => {
@@ -55,12 +55,27 @@ try {
         });
       } else {
         capture = page.waitForResponse((response) => response.url() === orderPath &&
-          response.request().method() === "POST").then(async (response) =>
-          ({ status: response.status(), ...await response.json() as { checkoutUrl: string } }));
+          response.request().method() === "POST").then(async (response) => {
+          try {
+            return { status: response.status(), ...await response.json() as { checkoutUrl: string } };
+          } catch (error) {
+            // The app immediately navigates after consuming JSON. Chromium can
+            // discard the response body before the passive reader reaches it.
+            if (!(error instanceof Error) || !/No resource with given identifier|No data found for resource|Response body is not available/.test(error.message)) {
+              throw error;
+            }
+            return { status: response.status(), bodyUnavailable: true as const };
+          }
+        });
       }
       await page.goto(origin);
       await page.getByRole("button", { name: "Open Sandbox checkout" }).click();
-      assert.deepEqual(await capture, { status: 201, checkoutUrl: hosted });
+      const captured = await capture;
+      const bodyUnavailable = captured.bodyUnavailable === true;
+      assert.equal(captured.status, 201);
+      if (mode === "proxy" || !bodyUnavailable) {
+        assert.deepEqual(captured, { status: 201, checkoutUrl: hosted });
+      }
       await page.waitForURL(hosted);
       diagnostics.beforeClick();
       await page.getByRole("button", { name: "Pay now", exact: true }).click();
@@ -74,6 +89,7 @@ try {
       assert.equal(writes[0].error, undefined);
       assert.ok(!JSON.stringify(diagnostics.snapshot()).includes("private-fixture"));
       console.log("PASS: synthetic " + mode + " app capture, navigation and one provider POST");
+      console.log("OBSERVED: " + mode + " response body " + (bodyUnavailable ? "unavailable after navigation" : "captured"));
     } finally { await context.close(); }
   }
   assert.equal(appOrders, 2);
