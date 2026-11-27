@@ -132,6 +132,10 @@ export function observeCheckout(context: BrowserContext, appOrigin: string) {
   const providerWrites: ProviderWrite[] = [];
   // Independent buffer: high-volume child-frame telemetry must not hide the main-frame POST.
   const mainPolarWrites: ProviderWrite[] = [];
+  // Retain the most recent pre-click main-frame writes for comparison. A request
+  // canceled after Pay may have started before Pay and need not be a payment.
+  const prePayMainPolarWrites: ProviderWrite[] = [];
+  let omittedPrePayMainPolarWrites = 0;
   let omittedMainPolarWrites = 0;
   let omittedProviderWrites = 0;
   let nextProviderWriteId = 0;
@@ -176,6 +180,16 @@ export function observeCheckout(context: BrowserContext, appOrigin: string) {
     const metadata = { ...classification, resource: resourceTypes.has(type) ? type : "other", frame, after_pay: afterPay };
     const startedAt = performance.now();
     let write: ProviderWrite | undefined;
+    if (!afterPay && metadata.host === "polar" && metadata.frame === "main" &&
+        ["POST", "PATCH", "PUT", "DELETE"].includes(metadata.method)) {
+      write = { ...metadata, ...providerWriteTarget(request),
+        request_id: ++nextProviderWriteId, started_ms: Math.round(startedAt - started) };
+      if (prePayMainPolarWrites.length >= 40) {
+        prePayMainPolarWrites.shift();
+        omittedPrePayMainPolarWrites++;
+      }
+      prePayMainPolarWrites.push(write);
+    }
     if (afterPay) {
       confirmationRequested ||= metadata.route === "confirmation";
       const providerWrite = ["polar", "stripe"].includes(metadata.host) &&
@@ -251,6 +265,8 @@ export function observeCheckout(context: BrowserContext, appOrigin: string) {
       omitted_provider_writes: omittedProviderWrites,
       post_pay_main_polar_writes: mainPolarWrites.map((write) => ({ ...write })),
       omitted_main_polar_writes: omittedMainPolarWrites,
+      pre_pay_main_polar_writes: prePayMainPolarWrites.map((write) => ({ ...write })),
+      omitted_pre_pay_main_polar_writes: omittedPrePayMainPolarWrites,
     }),
     timeoutReason(screen: string, checkout: string, order: string) {
       if (checkout !== "open" || order !== "absent") return "sandbox_provider_state_unresolved";

@@ -120,3 +120,36 @@ test("preserves post-pay navigation and unexpected closure after telemetry satur
   ]);
   assert.ok(!JSON.stringify(snapshot).includes(privateMarker));
 });
+
+test("compares pre-pay writes that finish after Pay without treating them as submissions", () => {
+  const context = new EventEmitter();
+  const diagnostic = observeCheckout(context as unknown as BrowserContext, origin);
+  const request = () => ({
+    method: () => "POST", resourceType: () => "fetch",
+    url: () => "https://sandbox.polar.sh/checkout/" + privateMarker,
+    headers: () => ({ "next-action": privateMarker }),
+    frame: () => ({ parentFrame: () => null }),
+    failure: () => ({ errorText: "net::ERR_ABORTED" }),
+  });
+  for (let i = 0; i < 45; i++) context.emit("request", request());
+  const before = request();
+  context.emit("request", before);
+  diagnostic.beforeClick();
+  context.emit("requestfailed", before);
+  assert.equal(diagnostic.timeoutReason("pay_button_available", "open", "absent"),
+    "sandbox_payment_submission_not_observed");
+  const after = request();
+  context.emit("request", after);
+  context.emit("requestfailed", after);
+  const snapshot = diagnostic.snapshot();
+  assert.equal(snapshot.pre_pay_main_polar_writes.length, 40);
+  assert.equal(snapshot.omitted_pre_pay_main_polar_writes, 6);
+  const earlier = snapshot.pre_pay_main_polar_writes.at(-1)!;
+  const later = snapshot.post_pay_main_polar_writes[0];
+  assert.equal(earlier.after_pay, false);
+  assert.equal(later.after_pay, true);
+  assert.equal(earlier.error, "net::ERR_ABORTED");
+  assert.equal(earlier.path_shape, later.path_shape);
+  assert.equal(earlier.request_id + 1, later.request_id);
+  assert.ok(!JSON.stringify(snapshot).includes(privateMarker));
+});

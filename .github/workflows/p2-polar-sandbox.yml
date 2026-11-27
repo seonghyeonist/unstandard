@@ -53,6 +53,7 @@ jobs:
         run: |
           npx playwright install --with-deps chromium
           node scripts/test-checkout-observation-browser.mts
+          node scripts/test-checkout-capture-browser.mts
       - name: Build and smoke-test the B2C container
         env:
           SMOKE_KEY: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
