@@ -207,5 +207,102 @@
     "sandbox_runner_payments_read_scope": false,
     "credential_changes": 0,
     "support_draft_sent": false
+  },
+  "polar_mandate_v3_execution_2026_11_27": {
+    "baseline_sha": "a2870b3fa095f0e471eb10324739b42dc8f23852",
+    "code_sha": "336525e9f413ac4a85ab9f85eb7fb4f2e4040ec3",
+    "code_commits": [
+      "cf1d5f3730e9931975120a42901d87e11b6c6f0f",
+      "336525e9f413ac4a85ab9f85eb7fb4f2e4040ec3"
+    ],
+    "checks": {
+      "run_id": 45983862986,
+      "job_id": 140454341963,
+      "attempt": 1,
+      "lint": "PASS",
+      "typecheck": "PASS",
+      "unit_passed": 21,
+      "postgres_integration_passed": 12,
+      "migrations_twice": "PASS",
+      "chromium": "SYNTHETIC_PASS",
+      "docker_build_smoke": "PASS"
+    },
+    "capture_comparison": {
+      "proxy_body": "captured",
+      "passive_body": "unavailable_after_immediate_navigation",
+      "provider_fixture_post_each_mode": 1,
+      "real_provider_used": false,
+      "decision": "retain_exact_app_only_proxy"
+    },
+    "failure_log_reanalysis": {
+      "job_id": 140319790558,
+      "pay_start_ms": 14041,
+      "pre_pay_polar_post_failure_ms": 14290,
+      "pre_pay_post_duration_ms": 3000,
+      "post_pay_polar_post_start_ms": 14793,
+      "post_pay_polar_post_failure_ms": 17792,
+      "post_pay_post_duration_ms": 3000,
+      "request_roles": "unclassified",
+      "causal_timeout": "unproven"
+    },
+    "read_only_status": {
+      "run_id": 45983509014,
+      "job_id": 140453105581,
+      "checked_at_utc": "2026-11-27T10:36:33Z",
+      "checkout_id": "76e2d82a-a4eb-4a96-bc07-c938fb373d59",
+      "organization_id": "e9d6161a-1711-4571-837b-05996cc8bd43",
+      "product_id": "903bf4e5-61c0-4fe0-9325-9364c8b52754",
+      "checkout_status": "open",
+      "order_state": "absent",
+      "scanned_checkouts": 11,
+      "scanned_orders": 0,
+      "unresolved_checkouts": 1,
+      "payment_read_http_status": 403,
+      "payment_attempts": "unverified",
+      "ready_for_rehearsal": false,
+      "expires_utc": "2026-11-28T04:55:32.313Z"
+    },
+    "credentials": {
+      "sandbox_organization_verified_in_browser": true,
+      "token_form_prepared_scopes": [
+        "payments:read",
+        "checkouts:read"
+      ],
+      "token_created": false,
+      "environment": "p2-polar-sandbox",
+      "secret": "B2C_POLAR_PAYMENT_READ_TOKEN",
+      "secret_present": false,
+      "blocking_step": "browser_action_time_confirmation_for_new_persistent_credential"
+    },
+    "support_draft": {
+      "draft_id": "r-3105449313664746486",
+      "updated_with_pre_pay_abort": true,
+      "verified_unsent": true
+    },
+    "public_source_review": {
+      "repository": "polarsource/polar",
+      "sha": "816031a07d13642b2e30adf183c41a167d19bf47",
+      "confirmation_sequence": [
+        "elements.submit",
+        "stripe.createConfirmationToken",
+        "POST /v1/checkouts/client/{client_secret}/confirm"
+      ],
+      "sandbox_deployed_source_match": "unverified"
+    },
+    "local_environment": {
+      "lint_typecheck_unit_build": "PASS",
+      "chromium_binary": "missing_under_wrapper",
+      "playwright_download": "403",
+      "postgresql_docker": "not_installed",
+      "remote_ci_used_for_full_suite": true
+    },
+    "new_checkout_count": 0,
+    "pay_calls": 0,
+    "refunds": 0,
+    "deployments": 0,
+    "credential_changes": 0,
+    "additional_spend_usd": 0,
+    "real_sandbox_e2e": "NOT_RUN",
+    "resume_after_credential_registration": "Rerun only checkout-status job 140453105581; verify exact SHA and full result, including 403 resolution. Rehearsal remains forbidden until terminal Checkout and all history/concurrency gates pass."
   }
 }
