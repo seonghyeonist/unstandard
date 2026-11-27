@@ -98,3 +98,25 @@ test("retains main-frame Polar request and outcome after child-frame traffic fil
   assert.equal(snapshot.post_pay_main_polar_writes[0].path_shape, "/checkout/[redacted]");
   assert.ok(!JSON.stringify(snapshot).includes(privateMarker));
 });
+
+test("preserves post-pay navigation and unexpected closure after telemetry saturation", () => {
+  const context = new EventEmitter();
+  const page = new EventEmitter();
+  const diagnostic = observeCheckout(context as unknown as BrowserContext, origin);
+  context.emit("page", page);
+  diagnostic.beforeClick();
+  const frame = { url: () => "https://sandbox.polar.sh/" + privateMarker, parentFrame: () => null };
+  page.emit("framenavigated", frame);
+  page.emit("framedetached", frame);
+  page.emit("crash");
+  page.emit("close");
+  context.emit("close");
+  for (let i = 0; i < 200; i++) page.emit("pageerror", new TypeError(privateMarker));
+  const snapshot = diagnostic.snapshot();
+  assert.ok(snapshot.omitted > 0);
+  assert.equal(snapshot.omitted_post_pay_lifecycle, 0);
+  assert.deepEqual(snapshot.post_pay_lifecycle.map((entry) => (entry as { event: string }).event), [
+    "pay_click_started", "frame_navigated", "frame_detached", "page_crashed", "page_closed", "context_closed",
+  ]);
+  assert.ok(!JSON.stringify(snapshot).includes(privateMarker));
+});
