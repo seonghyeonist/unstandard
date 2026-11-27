@@ -304,5 +304,56 @@
     "additional_spend_usd": 0,
     "real_sandbox_e2e": "NOT_RUN",
     "resume_after_credential_registration": "Rerun only checkout-status job 140453105581; verify exact SHA and full result, including 403 resolution. Rehearsal remains forbidden until terminal Checkout and all history/concurrency gates pass."
+  },
+  "polar_payment_read_access_2026_11_27": {
+    "organization_id": "e9d6161a-1711-4571-837b-05996cc8bd43",
+    "scopes": [
+      "payments:read",
+      "checkouts:read"
+    ],
+    "expiry_date": "2026-12-27",
+    "registered_token_name": "UNSTANDARD P2 payment reconciliation read only v2",
+    "environment": "p2-polar-sandbox",
+    "secret": "B2C_POLAR_PAYMENT_READ_TOKEN",
+    "secret_registered": true,
+    "existing_runtime_refund_webhook_tokens_unchanged": true,
+    "reauthentication": "completed_using_secure_browser_auth_Google",
+    "tokens_issued": 2,
+    "secret_writes": 1,
+    "first_token": {
+      "name": "UNSTANDARD P2 payment reconciliation read only",
+      "registered": false,
+      "incident": "automatically_issued_token_appeared_in_tool_screen_state_output_after_reauthentication",
+      "revoked": false,
+      "cleanup": "exact_token_revocation_form_prepared_awaiting_action_time_confirmation_for_permanent_deletion"
+    },
+    "registered_token_value_printed": false,
+    "read_status": {
+      "run_id": 45983509014,
+      "attempt": 2,
+      "job_id": 140458924275,
+      "sha": "cf1d5f3730e9931975120a42901d87e11b6c6f0f",
+      "checked_at_utc": "2026-11-27T10:48:49Z",
+      "checkout_id": "76e2d82a-a4eb-4a96-bc07-c938fb373d59",
+      "checkout_status": "open",
+      "order_state": "absent",
+      "expected_checkout_matches_latest": true,
+      "scanned_checkouts": 11,
+      "scanned_orders": 0,
+      "unresolved_checkouts": 1,
+      "payment_attempts": 0,
+      "pending_org_payments": 0,
+      "unresolved_payments": 0,
+      "payment_read_403_resolved": true,
+      "ready_for_rehearsal": false
+    },
+    "rerun_note": "Connector rerun-job also reran old checks on cf1d5f3, which reproduced the known passive-capture experimental failure fixed in 336525e. Current code checks previously passed on 3174954. A new latest-head read-only status/checks run is requested by this evidence commit.",
+    "new_checkout_count": 0,
+    "pay_calls": 0,
+    "refunds": 0,
+    "deployments": 0,
+    "additional_spend_usd": 0,
+    "actual_payment_e2e": "NOT_RUN",
+    "next_gate": "Actual terminal Checkout with complete reconciliation and no concurrent rehearsal; elapsed expiry alone is insufficient."
   }
 }
