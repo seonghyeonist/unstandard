@@ -1,0 +1,196 @@
+name: P2 checks and Sandbox operations
+
+on:
+  push:
+    branches: [pivot/b2c-v4-p2-paddle]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: p2-polar-sandbox-rehearsal
+  cancel-in-progress: false
+
+jobs:
+  checks:
+    if: github.repository == 'seonghyeonist/unstandard' && github.ref == 'refs/heads/pivot/b2c-v4-p2-paddle' && !github.event.deleted
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: apps/b2c
+    services:
+      pg:
+        image: postgres:17
+        env:
+          POSTGRES_USER: b2c_runner
+          POSTGRES_PASSWORD: local-fixture-only
+          POSTGRES_DB: unstandard_b2c
+        ports: [5432]
+        options: >-
+          --health-cmd "pg_isready -U b2c_runner -d unstandard_b2c"
+          --health-interval 3s --health-timeout 3s --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24.x
+      - name: Build and test without provider credentials
+        env:
+          B2C_DATABASE_URL: postgresql://b2c_runner:local-fixture-only@127.0.0.1:${{ job.services.pg.ports[5432] }}/unstandard_b2c
+          B2C_MIGRATE_CONFIRM: local-b2c
+          B2C_DB_FIXTURES: disposable-loopback
+        run: |
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          npm ci --no-audit --no-fund
+          npm run check
+          npm run db:migrate
+          npm run db:migrate
+          npm run test:db
+      - name: Verify checkout diagnostics in synthetic Chromium
+        run: |
+          npx playwright install --with-deps chromium
+          node scripts/test-checkout-observation-browser.mts
+          node scripts/test-checkout-capture-browser.mts
+      - name: Build and smoke-test the B2C container
+        env:
+          SMOKE_KEY: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+        run: |
+          docker build -t b2c-ci .
+          fixture=$(docker run --detach --publish 127.0.0.1::8080 \
+            --env B2C_ORIGIN=https://p2.example.test --env B2C_PAYMENT_MODE=sandbox \
+            --env B2C_SANDBOX_ACCESS_KEY="$SMOKE_KEY" --env B2C_PAYMENT_TOKEN_KEY="$SMOKE_KEY" \
+            --env B2C_REVISION="$GITHUB_SHA" \
+            --env B2C_DATABASE_URL=postgresql://b2c_fixture@127.0.0.1/unstandard_b2c \
+            --env B2C_POLAR_ACCESS_TOKEN=polar_oat_fixture \
+            --env B2C_POLAR_PRODUCT_ID=22222222-2222-4222-8222-222222222222 \
+            --env B2C_POLAR_ORGANIZATION_ID=11111111-1111-4111-8111-111111111111 \
+            --env B2C_POLAR_WEBHOOK_SECRET=synthetic-fixture-webhook-secret b2c-ci)
+          cleanup() {
+            if [ "$?" -ne 0 ]; then docker logs "$fixture" >&2 || true; fi
+            docker rm --force "$fixture" >/dev/null 2>&1 || true
+          }
+          trap cleanup EXIT
+          origin="http://$(docker port "$fixture" 8080/tcp)"
+          curl --fail --silent --show-error --retry-all-errors --retry 8 --retry-delay 2 --max-time 5 \
+            --dump-header "$RUNNER_TEMP/p2-health" --output /dev/null "$origin/healthz"
+          grep -iq "^X-B2C-Revision: $GITHUB_SHA" "$RUNNER_TEMP/p2-health"
+          test "$(curl --silent -o /dev/null -w '%{http_code}' "$origin/checkout")" = 401
+          test "$(curl --silent -o /dev/null -w '%{http_code}' --user "b2c:$SMOKE_KEY" "$origin/checkout")" = 200
+          curl --silent --request POST "$origin/api/b2c/webhooks/polar" | jq -e '.error == "invalid_signature"'
+  checkout-status:
+    if: >-
+      github.repository == 'seonghyeonist/unstandard' &&
+      github.ref == 'refs/heads/pivot/b2c-v4-p2-paddle' &&
+      endsWith(github.event.head_commit.message, 'P2-Polar-Sandbox: status')
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    environment: p2-polar-sandbox
+    defaults:
+      run:
+        working-directory: apps/b2c
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24.x
+      - name: Read Sandbox checkout, order, refund and payment history
+        env:
+          B2C_POLAR_ORGANIZATION_ID: e9d6161a-1711-4571-837b-05996cc8bd43
+          B2C_POLAR_PRODUCT_ID: 903bf4e5-61c0-4fe0-9325-9364c8b52754
+          B2C_POLAR_ACCESS_TOKEN: ${{ secrets.B2C_POLAR_ACCESS_TOKEN }}
+          B2C_POLAR_PAYMENT_READ_TOKEN: ${{ secrets.B2C_POLAR_PAYMENT_READ_TOKEN }}
+        run: |
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          npm ci --no-audit --no-fund
+          node scripts/polar-tunnel-rehearsal.mts --checkout-status
+  rehearsal:
+    needs: checks
+    if: >-
+      github.run_attempt == '1' &&
+      endsWith(github.event.head_commit.message, 'P2-Polar-Sandbox: run')
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    environment: p2-polar-sandbox
+    defaults:
+      run:
+        working-directory: apps/b2c
+    services:
+      pg:
+        image: postgres:17
+        env:
+          POSTGRES_USER: b2c_runner
+          POSTGRES_PASSWORD: local-fixture-only
+          POSTGRES_DB: unstandard_b2c
+        ports:
+          - 5432
+        options: >-
+          --health-cmd "pg_isready -U b2c_runner -d unstandard_b2c"
+          --health-interval 3s --health-timeout 3s --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24.x
+      - name: Install headed Chromium
+        run: |
+          npm ci --no-audit --no-fund
+          npx playwright install --with-deps chromium
+      - name: Install verified Cloudflare tunnel client
+        shell: bash
+        run: |
+          curl --fail --silent --show-error --location --proto '=https' --max-time 90 \
+            https://github.com/cloudflare/cloudflared/releases/download/2026.11.0/cloudflared-linux-amd64 \
+            --output "$RUNNER_TEMP/cloudflared"
+          printf '%s  %s\n' 51f7c68b57ed7269164075d7e789efce5b59355982f06392deeb037d982a51fd "$RUNNER_TEMP/cloudflared" | sha256sum --check --status
+          chmod 0700 "$RUNNER_TEMP/cloudflared"
+      - name: Migrate isolated runner database
+        env:
+          B2C_DATABASE_URL: postgresql://b2c_runner:local-fixture-only@127.0.0.1:${{ job.services.pg.ports[5432] }}/unstandard_b2c
+          B2C_MIGRATE_CONFIRM: local-b2c
+        run: npm run db:migrate
+      - name: Rehearse the explicitly selected Sandbox checkout
+        env:
+          B2C_DATABASE_URL: postgresql://b2c_runner:local-fixture-only@127.0.0.1:${{ job.services.pg.ports[5432] }}/unstandard_b2c
+          B2C_POLAR_ORGANIZATION_ID: e9d6161a-1711-4571-837b-05996cc8bd43
+          B2C_POLAR_PRODUCT_ID: 903bf4e5-61c0-4fe0-9325-9364c8b52754
+          B2C_POLAR_ACCESS_TOKEN: ${{ secrets.B2C_POLAR_ACCESS_TOKEN }}
+          B2C_POLAR_PAYMENT_READ_TOKEN: ${{ secrets.B2C_POLAR_PAYMENT_READ_TOKEN }}
+          B2C_POLAR_E2E_REFUND_TOKEN: ${{ secrets.B2C_POLAR_E2E_REFUND_TOKEN }}
+          B2C_POLAR_E2E_WEBHOOK_TOKEN: ${{ secrets.B2C_POLAR_E2E_WEBHOOK_TOKEN }}
+          B2C_BROWSER_HEADED: '1'
+          B2C_E2E_VERIFY_LOCAL_LEDGER: '1'
+          B2C_SANDBOX_WRITE_CONFIRM: checkout-b2c-polar-sandbox
+        run: B2C_CLOUDFLARED="$RUNNER_TEMP/cloudflared" xvfb-run -a node scripts/polar-tunnel-rehearsal.mts
+  deploy:
+    needs: checks
+    if: >-
+      github.run_attempt == '1' &&
+      endsWith(github.event.head_commit.message, 'P2-Render-Sandbox: deploy')
+    runs-on: ubuntu-24.04
+    timeout-minutes: 32
+    environment: p2-render-sandbox
+    defaults:
+      run:
+        working-directory: apps/b2c
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24.x
+      - name: Deploy and verify the exact Sandbox revision
+        env:
+          B2C_RENDER_API_TOKEN: ${{ secrets.B2C_RENDER_API_TOKEN }}
+          B2C_RENDER_SERVICE_ID: ${{ vars.B2C_RENDER_SERVICE_ID }}
+          B2C_RENDER_DEPLOY_CONFIRM: ${{ vars.B2C_RENDER_DEPLOY_CONFIRM }}
+        run: |
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          node scripts/deploy-render.mts

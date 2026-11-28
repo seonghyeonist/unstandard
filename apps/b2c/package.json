@@ -2,11 +2,12 @@
   "name": "@unstandard/b2c",
   "version": "0.1.0",
   "private": true,
+  "type": "module",
   "engines": {
     "node": "24.x"
   },
   "scripts": {
-    "lint": "eslint --config eslint.config.mjs src scripts server db tests drizzle.config.mts --max-warnings=0",
+    "lint": "eslint --config eslint.config.mjs src scripts server db tests api drizzle.config.mts --max-warnings=0",
     "typecheck": "tsc -p tsconfig.json",
     "test": "node --test tests/*.test.mjs tests/*.test.mts",
     "build": "node scripts/build.mjs",
@@ -14,9 +15,17 @@
     "start": "node server/start.mts",
     "db:generate": "drizzle-kit generate --config drizzle.config.mts",
     "db:migrate": "node scripts/migrate.mts",
-    "test:db": "node --test tests/*.integration.mts"
+    "test:db": "node --test tests/*.integration.mts",
+    "b2c:test:unit": "node scripts/test-summary.mts unit",
+    "b2c:test:db": "node scripts/test-summary.mts db",
+    "b2c:test:payment:synthetic": "node scripts/test-summary.mts synthetic",
+    "b2c:polar:preflight": "node scripts/polar-preflight.mts",
+    "b2c:test:checkout:sandbox": "node scripts/checkout-sandbox.mts",
+    "b2c:test:payment:reconcile": "node scripts/payment-jobs.mts",
+    "b2c:test:all": "node scripts/test-summary.mts all"
   },
   "devDependencies": {
+    "@playwright/test": "1.65.1",
     "@types/node": "24.13.3",
     "@types/pg": "8.23.1",
     "@typescript-eslint/parser": "8.73.0",
@@ -26,6 +35,7 @@
     "typescript": "5.9.3"
   },
   "dependencies": {
+    "@polar-sh/sdk": "1.3.2",
     "drizzle-orm": "0.45.3",
     "pg": "8.23.1"
   },

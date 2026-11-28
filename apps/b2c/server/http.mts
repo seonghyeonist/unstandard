@@ -1,7 +1,11 @@
-import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
+import { createServer } from "node:http";
+import type { HttpRequest, HttpResponse } from "./request.mts";
 import { readFile } from "node:fs/promises";
 import type { Repository } from "./repository.mts";
 import { readSessionCookie } from "./session.mts";
+import { json } from "./response.mts";
+import type { createPaymentHandler } from "./payment-http.mts";
+import { serveCheckout } from "./checkout.mts";
 
 const root = new URL("../dist/", import.meta.url);
 const assets = new Map([
@@ -12,17 +16,7 @@ const assets = new Map([
 ]);
 const roomPath = /^\/api\/b2c\/rooms\/([\da-f]{8}-(?:[\da-f]{4}-){3}[\da-f]{12})(\/me)?$/i;
 
-function json(res: ServerResponse, status: number, body: unknown) {
-  res.writeHead(status, {
-    "Content-Type": "application/json; charset=utf-8",
-    "Cache-Control": "no-store",
-    "Referrer-Policy": "no-referrer",
-    "X-Content-Type-Options": "nosniff",
-  });
-  res.end(JSON.stringify(body));
-}
-
-async function readUpdate(req: IncomingMessage) {
+async function readUpdate(req: HttpRequest) {
   if (req.headers["content-type"]?.split(";")[0].trim() !== "application/json") {
     return {status: 415} as const;
   }
@@ -48,7 +42,12 @@ async function readUpdate(req: IncomingMessage) {
   return {status: 200, locale, revision} as const;
 }
 
-export function createAppServer(repository: Repository, origin: string) {
+type AppOptions = {
+  payment?: ReturnType<typeof createPaymentHandler>;
+  serveStatic?: boolean;
+};
+
+export function createAppHandler(repository: Repository, origin: string, options: AppOptions = {}) {
   const expectedOrigin = new URL(origin);
   const loopbackHttp = expectedOrigin.protocol === "http:" &&
     ["127.0.0.1", "localhost", "[::1]"].includes(expectedOrigin.hostname);
@@ -56,10 +55,13 @@ export function createAppServer(repository: Repository, origin: string) {
     throw new Error("B2C_ORIGIN must be an exact HTTPS origin or a loopback HTTP origin");
   }
 
-  return createServer(async (req, res) => {
+  return async (req: HttpRequest, res: HttpResponse) => {
     const path = req.url?.split("?", 1)[0] ?? "";
     try {
-      const asset = assets.get(path);
+      const page = path === "/api/b2c/checkout" ? "/checkout" : path === "/api/b2c/recover" ? "/recover" : path;
+      if (options.payment && serveCheckout(req, res, page)) return;
+      if (options.payment && await options.payment(req, res, path)) return;
+      const asset = options.serveStatic === false ? undefined : assets.get(path);
       if (asset && (req.method === "GET" || req.method === "HEAD")) {
         const [name, contentType] = asset;
         const file = await readFile(new URL(name, root));
@@ -96,5 +98,9 @@ export function createAppServer(repository: Repository, origin: string) {
       console.error("b2c_request_failed");
       if (!res.headersSent) json(res, 503, {error: "temporarily_unavailable"});
     }
-  });
+  };
+}
+
+export function createAppServer(repository: Repository, origin: string, options: AppOptions = {}) {
+  return createServer(createAppHandler(repository, origin, options));
 }

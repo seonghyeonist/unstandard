@@ -1,0 +1,417 @@
+{
+  "verified_on_kst": "2026-11-20",
+  "base_sha": "48cf2886f4cc50f5e3cdecc7a9e1c779b3bd1726",
+  "head_ref": "pivot/b2c-v4-p2-paddle",
+  "node": "24.22.3",
+  "postgresql": "17.11",
+  "paddle_node_sdk": "3.12.0",
+  "local": {
+    "b2c_unit": {
+      "status": "PASS",
+      "passed": 12
+    },
+    "p1_postgres": {
+      "status": "PASS",
+      "passed": 5
+    },
+    "p2_payment_postgres": {
+      "status": "PASS",
+      "passed": 7
+    },
+    "alpha": {
+      "status": "PASS",
+      "passed": 405,
+      "static_pages": 39
+    },
+    "migration": {
+      "status": "PASS",
+      "total_journal_entries_after_two_runs": 2,
+      "schema_drift": false
+    },
+    "b2c_dependency_audit": {
+      "status": "PASS",
+      "reported_vulnerabilities": 0
+    },
+    "free_receipt_chromium": {
+      "status": "PASS",
+      "version": "153.0.8010.0",
+      "viewports": [
+        "360x800",
+        "1440x1000"
+      ],
+      "locales": [
+        "ko",
+        "en"
+      ],
+      "interaction_network_requests": 0
+    },
+    "vercel_function_bundle": {
+      "status": "PASS",
+      "builder": "@vercel/node 32.0.0",
+      "runtime": "nodejs24.x",
+      "anonymous_checkout_http": 401,
+      "authorized_checkout_http": 200,
+      "cross_destination_signature_http": 401,
+      "valid_simulator_signature_http": 200
+    }
+  },
+  "remote": {
+    "paddle_preflight": {
+      "status": "BLOCKED",
+      "exit": 78,
+      "reason": "missing_B2C_PADDLE_SETUP_API_KEY"
+    },
+    "paddle_provision": {
+      "status": "BLOCKED",
+      "exit": 78,
+      "reason": "missing_B2C_PADDLE_SETUP_API_KEY"
+    },
+    "paddle_simulator": {
+      "status": "BLOCKED",
+      "exit": 78,
+      "reason": "missing_B2C_PADDLE_SETUP_API_KEY"
+    },
+    "real_sandbox_checkout_and_refund": {
+      "status": "BLOCKED",
+      "exit": 78,
+      "reason": "missing_B2C_SANDBOX_WRITE_CONFIRM"
+    },
+    "payment_jobs": {
+      "status": "BLOCKED",
+      "exit": 78,
+      "reason": "missing_B2C_SANDBOX_WRITE_CONFIRM"
+    },
+    "vercel_https": {
+      "status": "BLOCKED",
+      "reason": "no_dedicated_b2c_preview_linked"
+    }
+  },
+  "polar_recovery_2026_11_26": {
+    "verified_on_kst": "2026-11-26",
+    "local_unit_passed": 14,
+    "local_postgres_integration_passed": 12,
+    "local_alpha_passed": 405,
+    "synthetic_chromium": "PASS",
+    "baseline_head_sha": "14dc57794eb2f19ea6d8abf625897a612f7a0f02",
+    "provider": "Polar Sandbox",
+    "last_rehearsal_sha": "60cfe79d3da3ab91a689a3966fb624869b1eef8b",
+    "last_rehearsal_run": 45755155609,
+    "checkout_id": "d0aafaf7-4b83-4035-8b2f-10196d50a367",
+    "provider_status": "open",
+    "provider_expiry_utc": "2026-11-27T04:29:17.454Z",
+    "hosted_card_field_inspection": {
+      "status": "PASS",
+      "run_id": 45767429114,
+      "job_id": 139731613423,
+      "verified_sha": "e742fafbc97a3236ba997962125bd68b2bcfeb22",
+      "public_field_controls_passed": 3,
+      "pay_clicks": 0,
+      "blocked_non_read_requests": 42
+    },
+    "dashboard_payment_attempts": 0,
+    "dashboard_orders": 0,
+    "real_e2e": "BLOCKED",
+    "new_payment_submissions": 0,
+    "new_refunds": 0,
+    "new_deployments": 0
+  },
+  "polar_recovery_2026_11_27": {
+    "verified_on_kst": "2026-11-27",
+    "provider": "Polar Sandbox",
+    "real_e2e": "BLOCKED",
+    "prior_checkout": {
+      "id": "d0aafaf7-4b83-4035-8b2f-10196d50a367",
+      "status": "expired",
+      "order_state": "absent",
+      "dashboard_payment_attempts": 0,
+      "dashboard_orders": 0,
+      "api_job_id": 140319305762,
+      "ready_for_rehearsal": true
+    },
+    "rehearsal": {
+      "sha": "6cc83298ee051a27140b4363d2b651137055edd8",
+      "run_id": 45942446362,
+      "job_id": 140319790558,
+      "run_attempt": 1,
+      "checks": "PASS",
+      "deploy": "SKIPPED",
+      "result": "sandbox_payment_submission_unclassified",
+      "https": "PASS",
+      "app_checkout_http": 201,
+      "checkout_id": "76e2d82a-a4eb-4a96-bc07-c938fb373d59",
+      "checkout_status": "open",
+      "order_state": "absent",
+      "card_fields_publicly_valid": 3,
+      "pay_click_calls_completed": 1,
+      "dom_trusted_click_recorded": false,
+      "dom_native_submit_recorded": false,
+      "unclassified_polar_main_frame_post": {
+        "http_status": null,
+        "error": "net::ERR_ABORTED",
+        "duration_ms": 3000
+      },
+      "browser_timeline_omitted": 940,
+      "temporary_webhook_disabled": true,
+      "dashboard_payment_attempts": 0,
+      "dashboard_orders": 0,
+      "checkout_expires_utc": "2026-11-28T04:55:32.313Z",
+      "last_status_run_id": 45942956882,
+      "last_status_job_id": 140321166059,
+      "ready_for_rehearsal": false
+    },
+    "actual_webhook_ledger_access_refund_revocation": "UNVERIFIED",
+    "new_checkout_count": 1,
+    "confirmed_paid_orders": 0,
+    "refund_count": 0,
+    "deployment_count": 0,
+    "diagnostic_regression_local_passed": 2
+  },
+  "polar_mandate_v2_2026_11_27": {
+    "baseline_sha": "a13ae7c7117e7b51f1a4dce2966645b44c9309b7",
+    "baseline_run_id": 45944253472,
+    "baseline_checks_job_id": 140325220219,
+    "reconciliation_sha": "96a56393b79325c1032446e64cd16af390246d17",
+    "run_id": 45945032904,
+    "checkout_status_job_id": 140327660114,
+    "run_attempt": 1,
+    "checked_at_kst": "2026-11-27T14:18:47+09:00",
+    "exact_checkout_id": "76e2d82a-a4eb-4a96-bc07-c938fb373d59",
+    "expiry_kst": "2026-11-28T13:55:32.313+09:00",
+    "checkout_status": "open",
+    "order_state": "absent",
+    "scanned_checkouts": 11,
+    "scoped_orders": 0,
+    "unresolved_checkouts": 1,
+    "payment_api_http": 403,
+    "payment_api_attempts": "unverified",
+    "dashboard_exact_checkout_attempts": 0,
+    "ready_for_rehearsal": false,
+    "local_targeted_node_tests": 6,
+    "first_ci_chromium_failure": "startup_page_error_evicted_from_bounded_timeline_before_assertion",
+    "checkout_created_this_turn": 0,
+    "pay_calls_this_turn": 0,
+    "new_provider_attempts": "unverified_via_API",
+    "new_confirmed_orders": 0,
+    "refunds": 0,
+    "deployments": 0,
+    "additional_spend_usd": 0,
+    "live_sandbox_checkout_and_refund": "NOT_RUN",
+    "verified_code_sha": "43c885a1d749cec32e78cf131e1068199ae6f140",
+    "verified_code_ci_run_id": 45945298686,
+    "verified_code_ci_job_id": 140328502438,
+    "verified_code_ci_attempt": 1,
+    "unit_passed": 18,
+    "postgres_integration_passed": 12,
+    "chromium": "SYNTHETIC_PASS",
+    "docker_smoke": "PASS",
+    "sandbox_runner_payments_read_scope": false,
+    "credential_changes": 0,
+    "support_draft_sent": false
+  },
+  "polar_mandate_v3_execution_2026_11_27": {
+    "baseline_sha": "a2870b3fa095f0e471eb10324739b42dc8f23852",
+    "code_sha": "336525e9f413ac4a85ab9f85eb7fb4f2e4040ec3",
+    "code_commits": [
+      "cf1d5f3730e9931975120a42901d87e11b6c6f0f",
+      "336525e9f413ac4a85ab9f85eb7fb4f2e4040ec3"
+    ],
+    "checks": {
+      "run_id": 45983862986,
+      "job_id": 140454341963,
+      "attempt": 1,
+      "lint": "PASS",
+      "typecheck": "PASS",
+      "unit_passed": 21,
+      "postgres_integration_passed": 12,
+      "migrations_twice": "PASS",
+      "chromium": "SYNTHETIC_PASS",
+      "docker_build_smoke": "PASS"
+    },
+    "capture_comparison": {
+      "proxy_body": "captured",
+      "passive_body": "unavailable_after_immediate_navigation",
+      "provider_fixture_post_each_mode": 1,
+      "real_provider_used": false,
+      "decision": "retain_exact_app_only_proxy"
+    },
+    "failure_log_reanalysis": {
+      "job_id": 140319790558,
+      "pay_start_ms": 14041,
+      "pre_pay_polar_post_failure_ms": 14290,
+      "pre_pay_post_duration_ms": 3000,
+      "post_pay_polar_post_start_ms": 14793,
+      "post_pay_polar_post_failure_ms": 17792,
+      "post_pay_post_duration_ms": 3000,
+      "request_roles": "unclassified",
+      "causal_timeout": "unproven"
+    },
+    "read_only_status": {
+      "run_id": 45983509014,
+      "job_id": 140453105581,
+      "checked_at_utc": "2026-11-27T10:36:33Z",
+      "checkout_id": "76e2d82a-a4eb-4a96-bc07-c938fb373d59",
+      "organization_id": "e9d6161a-1711-4571-837b-05996cc8bd43",
+      "product_id": "903bf4e5-61c0-4fe0-9325-9364c8b52754",
+      "checkout_status": "open",
+      "order_state": "absent",
+      "scanned_checkouts": 11,
+      "scanned_orders": 0,
+      "unresolved_checkouts": 1,
+      "payment_read_http_status": 403,
+      "payment_attempts": "unverified",
+      "ready_for_rehearsal": false,
+      "expires_utc": "2026-11-28T04:55:32.313Z"
+    },
+    "credentials": {
+      "sandbox_organization_verified_in_browser": true,
+      "token_form_prepared_scopes": [
+        "payments:read",
+        "checkouts:read"
+      ],
+      "token_created": false,
+      "environment": "p2-polar-sandbox",
+      "secret": "B2C_POLAR_PAYMENT_READ_TOKEN",
+      "secret_present": false,
+      "blocking_step": "browser_action_time_confirmation_for_new_persistent_credential"
+    },
+    "support_draft": {
+      "draft_id": "r-3105449313664746486",
+      "updated_with_pre_pay_abort": true,
+      "verified_unsent": true
+    },
+    "public_source_review": {
+      "repository": "polarsource/polar",
+      "sha": "816031a07d13642b2e30adf183c41a167d19bf47",
+      "confirmation_sequence": [
+        "elements.submit",
+        "stripe.createConfirmationToken",
+        "POST /v1/checkouts/client/{client_secret}/confirm"
+      ],
+      "sandbox_deployed_source_match": "unverified"
+    },
+    "local_environment": {
+      "lint_typecheck_unit_build": "PASS",
+      "chromium_binary": "missing_under_wrapper",
+      "playwright_download": "403",
+      "postgresql_docker": "not_installed",
+      "remote_ci_used_for_full_suite": true
+    },
+    "new_checkout_count": 0,
+    "pay_calls": 0,
+    "refunds": 0,
+    "deployments": 0,
+    "credential_changes": 0,
+    "additional_spend_usd": 0,
+    "real_sandbox_e2e": "NOT_RUN",
+    "resume_after_credential_registration": "Rerun only checkout-status job 140453105581; verify exact SHA and full result, including 403 resolution. Rehearsal remains forbidden until terminal Checkout and all history/concurrency gates pass."
+  },
+  "polar_payment_read_access_2026_11_27": {
+    "organization_id": "e9d6161a-1711-4571-837b-05996cc8bd43",
+    "scopes": [
+      "payments:read",
+      "checkouts:read"
+    ],
+    "expiry_date": "2026-12-27",
+    "registered_token_name": "UNSTANDARD P2 payment reconciliation read only v2",
+    "environment": "p2-polar-sandbox",
+    "secret": "B2C_POLAR_PAYMENT_READ_TOKEN",
+    "secret_registered": true,
+    "existing_runtime_refund_webhook_tokens_unchanged": true,
+    "reauthentication": "completed_using_secure_browser_auth_Google",
+    "tokens_issued": 2,
+    "secret_writes": 1,
+    "first_token": {
+      "name": "UNSTANDARD P2 payment reconciliation read only",
+      "registered": false,
+      "incident": "automatically_issued_token_appeared_in_tool_screen_state_output_after_reauthentication",
+      "revoked": true,
+      "cleanup": "User-approved permanent revocation completed; refreshed provider token list excludes exact first token and retains registered v2 plus four pre-existing tokens."
+    },
+    "registered_token_value_printed": false,
+    "read_status": {
+      "run_id": 45983509014,
+      "attempt": 2,
+      "job_id": 140458924275,
+      "sha": "cf1d5f3730e9931975120a42901d87e11b6c6f0f",
+      "checked_at_utc": "2026-11-27T10:48:49Z",
+      "checkout_id": "76e2d82a-a4eb-4a96-bc07-c938fb373d59",
+      "checkout_status": "open",
+      "order_state": "absent",
+      "expected_checkout_matches_latest": true,
+      "scanned_checkouts": 11,
+      "scanned_orders": 0,
+      "unresolved_checkouts": 1,
+      "payment_attempts": 0,
+      "pending_org_payments": 0,
+      "unresolved_payments": 0,
+      "payment_read_403_resolved": true,
+      "ready_for_rehearsal": false
+    },
+    "rerun_note": "Connector rerun-job also reran old checks on cf1d5f3, which reproduced the known passive-capture experimental failure fixed in 336525e. Current code checks previously passed on 3174954. A new latest-head read-only status/checks run is requested by this evidence commit.",
+    "new_checkout_count": 0,
+    "pay_calls": 0,
+    "refunds": 0,
+    "deployments": 0,
+    "additional_spend_usd": 0,
+    "actual_payment_e2e": "NOT_RUN",
+    "next_gate": "Actual terminal Checkout with complete reconciliation and no concurrent rehearsal; elapsed expiry alone is insufficient.",
+    "revocations": 1,
+    "cleanup_verified_in_browser": true,
+    "latest_head_status_before_cleanup": {
+      "sha": "00995a296ef0165387be2ae1d66668d160d5e9a2",
+      "run_id": 45985383049,
+      "job_id": 140459546378,
+      "checked_at_utc": "2026-11-27T10:50:13Z",
+      "checkout_status": "open",
+      "order_state": "absent",
+      "payment_attempts": 0,
+      "pending_org_payments": 0,
+      "ready_for_rehearsal": false,
+      "checks_job_id": 140459546369,
+      "checks": "PASS"
+    }
+  },
+  "polar_rehearsal_2026_11_28": {
+    "status": "BLOCKED_BEFORE_PAYMENT_CONFIRMATION",
+    "prior_status_job_id": 140933729538,
+    "execution_sha": "f12dee7300081d843acf6c452efe7ff5a34ea249",
+    "run_id": 46130363217,
+    "checks_job_id": 140933928741,
+    "rehearsal_job_id": 140934303801,
+    "post_run_status_job_id": 140935089174,
+    "post_run_status": {
+      "layer": "polar_sandbox_checkout_status",
+      "status": "PASS",
+      "checkout_id": "1511018d-9a6b-4f05-b6d4-e62f82fa7053",
+      "checkout_created_utc": "2026-11-28T09:27:43.715Z",
+      "checkout_expires_utc": "2026-11-29T09:27:43.715Z",
+      "checkout_status": "open",
+      "order_state": "absent",
+      "expected_checkout_matches_latest": true,
+      "scanned_checkouts": 12,
+      "scanned_orders": 0,
+      "unresolved_checkouts": 1,
+      "unresolved_orders": 0,
+      "duplicate_checkouts": 0,
+      "payment_attempts": 0,
+      "pending_org_payments": 0,
+      "unresolved_payments": 0,
+      "ready_for_rehearsal": false
+    },
+    "pay_calls": 1,
+    "trusted_click_observed": false,
+    "native_submit_observed": false,
+    "confirmation_request_observed": false,
+    "pre_pay_ingest_abort_ms": 2993,
+    "post_pay_ingest_abort_ms": 2999,
+    "webhook_disabled": true,
+    "runner_pg_removed": true,
+    "external_tunnel_closure_independently_verified": false,
+    "paid_orders": 0,
+    "refunds": 0,
+    "deployments": 0,
+    "support_message_id": "1a2217e68e7d6a2f",
+    "support_status": "SENT",
+    "approved_card_webhook_ledger_refund_revocation": "UNVERIFIED"
+  }
+}

@@ -1,0 +1,27 @@
+# UNSTANDARD P2 — EXECUTION MANDATE v3 / 2026-11-27 KST
+
+## 0. 임무와 위임
+너는 이 프로젝트의 실제 실행 책임자다. 보고서 생성, 인수인계 반복, 사용자에게 명령 복사시키기는 완료가 아니다. P2 코드·합성 데이터·테스트·격리 Sandbox·가역 설정·Draft PR에 대해 프로젝트 소유자가 기술 실행을 위임했다. 올바른 Polar Sandbox 조직에 한정된 payments:read/checkouts:read 전용 자격증명 발급 및 P2 환경 Secret 등록은 현재 사용자의 위임 범위에서 가능한지 확인하고, 기존 권한으로 가능하면 직접 수행하라. 인증/MFA/서비스 권한 부족은 우회하지 않는다. 추가 지출 $0, main/Alpha/Production/Polar Live/DNS/실제 고객 DB/PR merge 금지. 운영 자격증명 접근 금지. 값은 로그, 채팅, 코드, 문서에 남기지 않는다.
+
+## 1. 사실과 출발점
+- repo seonghyeonist/unstandard, Draft PR #100, branch pivot/b2c-v4-p2-paddle, base pivot/b2c-v4-p1-data-session. 이 파일 작성 직전 HEAD 3d03b6f87227f8bfcd84ee9fbcf75d6687963fd6; 실제 HEAD부터 다시 읽어라.
+- cd17ad7ad20a241ddae094ac78d7d9d2af1d536c checks run 45945599197 job 140329450225 success, unit 19 / PG 12, Chromium and Docker checks; status/rehearsal/deploy skipped. 최신 두 코드 커밋 164e2f428b629d342016cce7f5ea5d478a9491e1, 3d03b6f87227f8bfcd84ee9fbcf75d6687963fd6의 CI는 이 기록 작성 시 미확인.
+- 실제 실패 run 45942446362 job 140319790558: app Checkout 201, hosted card input, Pay 1회, 미분류 Polar main-frame POST, 약 3초 후 net::ERR_ABORTED, HTTP 응답 미관측. 최초 원인 미확정. 마지막 상태 run 45945032904 job 140327660114: 2026-11-27 14:18:47 KST Checkout 76e2d82a-a4eb-4a96-bc07-c938fb373d59 open, orders 0, checkout 11, unresolved 1, payments API 403. 만료 예정 2026-11-28 13:55:32.313 KST. 경과 시간만으로 종료 판단 금지.
+- 실제 Sandbox org e9d6161a-1711-4571-837b-05996cc8bd43, product 903bf4e5-61c0-4fe0-9325-9364c8b52754. 현재 채팅 Polar connector에서 관측한 조직은 191044c5-d14b-412f-abfa-088e7e8e4068로 다르다. 이 계정의 empty/404는 Sandbox 결제 부재 증거가 아니다. 절대 잘못된 조직에 쓰지 마라.
+- Render service srv-dc34i43rjlhs73eo21bg Free, autoDeploy no, trigger off. 결제 리허설은 Actions의 임시 HTTPS와 disposable PG17에서 수행. Vercel/Neon/Render 이전을 결제 장애의 해결책으로 추정하지 마라.
+- 이번 개입: Pay 후 main-frame 이동/분리 및 page crash/close, context close, provider state, click 기록을 별도 bounded buffer에 보존, telemetry saturation regression 추가. 신규 Sandbox 결제/환불/배포 0회. 지원 문의 Gmail 초안 저장, 발송하지 않음.
+
+## 2. 실행 우선순위
+A. 자격증명 장애부터 해결. 지금 당장 올바른 Sandbox dashboard Settings > Access Tokens 및 GitHub Settings > Environments > p2-polar-sandbox의 권한을 조사. 사용 가능한 Work Cloud Browser, 승인된 터미널/CLI, 연결 도구를 순서와 무관하게 활용하고, 가능한 경로를 실제 시도. Sandbox 조직 ID를 확인하기 전 발급 금지. payments:read/checkouts:read 전용 토큰만 발급하여 B2C_POLAR_PAYMENT_READ_TOKEN에 직접 저장. 원래 runtime/refund/webhook token 교체·권한 확대·기존 secret 조회/노출 금지. 현재 채팅 커넥터는 두 작업을 제공하지 않았으므로 Work의 인증된 브라우저가 필요할 수 있다. 로그인/권한 자체가 없으면 최소한의 인간 개입을 정확히 명시하되 나머지 작업은 계속.
+B. 토큰 등록 직후 읽기 전용 status. 현행 workflow와 현재 SHA 확인. 정확한 Prior-Checkout: 76e2d82a-a4eb-4a96-bc07-c938fb373d59 줄과 마지막 P2-Polar-Sandbox: status marker를 이용한 의도적 read-only 실행만 허용. 기존 status run을 사용 가능하면 새 커밋을 남발하지 마라. 실제 run/job/attempt 및 응답 상태 조회. 403이 없어졌는지 별도 확인. API 결과 empty를 해석하기 전에 정확한 Checkout/org/product 검증. 아직 open이라도 token/read gate 진단은 완료 가능하다.
+C. 독립적으로 최신 CI와 합성 브라우저 진단을 완료하라. 기존 checkout-observation, checkout-sandbox, polar-checkout-reconciliation, polar-tunnel-rehearsal, tests, workflow 및 evidence 읽기. 최신 exact SHA lint/typecheck/unit/PG/Docker/Chromium 성공 확인. PR-only run 조회가 비어 있어도 push workflow 실패/부재를 뜻하지 않으므로 Actions UI/API 또는 Gmail 링크로 실제 run 확인. 새 lifecycle buffer의 cap, omission, navigation/detach, privacy를 시험. 실제 checkout-sandbox 코드의 app order route interception은 앱의 정확한 URL 한 번만 대상으로 하며 현재 증거로 Polar POST를 abort한다고 볼 수 없다. 필요하면 synthetic app fixture에서 passive response capture 대조 실험 후에만 변경. Playwright의 default timeout, page teardown, provider lifecycle, browser network and public Polar source를 증거로 구분하고 3000ms에 근거한 단정 금지. 민감정보 원문 저장 금지.
+D. 결제 대조: 정확한 prior Checkout 실제 terminal(expired/failed, 또는 성공 후 완전 환불) 상태, all pages, 올바른 org/product, pending/unknown payment, unresolved order, duplicates, concurrent run, full refund를 확인. 401/403/404/불일치/누락/진행 중이면 fail closed. Dashboard supplementary only. 2026-11-28 13:55:32.313 KST 이후 실제 상태를 다시 조회하되 idle wait하지 마라. 실행 환경 종료 시 남은 독립 작업을 끝내고 증거를 고정.
+E. D와 CI를 통과한 후에만 정확한 prior ID와 마지막 P2-Polar-Sandbox: run marker로 한 번 실행. 직전과 동일한 실패를 관측하고 재시도 반복 금지. 1회 Pay, 실제 provider state + main POST classification and lifecycle timestamp + provider payment status를 교차 검증. POST 중단이 반복되면 증거를 보존하고 공급자 측 trace 요청으로 전환. 발송 전 기존 지원 초안, 수신처, 위임 범위를 확인; 별도 승인 필요하면 해당 발송만 보류. 지원 요청에는 Sandbox IDs, UTC, sanitized network error만 포함; 결제 URL, card data, secret, raw headers, bodies 금지.
+F. 실제 결제가 성공하면 같은 주문의 USD 899 cents pre-tax, quantity 1, tax/total, signed webhook, paid ledger, same buyer card 200, unrelated denial, same order full tax-inclusive refund, actual signed refund event, refunded/revoked ledger, same buyer session entitlement denial 순서로 증명. 202는 완료 아님. P3 card generation 없는 경우 paid 이후 disposable fixture만 사용하고 구분 표기. Paid 이후 실패하면 새 결제를 만들지 말고 기존 거래 복구와 cleanup 우선. temporary webhook disable, tunnel 종료, disposable PG teardown 확인.
+
+## 3. 종료 규칙 (가장 중요)
+- 최초 오류는 전체 작업 종료 사유가 아니다. 각 실패를 분리하고 다른 실행 가능한 작업을 계속한다.
+- STOP 금지 대상: 조사 없이 반복한 403/404, 잘못된 계정의 empty 응답, 문서 갱신, 단순 CI queue, 사용자에게 명령/로그 복사 요청, 기존 계획 재서술. 실제 접근 부족이면 시도한 경로와 정확한 오류를 기록하고 독립 작업을 끝낸다.
+- 안전 경계는 절대 해제하지 않는다. 새 결제를 막는 guard를 제거하거나 API 미확인을 0건으로 바꾸지 않는다. 사용자 위임은 실제 인증·플랫폼 보안 권한을 대체하지 않는다.
+- 완결 기준은 실제 same-order Sandbox 결제→signed webhook→ledger→card access→refund→revocation→cleanup. 어느 하나라도 미확인일 경우 PARTIAL PASS/BLOCKED, 합성 검증과 실제 검증 분리.
+- 최종 보고는 변경 SHA, exact run/job, status evidence, 실제 외부 write count, 지출, cleanup, 미해결 원인, 다음 실행의 단일 gate, 인간만 수행할 최소 행동을 포함한다. 이번 세션에서 진짜 실행 가능한 작업을 모두 소진하기 전에는 인수인계 문서로 도피하지 않는다. 백그라운드 실행 약속 금지.

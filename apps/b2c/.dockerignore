@@ -1,0 +1,13 @@
+*
+!.dockerignore
+!Dockerfile
+!package.json
+!package-lock.json
+!scripts/
+!scripts/build.mjs
+!src/
+!src/**
+!server/
+!server/**
+!db/
+!db/**

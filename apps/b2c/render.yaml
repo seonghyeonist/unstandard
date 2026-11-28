@@ -1,0 +1,34 @@
+services:
+  - type: web
+    name: unstandard-b2c-p2
+    runtime: docker
+    repo: https://github.com/seonghyeonist/unstandard
+    branch: pivot/b2c-v4-p2-paddle
+    plan: free
+    region: ohio
+    autoDeployTrigger: "off"
+    dockerContext: apps/b2c
+    dockerfilePath: apps/b2c/Dockerfile
+    healthCheckPath: /healthz
+    envVars:
+      - key: B2C_ORIGIN
+        value: https://unstandard-b2c-p2.onrender.com
+      - key: B2C_PAYMENT_MODE
+        value: sandbox
+      - key: B2C_SANDBOX_ACCESS_KEY
+        sync: false
+      - key: B2C_PAYMENT_TOKEN_KEY
+        sync: false
+      # Managed per environment so an explicit Blueprint sync preserves the live connection.
+      - key: B2C_DATABASE_URL
+        sync: false
+      - key: B2C_EXPECT_DB_HOST
+        sync: false
+      - key: B2C_POLAR_ACCESS_TOKEN
+        sync: false
+      - key: B2C_POLAR_PRODUCT_ID
+        sync: false
+      - key: B2C_POLAR_ORGANIZATION_ID
+        sync: false
+      - key: B2C_POLAR_WEBHOOK_SECRET
+        sync: false
