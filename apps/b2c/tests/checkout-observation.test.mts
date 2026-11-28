@@ -34,6 +34,12 @@ test("captures startup and submission failures without serializing browser data"
     frame: () => { throw new Error(privateMarker); },
     failure: () => ({ errorText }),
   });
+  const telemetry = request("ingest/" + privateMarker, "net::ERR_ABORTED");
+  context.emit("request", telemetry);
+  context.emit("requestfailed", telemetry);
+  assert.equal(diagnostic.snapshot().post_pay_provider_writes[0].route, "telemetry");
+  assert.equal(diagnostic.timeoutReason("pay_button_available", "open", "absent"), "sandbox_payment_submission_not_observed");
+
   const unclassified = request("checkout/" + privateMarker, privateMarker);
   assert.equal(diagnostic.timeoutReason("pay_button_available", "open", "absent"), "sandbox_payment_submission_not_observed");
   context.emit("request", unclassified);
@@ -65,9 +71,10 @@ test("captures startup and submission failures without serializing browser data"
   const writes = diagnostic.snapshot().post_pay_provider_writes;
   assert.deepEqual(writes.map(({ request_id, path_shape, next_action, http, error }) =>
     ({ request_id, path_shape, next_action, http, error })), [
-    { request_id: 1, path_shape: "/checkout/[redacted]", next_action: true, http: undefined, error: "other" },
-    { request_id: 2, path_shape: "/checkouts/[redacted]/confirm", next_action: true, http: undefined, error: "net::ERR_ABORTED" },
-    { request_id: 3, path_shape: "/checkouts/[redacted]/confirm", next_action: true, http: 422, error: undefined },
+    { request_id: 1, path_shape: "/ingest/[redacted]", next_action: true, http: undefined, error: "net::ERR_ABORTED" },
+    { request_id: 2, path_shape: "/checkout/[redacted]", next_action: true, http: undefined, error: "other" },
+    { request_id: 3, path_shape: "/checkouts/[redacted]/confirm", next_action: true, http: undefined, error: "net::ERR_ABORTED" },
+    { request_id: 4, path_shape: "/checkouts/[redacted]/confirm", next_action: true, http: 422, error: undefined },
   ]);
   assert.ok(!JSON.stringify(diagnostic.snapshot()).includes(privateMarker));
 });

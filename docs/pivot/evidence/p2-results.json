@@ -370,5 +370,48 @@
       "checks_job_id": 140459546369,
       "checks": "PASS"
     }
+  },
+  "polar_rehearsal_2026_11_28": {
+    "status": "BLOCKED_BEFORE_PAYMENT_CONFIRMATION",
+    "prior_status_job_id": 140933729538,
+    "execution_sha": "f12dee7300081d843acf6c452efe7ff5a34ea249",
+    "run_id": 46130363217,
+    "checks_job_id": 140933928741,
+    "rehearsal_job_id": 140934303801,
+    "post_run_status_job_id": 140935089174,
+    "post_run_status": {
+      "layer": "polar_sandbox_checkout_status",
+      "status": "PASS",
+      "checkout_id": "1511018d-9a6b-4f05-b6d4-e62f82fa7053",
+      "checkout_created_utc": "2026-11-28T09:27:43.715Z",
+      "checkout_expires_utc": "2026-11-29T09:27:43.715Z",
+      "checkout_status": "open",
+      "order_state": "absent",
+      "expected_checkout_matches_latest": true,
+      "scanned_checkouts": 12,
+      "scanned_orders": 0,
+      "unresolved_checkouts": 1,
+      "unresolved_orders": 0,
+      "duplicate_checkouts": 0,
+      "payment_attempts": 0,
+      "pending_org_payments": 0,
+      "unresolved_payments": 0,
+      "ready_for_rehearsal": false
+    },
+    "pay_calls": 1,
+    "trusted_click_observed": false,
+    "native_submit_observed": false,
+    "confirmation_request_observed": false,
+    "pre_pay_ingest_abort_ms": 2993,
+    "post_pay_ingest_abort_ms": 2999,
+    "webhook_disabled": true,
+    "runner_pg_removed": true,
+    "external_tunnel_closure_independently_verified": false,
+    "paid_orders": 0,
+    "refunds": 0,
+    "deployments": 0,
+    "support_message_id": "1a2217e68e7d6a2f",
+    "support_status": "SENT",
+    "approved_card_webhook_ledger_refund_revocation": "UNVERIFIED"
   }
 }

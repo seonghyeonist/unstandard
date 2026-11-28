@@ -23,6 +23,9 @@ export function classifyCheckoutRequest(method: string, url: string, appOrigin: 
   const host = service(url, appOrigin);
   const path = URL.parse(url)?.pathname ?? "";
   let route = "unclassified";
+  // Polar routes its analytics proxy through /ingest on its Hosted Checkout host.
+  if (host === "polar" && URL.parse(url)?.hostname === "sandbox.polar.sh" &&
+      method === "POST" && path.startsWith("/ingest/")) route = "telemetry";
   if (host === "stripe" && URL.parse(url)?.hostname === "api.stripe.com" && method === "POST" &&
       /^\/v1\/(?:confirmation_tokens|payment_methods|(?:payment_intents|setup_intents)\/[^/]+\/confirm)\/?$/.test(path)) {
     route = "confirmation";

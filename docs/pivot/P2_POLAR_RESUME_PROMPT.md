@@ -1,3 +1,14 @@
+# Current restart point — 2026-11-28 KST
+
+- Sandbox attempt [46130363217](https://github.com/seonghyeonist/unstandard/actions/runs/46130363217/job/140934303801) followed verified terminal reconciliation of the previous Checkout. App checkout creation returned 201, the Hosted Checkout loaded and the test-card fields passed public validation. The Pay automation call returned once. The page recorded no trusted click, no native form submit, and no classified confirmation request.
+- The aborted POSTs before and after Pay matched Polar's `/ingest/…` telemetry proxy. The checkout diagnostics now exclude known telemetry from payment-submission failure classification. The reason the Pay activation did not lead to confirmation remains unverified.
+- [Post-attempt read-only status](https://github.com/seonghyeonist/unstandard/actions/runs/46130734195/job/140935089174) at 18:30 KST found `1511018d-9a6b-4f05-b6d4-e62f82fa7053` open, with zero linked orders, attempts or pending payments. Scheduled expiry is **2026-11-29 18:27:43.715 KST**. Recheck this exact ID and reconcile full history and concurrent actions before any new rehearsal. Time alone cannot establish termination.
+- Polar support received the latest ID and reproduction timeline; await Hosted Checkout/Stripe trace. Do not repeat the same browser submission. Use provider guidance and evidence to choose a materially different single-submit test. If an existing paid record appears, recover it instead of creating a second order.
+- Latest read-only Hosted Checkout field inspection: [46130846626](https://github.com/seonghyeonist/unstandard/actions/runs/46130846626). Test does not call Pay and blocks outbound writes. It is a field probe, not a payment attempt.
+- Temporary webhook disable and runner PostgreSQL removal confirmed. Tunnel shutdown was requested by the job and external endpoint disappearance was not independently checked. Payment, signed webhook, ledger, buyer access and unrelated-session denial, full tax-inclusive refund and revocation all remain unverified for a real paid transaction.
+
+---
+
 # Current restart point — 2026-11-27 KST, after credential cleanup
 
 This section supersedes conflicting historical restart instructions below.
